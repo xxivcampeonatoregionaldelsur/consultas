@@ -1105,11 +1105,10 @@ async function deleteUser(usuario){
 
 // ── HELPERS ───────────────────────────────────────────────────
 async function apiFetch(action,payload){
-  const res=await fetch(SCRIPT_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action,...payload,token:session.token})
-  });
+  // Google Apps Script no acepta preflight CORS (POST+JSON).
+  // Se envía todo como parámetros GET con redirect:follow para evitar el error.
+  const params=new URLSearchParams({action,token:session.token,...payload});
+  const res=await fetch(`${SCRIPT_URL}?${params.toString()}`,{redirect:'follow'});
   return res.json();
 }
 
