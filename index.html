@@ -391,7 +391,7 @@ async function doLogin(){
   if(!user||!pass){err.textContent='Completa usuario y contraseña';return;}
   btn.textContent='Verificando...';btn.disabled=true;err.textContent='';
   try{
-    const r=await fetch(`${SCRIPT_URL}?action=login&usuario=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`);
+    const r=await fetch(`${SCRIPT_URL}?action=login&usuario=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`,{redirect:'follow'});
     const d=await r.json();
     if(d.result==='ok'){
       session={token:d.token,rol:d.rol,usuario:d.usuario,dependencia:d.dependencia||''};
@@ -435,7 +435,7 @@ async function loadData(){
   const btn=document.getElementById('btn-refresh');
   btn.disabled=true;btn.textContent='...';
   try{
-    const r=await fetch(`${SCRIPT_URL}?action=getData&token=${session.token}&t=${Date.now()}`);
+    const r=await fetch(`${SCRIPT_URL}?action=getData&token=${session.token}&t=${Date.now()}`,{redirect:'follow'});
     const d=await r.json();
     if(d.result==='error'&&d.mensaje&&d.mensaje.includes('expirad')){logout();return;}
     if(d.rows){ allRows=d.rows; checkins=d.checkins||{}; }
@@ -658,7 +658,7 @@ function showToast(msg){
 async function loadUsers(){
   if(session.rol!=='administrador') return;
   try{
-    const r=await fetch(`${SCRIPT_URL}?action=getUsers&token=${session.token}`);
+    const r=await fetch(`${SCRIPT_URL}?action=getUsers&token=${session.token}`,{redirect:'follow'});
     const d=await r.json();
     if(!d.users){document.getElementById('users-table').innerHTML='<div class="empty">Error cargando usuarios</div>';return;}
     const rmap={administrador:'role-admin',delegado:'role-delegado',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega'};
