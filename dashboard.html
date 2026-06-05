@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EventoDash · Panel de Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+/* ─── TOKENS ─────────────────────────────────────────────── */
+:root {
+  --bg:       #080a10;
+  --s1:       #10131c;
+  --s2:       #181c28;
+  --s3:       #1e2333;
+  --border:   #252b3b;
+  --border2:  #2e3650;
+  --gold:     #f5c842;
+  --coral:    #ff6b4a;
+  --mint:     #3ddba0;
+  --lavender: #8b8fff;
+  --text:     #dde2f0;
+  --muted:    #6b748f;
+  --danger:   #ff4466;
+  --r:        10px;
+  --font-h:   'Syne', sans-serif;
+  --font-b:   'Outfit', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:14px;min-height:100vh;overflow-x:hidden}
+/* ─── LOGIN SCREEN ───────────────────────────────────────── */
+#login-screen{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;z-index:1000;
+  background-image:radial-gradient(ellipse 60% 50% at 50% 0%, rgba(245,200,66,.07) 0%, transparent 70%);
+}
+.login-card{
+  width:360px;background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:40px;text-align:center;
+  box-shadow:0 24px 80px rgba(0,0,0,.6);
+}
+.login-logo{
+  font-family:var(--font-h);font-size:28px;font-weight:800;
+  color:var(--gold);letter-spacing:-1px;margin-bottom:6px;
+}
+.login-sub{color:var(--muted);font-size:13px;margin-bottom:32px}
+.login-field{
+  width:100%;background:var(--s2);border:1px solid var(--border);
+  border-radius:8px;padding:12px 14px;color:var(--text);
+  font-family:var(--font-b);font-size:14px;outline:none;
+  transition:border-color .15s;margin-bottom:12px;
+}
+.login-field:focus{border-color:var(--gold)}
+.login-field::placeholder{color:var(--muted)}
+.btn-login{
+  width:100%;background:var(--gold);color:#000;border:none;
+  border-radius:8px;padding:13px;font-family:var(--font-h);
+  font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.5px;
+  transition:opacity .2s;margin-top:4px;
+}
+.btn-login:hover{opacity:.88}
+.login-error{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px}
+/* ─── APP SHELL ──────────────────────────────────────────── */
+#app{display:none;min-height:100vh;flex-direction:column}
+header{
+  background:var(--s1);border-bottom:1px solid var(--border);
+  padding:14px 24px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;
+}
+.brand{font-family:var(--font-h);font-size:18px;font-weight:800;color:var(--gold);letter-spacing:-0.5px}
+.brand span{color:var(--text)}
+.header-right{display:flex;align-items:center;gap:10px}
+.user-pill{
+  background:var(--s2);border:1px solid var(--border);border-radius:20px;
+  padding:6px 12px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;
+}
+.user-pill .role-badge{
+  padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.4px;
+}
+.role-admin{background:rgba(245,200,66,.15);color:var(--gold)}
+.role-delegado{background:rgba(139,143,255,.15);color:var(--lavender)}
+.role-vasistencia{background:rgba(61,219,160,.15);color:var(--mint)}
+.role-ventrega{background:rgba(255,107,74,.15);color:var(--coral)}
+.btn-logout{background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s}
+.btn-logout:hover{border-color:var(--danger);color:var(--danger)}
+/* ─── NAV TABS ───────────────────────────────────────────── */
+.nav{display:flex;gap:2px;padding:0 24px;background:var(--s1);border-bottom:1px solid var(--border)}
+.nav-tab{
+  padding:12px 18px;font-family:var(--font-h);font-size:12px;font-weight:700;
+  color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;
+  transition:all .15s;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;
+}
+.nav-tab:hover{color:var(--text)}
+.nav-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+/* ─── MAIN ───────────────────────────────────────────────── */
+main{flex:1;padding:24px}
+.tab-pane{display:none}.tab-pane.active{display:block}
+/* ─── STATS ──────────────────────────────────────────────── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:18px;position:relative;overflow:hidden}
+.stat::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat.g::after{background:var(--gold)}
+.stat.c::after{background:var(--coral)}
+.stat.m::after{background:var(--mint)}
+.stat.l::after{background:var(--lavender)}
+.stat-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px}
+.stat-val{font-family:var(--font-h);font-size:32px;font-weight:800;line-height:1}
+.stat.g .stat-val{color:var(--gold)}
+.stat.c .stat-val{color:var(--coral)}
+.stat.m .stat-val{color:var(--mint)}
+.stat.l .stat-val{color:var(--lavender)}
+/* ─── CHARTS ─────────────────────────────────────────────── */
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:700px){.charts{grid-template-columns:1fr}}
+.card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.card-title{font-family:var(--font-h);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:14px}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bar-lbl{width:140px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+.bar-track{flex:1;height:20px;background:var(--bg);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:11px;font-weight:700;color:#000;min-width:26px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.bf-gold{background:var(--gold)}
+.bf-coral{background:var(--coral)}
+.bf-mint{background:var(--mint)}
+.bf-lav{background:var(--lavender)}
+/* ─── TOOLBAR ────────────────────────────────────────────── */
+.toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.search{flex:1;min-width:200px;background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:10px 13px;color:var(--text);font-family:var(--font-b);font-size:13px;outline:none;transition:border-color .15s}
+.search:focus{border-color:var(--gold)}
+.search::placeholder{color:var(--muted)}
+select.filter{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-b);font-size:13px;outline:none;cursor:pointer}
+select.filter:focus{border-color:var(--gold)}
+/* ─── TABLE ──────────────────────────────────────────────── */
+.tbl-wrap{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:700px}
+thead tr{background:var(--s2);border-bottom:1px solid var(--border)}
+th{padding:11px 13px;text-align:left;font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;white-space:nowrap}
+td{padding:11px 13px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.attended td{opacity:.45}
+tr.attended .pname{text-decoration:line-through}
+tr:hover td{background:rgba(255,255,255,.015)}
+/* ─── BADGES ─────────────────────────────────────────────── */
+.bdg{display:inline-block;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.3px}
+.bdg-t{background:rgba(245,200,66,.15);color:var(--gold)}
+.bdg-a{background:rgba(61,219,160,.15);color:var(--mint)}
+.bdg-chk{background:rgba(61,219,160,.2);color:var(--mint)}
+.bdg-no{background:rgba(107,116,143,.15);color:var(--muted)}
+/* ─── BUTTONS ────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:7px;border:none;font-family:var(--font-b);font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+.btn:hover{opacity:.82}
+.btn-gold{background:var(--gold);color:#000}
+.btn-ghost{background:var(--s2);border:1px solid var(--border);color:var(--text)}
+.btn-mint{background:var(--mint);color:#000}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:5px 9px;font-size:11px}
+/* ─── REFRESH ────────────────────────────────────────────── */
+#btn-refresh{background:var(--gold);color:#000;border:none;border-radius:8px;padding:8px 16px;font-family:var(--font-h);font-weight:700;font-size:12px;cursor:pointer;transition:opacity .2s}
+#btn-refresh:hover{opacity:.85}
+#btn-refresh:disabled{opacity:.4;cursor:not-allowed}
+.last-upd{color:var(--muted);font-size:11px}
+/* ─── PROGRESS BAR ───────────────────────────────────────── */
+.prog-wrap{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.prog-track{flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;background:var(--mint);border-radius:3px;transition:width .4s}
+.prog-lbl{color:var(--muted);font-size:12px;white-space:nowrap}
+.prog-lbl strong{color:var(--mint);font-family:var(--font-h)}
+/* ─── QR MODAL ───────────────────────────────────────────── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:420px;width:100%;position:relative;max-height:90vh;overflow-y:auto}
+.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
+.modal-close:hover{color:var(--text)}
+.modal h2{font-family:var(--font-h);font-size:17px;font-weight:700;margin-bottom:4px}
+.modal .sub{color:var(--muted);font-size:12px;margin-bottom:20px}
+#qr-canvas{display:flex;justify-content:center;margin:16px 0}
+#qr-canvas canvas,#qr-canvas img{border-radius:8px;border:6px solid #fff}
+.qr-info{background:var(--bg);border-radius:8px;padding:14px;font-size:12px;line-height:1.8;margin-bottom:14px}
+.qr-info strong{color:var(--text);font-weight:600}
+.qr-info span{color:var(--muted)}
+/* ─── USER MANAGEMENT ────────────────────────────────────── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+.form-group label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.form-group input,.form-group select{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;color:var(--text);font-family:var(--font-b);font-size:13px;outline:none}
+.form-group input:focus,.form-group select:focus{border-color:var(--gold)}
+.msg{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;display:none}
+.msg.ok{background:rgba(61,219,160,.1);border:1px solid rgba(61,219,160,.3);color:var(--mint)}
+.msg.err{background:rgba(255,68,102,.1);border:1px solid rgba(255,68,102,.3);color:var(--danger)}
+/* ─── LOADER ─────────────────────────────────────────────── */
+.loader{display:flex;align-items:center;justify-content:center;padding:60px;flex-direction:column;gap:14px;color:var(--muted)}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:48px;text-align:center;color:var(--muted);font-size:13px}
+/* ─── SECTION TITLE ──────────────────────────────────────── */
+.sec-title{font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+/* ─── SCANNER URL BOX ────────────────────────────────────── */
+.url-box{background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--muted);word-break:break-all;margin-top:10px}
+.url-box a{color:var(--lavender);text-decoration:none}
+/* ─── RESPONSIVE ─────────────────────────────────────────── */
+@media(max-width:600px){
+  header{padding:12px 14px}
+  .nav{padding:0 14px;overflow-x:auto}
+  main{padding:14px}
+  .stats{grid-template-columns:1fr 1fr;gap:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ═══════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">EVENT<span style="color:var(--text)">DASH</span></div>
+    <div class="login-sub">Panel de gestión de evento</div>
+    <input class="login-field" id="l-user" type="text" placeholder="Usuario" autocomplete="username">
+    <input class="login-field" id="l-pass" type="password" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" onclick="doLogin()" id="login-btn">Ingresar</button>
+    <div class="login-error" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ══ APP ═════════════════════════════════════════════════ -->
+<div id="app" style="display:none;flex-direction:column">
+  <header>
+    <div class="brand">EVENT<span>DASH</span></div>
+    <div class="header-right">
+      <div class="user-pill">
+        <span id="user-display"></span>
+        <span class="role-badge" id="role-badge"></span>
+      </div>
+      <button id="btn-refresh" onclick="loadData()">↺ Actualizar</button>
+      <button class="btn-logout" onclick="logout()">Salir</button>
+    </div>
+  </header>
+
+  <div class="nav">
+    <div class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
+    <div class="nav-tab" data-tab="participantes" onclick="switchTab('participantes')">👥 Participantes</div>
+    <div class="nav-tab admin-only" data-tab="usuarios" onclick="switchTab('usuarios')">🔑 Usuarios</div>
+    <div class="nav-tab admin-only" data-tab="scanner-info" onclick="switchTab('scanner-info')">📱 Escáner QR</div>
+  </div>
+
+  <main>
+    <!-- DASHBOARD -->
+    <div class="tab-pane active" id="pane-dashboard">
+      <div id="dash-inner"><div class="loader"><div class="spinner"></div><span>Cargando...</span></div></div>
+    </div>
+
+    <!-- PARTICIPANTES -->
+    <div class="tab-pane" id="pane-participantes">
+      <div id="part-inner"><div class="loader"><div class="spinner"></div><span>Cargando...</span></div></div>
+    </div>
+
+    <!-- USUARIOS (admin only) -->
+    <div class="tab-pane" id="pane-usuarios">
+      <div class="sec-title">Crear nuevo usuario</div>
+      <div id="user-msg" class="msg"></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Usuario</label><input id="nu-user" type="text" placeholder="ej: jperez"></div>
+        <div class="form-group"><label>Contraseña</label><input id="nu-pass" type="password" placeholder="mínimo 6 caracteres"></div>
+        <div class="form-group">
+          <label>Rol</label>
+          <select id="nu-rol">
+            <option value="">— Seleccionar rol —</option>
+            <option value="administrador">Administrador</option>
+            <option value="delegado">Delegado</option>
+            <option value="verificadorasistencia">Verificador de Asistencia</option>
+            <option value="verificadorentrega">Verificador de Entrega</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Dependencia (para delegado)</label><input id="nu-dep" type="text" placeholder="ej: Recursos Humanos"></div>
+      </div>
+      <button class="btn btn-gold" onclick="createUser()">+ Crear usuario</button>
+      <div class="sec-title" style="margin-top:28px">Usuarios registrados</div>
+      <div class="tbl-wrap" id="users-table"><div class="loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- SCANNER INFO -->
+    <div class="tab-pane" id="pane-scanner-info">
+      <div class="card" style="max-width:600px">
+        <div class="card-title">📱 Página de escaneo QR</div>
+        <p style="color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:16px">
+          Comparte el archivo <strong style="color:var(--text)">scanner.html</strong> o súbelo a cualquier hosting. Las personas con rol
+          <span class="bdg bdg-t">verificadorasistencia</span> o <span class="bdg bdg-a">verificadorentrega</span> pueden iniciar sesión
+          en esa página y escanear los QR para registrar ingresos y entregas de comida.
+        </p>
+        <p style="color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:6px">
+          El QR de cada participante contiene una URL a esa página con su ID. Al escanear:
+        </p>
+        <ul style="color:var(--muted);font-size:13px;line-height:2;margin-left:18px;margin-bottom:16px">
+          <li>Si no hay sesión activa → muestra solo info de la persona</li>
+          <li>Si hay sesión como <strong style="color:var(--mint)">verificadorasistencia</strong> → habilita botón de ingreso</li>
+          <li>Si hay sesión como <strong style="color:var(--coral)">verificadorentrega</strong> → habilita botón de entrega de comida</li>
+          <li>Si hay sesión como <strong style="color:var(--gold)">administrador</strong> → ambos botones</li>
+        </ul>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;font-size:12px;color:var(--muted)">
+          <strong style="color:var(--text)">URL del script (configurada en ambos archivos):</strong><br>
+          <span id="show-script-url" style="color:var(--lavender);word-break:break-all"></span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══ QR MODAL ════════════════════════════════════════════ -->
+<div id="qr-modal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeQR()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeQR()">✕</button>
+    <h2 id="qr-title">Código QR</h2>
+    <div class="sub" id="qr-sub"></div>
+    <div id="qr-canvas"></div>
+    <div class="qr-info" id="qr-info"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gold" onclick="downloadQR()">⬇ Descargar QR</button>
+      <button class="btn btn-ghost btn-sm" onclick="copyQRUrl()">🔗 Copiar URL</button>
+    </div>
+    <div class="url-box" id="qr-url-box"></div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────────
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbydxrR656OAebv0sPa5tjgdk6c-SvMuIa4Pe9mxqalO0FUNUsEBdM9h-Px43rqPHfHZVA/exec';
+// Cambia esto por la URL donde estará tu scanner.html
+const SCANNER_URL = window.location.href.replace('dashboard.html','scanner.html');
+
+const C = {FechaHora:0,Tipo:1,Nombre:2,Dependencia:3,Celular:4,Padrino:5,TipoPersona:6,TipoParticipacion:7,Disciplina:8,Comida:9,Bebida:10,Observaciones:11,Registro:12,QR_ID:13};
+
+let session = JSON.parse(localStorage.getItem('ev_session')||'null');
+let allRows = [], checkins = {};
+let currentSearch='', currentFilter='todos';
+let currentQRId = '', currentQRUrl = '';
+
+// ── BOOT ─────────────────────────────────────────────────────
+window.onload = function(){
+  document.getElementById('show-script-url').textContent = SCRIPT_URL;
+  if(session && session.token) startApp();
+  else document.getElementById('login-screen').style.display='flex';
+};
+
+// ── AUTH ─────────────────────────────────────────────────────
+async function doLogin(){
+  const btn=document.getElementById('login-btn');
+  const err=document.getElementById('login-err');
+  const user=document.getElementById('l-user').value.trim();
+  const pass=document.getElementById('l-pass').value.trim();
+  if(!user||!pass){err.textContent='Completa usuario y contraseña';return;}
+  btn.textContent='Verificando...';btn.disabled=true;err.textContent='';
+  try{
+    const r=await fetch(`${SCRIPT_URL}?action=login&usuario=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`);
+    const d=await r.json();
+    if(d.result==='ok'){
+      session={token:d.token,rol:d.rol,usuario:d.usuario,dependencia:d.dependencia||''};
+      localStorage.setItem('ev_session',JSON.stringify(session));
+      startApp();
+    } else {
+      err.textContent=d.mensaje||'Error de autenticación';
+    }
+  } catch(e){
+    err.textContent='Error de conexión con el servidor';
+  }
+  btn.textContent='Ingresar';btn.disabled=false;
+}
+
+function startApp(){
+  document.getElementById('login-screen').style.display='none';
+  const app=document.getElementById('app');
+  app.style.display='flex';
+  document.getElementById('user-display').textContent=session.usuario;
+  const rb=document.getElementById('role-badge');
+  const rmap={administrador:['Administrador','role-admin'],delegado:['Delegado','role-delegado'],verificadorasistencia:['Ver. Asistencia','role-vasistencia'],verificadorentrega:['Ver. Entrega','role-ventrega']};
+  const rm=rmap[session.rol]||[session.rol,'role-admin'];
+  rb.textContent=rm[0];rb.className='role-badge '+rm[1];
+  // Mostrar/ocultar tabs según rol
+  if(session.rol!=='administrador'){
+    document.querySelectorAll('.admin-only').forEach(el=>el.style.display='none');
+  }
+  loadData();
+}
+
+function logout(){
+  localStorage.removeItem('ev_session');
+  session=null;allRows=[];checkins={};
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('l-pass').value='';
+}
+
+// ── DATA LOADING ──────────────────────────────────────────────
+async function loadData(){
+  const btn=document.getElementById('btn-refresh');
+  btn.disabled=true;btn.textContent='...';
+  try{
+    const r=await fetch(`${SCRIPT_URL}?action=getData&token=${session.token}&t=${Date.now()}`);
+    const d=await r.json();
+    if(d.result==='error'&&d.mensaje&&d.mensaje.includes('expirad')){logout();return;}
+    if(d.rows){ allRows=d.rows; checkins=d.checkins||{}; }
+    renderDashboard();
+    renderParticipants();
+    if(session.rol==='administrador') loadUsers();
+    document.querySelector('.last-upd')&&(document.querySelector('.last-upd').textContent='Actualizado: '+new Date().toLocaleTimeString('es-PE'));
+  } catch(e){
+    document.getElementById('dash-inner').innerHTML=`<div class="msg err" style="display:block">Error cargando datos. Verifica el script.</div>`;
+  }
+  btn.disabled=false;btn.textContent='↺ Actualizar';
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+function renderDashboard(){
+  const titulares=allRows.filter(r=>r[C.TipoPersona]==='Titular');
+  const acomps=allRows.filter(r=>r[C.TipoPersona]==='Acompañante');
+  const countIngresos=Object.values(checkins).filter(c=>c.ingreso).length;
+  const countEntregas=Object.values(checkins).filter(c=>c.entrega).length;
+
+  const count=arr=>arr.reduce((m,v)=>{if(v)m[v]=(m[v]||0)+1;return m},{});
+  const sorted=m=>Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  const comidas=count(allRows.map(r=>r[C.Comida]).filter(v=>v&&v!=='—'));
+  const bebidas=count(allRows.map(r=>r[C.Bebida]).filter(v=>v&&v!=='—'));
+  const tipos=count(allRows.map(r=>r[C.TipoParticipacion]).filter(v=>v&&v!=='—'));
+  const discs=count(allRows.map(r=>r[C.Disciplina]).filter(v=>v&&v!=='—'));
+
+  const maxC=Math.max(...Object.values(comidas),1);
+  const maxB=Math.max(...Object.values(bebidas),1);
+  const maxT=Math.max(...Object.values(tipos),1);
+  const maxD=Math.max(...Object.values(discs),1);
+
+  const bars=(data,cls,max)=>sorted(data).map(([k,v])=>`
+    <div class="bar-row">
+      <div class="bar-lbl" title="${e(k)}">${e(k)}</div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.round(v/max*100)}%">${v}</div></div>
+    </div>`).join('')||'<div style="color:var(--muted);font-size:12px">Sin datos</div>';
+
+  document.getElementById('dash-inner').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px">
+      <div class="sec-title" style="flex:1;margin:0">Resumen del evento</div>
+      <span class="last-upd"></span>
+    </div>
+    <div class="stats">
+      <div class="stat g"><div class="stat-lbl">Total Personas</div><div class="stat-val">${allRows.length}</div></div>
+      <div class="stat c"><div class="stat-lbl">Titulares</div><div class="stat-val">${titulares.length}</div></div>
+      <div class="stat m"><div class="stat-lbl">Acompañantes</div><div class="stat-val">${acomps.length}</div></div>
+      <div class="stat l"><div class="stat-lbl">Ingresos ✓</div><div class="stat-val">${countIngresos}</div></div>
+      <div class="stat g"><div class="stat-lbl">Entregas 🍽️</div><div class="stat-val">${countEntregas}</div></div>
+    </div>
+    <div class="charts">
+      <div class="card"><div class="card-title">🍽️ Platos solicitados</div>${bars(comidas,'bf-gold',maxC)}</div>
+      <div class="card"><div class="card-title">🥤 Bebidas solicitadas</div>${bars(bebidas,'bf-coral',maxB)}</div>
+      <div class="card"><div class="card-title">🎟️ Tipo de participación</div>${bars(tipos,'bf-mint',maxT)}</div>
+      <div class="card"><div class="card-title">🎨 Disciplinas</div>${bars(discs,'bf-lav',maxD)}</div>
+    </div>`;
+}
+
+// ── PARTICIPANTS ──────────────────────────────────────────────
+function renderParticipants(s,f){
+  if(s!==undefined) currentSearch=s.toLowerCase();
+  if(f!==undefined) currentFilter=f;
+
+  let rows=allRows.filter(r=>{
+    const nm=(r[C.Nombre]||'').toLowerCase();
+    const dp=(r[C.Dependencia]||'').toLowerCase();
+    const cl=(r[C.Celular]||'').toLowerCase();
+    const rg=(r[C.Registro]||'').toLowerCase();
+    const ms=!currentSearch||nm.includes(currentSearch)||dp.includes(currentSearch)||cl.includes(currentSearch)||rg.includes(currentSearch);
+    const tp=r[C.TipoPersona]||'';
+    const qid=r[C.QR_ID]||'';
+    const hasIngreso=checkins[qid]&&checkins[qid].ingreso;
+    const hasEntrega=checkins[qid]&&checkins[qid].entrega;
+    const mf=currentFilter==='todos'||
+      (currentFilter==='titulares'&&tp==='Titular')||
+      (currentFilter==='acompanantes'&&tp==='Acompañante')||
+      (currentFilter==='ingreso'&&hasIngreso)||
+      (currentFilter==='entrega'&&hasEntrega)||
+      (currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
+    return ms&&mf;
+  });
+
+  const total=rows.length;
+  const withIngreso=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].ingreso}).length;
+  const withEntrega=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].entrega}).length;
+
+  const tbody=rows.map(r=>{
+    const qid=r[C.QR_ID]||'';
+    const hasI=checkins[qid]&&checkins[qid].ingreso;
+    const hasE=checkins[qid]&&checkins[qid].entrega;
+    const tp=r[C.TipoPersona]||'';
+    return `
+    <tr class="${hasI&&hasE?'attended':''}">
+      <td><span class="pname">${e(r[C.Nombre]||'—')}</span></td>
+      <td><span class="bdg ${tp==='Titular'?'bdg-t':'bdg-a'}">${e(tp||'—')}</span></td>
+      <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
+      <td style="font-size:12px">${e(r[C.Comida]||'—')}</td>
+      <td style="font-size:12px">${e(r[C.Bebida]||'—')}</td>
+      <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
+      <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
+      <td>
+        ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(tp)}')">QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('part-inner').innerHTML=`
+    <div class="prog-wrap">
+      <div class="prog-lbl">Ingresos: <strong>${withIngreso}/${total}</strong></div>
+      <div class="prog-track"><div class="prog-fill" style="width:${total>0?Math.round(withIngreso/total*100):0}%"></div></div>
+      <div class="prog-lbl">Entregas: <strong>${withEntrega}/${total}</strong></div>
+    </div>
+    <div class="toolbar">
+      <input class="search" type="text" placeholder="🔍 Buscar nombre, dependencia, celular..." value="${e(currentSearch)}" oninput="renderParticipants(this.value)">
+      <select class="filter" onchange="renderParticipants(undefined,this.value)">
+        <option value="todos" ${currentFilter==='todos'?'selected':''}>Todos (${allRows.length})</option>
+        <option value="titulares" ${currentFilter==='titulares'?'selected':''}>Titulares</option>
+        <option value="acompanantes" ${currentFilter==='acompanantes'?'selected':''}>Acompañantes</option>
+        <option value="ingreso" ${currentFilter==='ingreso'?'selected':''}>Con ingreso ✓</option>
+        <option value="entrega" ${currentFilter==='entrega'?'selected':''}>Con entrega ✓</option>
+        <option value="pendientes" ${currentFilter==='pendientes'?'selected':''}>Sin check</option>
+      </select>
+      <span style="color:var(--muted);font-size:12px">${total} resultado${total!==1?'s':''}</span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Comida</th><th>Bebida</th>
+          <th>Ingreso</th><th>Entrega</th><th>QR</th>
+        </tr></thead>
+        <tbody>${tbody||`<tr><td colspan="8"><div class="empty">Sin resultados para "${currentSearch}"</div></td></tr>`}</tbody>
+      </table>
+    </div>`;
+}
+
+function formatHora(str){
+  if(!str) return '';
+  const parts=String(str).split(' ');
+  return parts[1]||parts[0]||'';
+}
+
+// ── QR MODAL ──────────────────────────────────────────────────
+function showQR(qrid, nombre, comida, bebida, tipo){
+  currentQRId=qrid;
+  const url=`${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
+  currentQRUrl=url;
+
+  document.getElementById('qr-title').textContent='QR de ' + nombre;
+  document.getElementById('qr-sub').textContent=(tipo==='Titular'?'👤 Titular':'👥 Acompañante') + ' · ID: '+qrid;
+  document.getElementById('qr-info').innerHTML=`
+    <strong>Nombre:</strong> <span>${e(nombre)}</span><br>
+    <strong>Comida:</strong> <span>${e(comida||'—')}</span><br>
+    <strong>Bebida:</strong> <span>${e(bebida||'—')}</span><br>
+    <strong>Tipo:</strong> <span>${e(tipo||'—')}</span>`;
+  document.getElementById('qr-url-box').innerHTML=`URL del QR: <a href="${e(url)}" target="_blank">${e(url)}</a>`;
+
+  const canvas=document.getElementById('qr-canvas');
+  canvas.innerHTML='';
+  new QRCode(canvas,{text:url,width:220,height:220,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.H});
+
+  document.getElementById('qr-modal').style.display='flex';
+}
+
+function closeQR(){ document.getElementById('qr-modal').style.display='none'; }
+
+function downloadQR(){
+  const img=document.querySelector('#qr-canvas img')||document.querySelector('#qr-canvas canvas');
+  if(!img) return;
+  const a=document.createElement('a');
+  a.download='QR_'+currentQRId+'.png';
+  if(img.tagName==='IMG') a.href=img.src;
+  else a.href=img.toDataURL();
+  a.click();
+}
+
+function copyQRUrl(){
+  navigator.clipboard.writeText(currentQRUrl).then(()=>alert('URL copiada al portapapeles'));
+}
+
+// ── USERS ─────────────────────────────────────────────────────
+async function loadUsers(){
+  if(session.rol!=='administrador') return;
+  try{
+    const r=await fetch(`${SCRIPT_URL}?action=getUsers&token=${session.token}`);
+    const d=await r.json();
+    if(!d.users){document.getElementById('users-table').innerHTML='<div class="empty">Error cargando usuarios</div>';return;}
+    const rmap={administrador:'role-admin',delegado:'role-delegado',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega'};
+    const rlbl={administrador:'Administrador',delegado:'Delegado',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega'};
+    const rows=d.users.map(u=>`
+      <tr>
+        <td><strong>${e(u.usuario)}</strong></td>
+        <td><span class="bdg role-badge ${rmap[u.rol]||''}">${rlbl[u.rol]||u.rol}</span></td>
+        <td style="color:var(--muted);font-size:12px">${e(u.dependencia||'—')}</td>
+        <td><span class="bdg ${u.activo==='SI'?'bdg-chk':'bdg-no'}">${u.activo==='SI'?'Activo':'Inactivo'}</span></td>
+        <td style="color:var(--muted);font-size:11px">${e(u.fecha||'')}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="toggleUser('${e(u.usuario)}','${u.activo==='SI'?'NO':'SI'}')">${u.activo==='SI'?'Desactivar':'Activar'}</button>
+          ${u.usuario!=='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteUser('${e(u.usuario)}')">Eliminar</button>`:''}
+        </td>
+      </tr>`).join('');
+    document.getElementById('users-table').innerHTML=`
+      <table><thead><tr><th>Usuario</th><th>Rol</th><th>Dependencia</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6"><div class="empty">Sin usuarios</div></td></tr>'}</tbody></table>`;
+  } catch(ex){
+    document.getElementById('users-table').innerHTML='<div class="empty">Error de conexión</div>';
+  }
+}
+
+async function createUser(){
+  const msg=document.getElementById('user-msg');
+  const u=document.getElementById('nu-user').value.trim();
+  const p=document.getElementById('nu-pass').value.trim();
+  const r=document.getElementById('nu-rol').value;
+  const d=document.getElementById('nu-dep').value.trim();
+  if(!u||!p||!r){showMsg(msg,'err','Completa todos los campos obligatorios');return;}
+  if(p.length<6){showMsg(msg,'err','La contraseña debe tener al menos 6 caracteres');return;}
+  try{
+    const res=await apiFetch('createUser',{usuario:u,password:p,rol:r,dependencia:d});
+    if(res.result==='ok'){
+      showMsg(msg,'ok','Usuario creado correctamente');
+      document.getElementById('nu-user').value='';
+      document.getElementById('nu-pass').value='';
+      document.getElementById('nu-rol').value='';
+      document.getElementById('nu-dep').value='';
+      loadUsers();
+    } else { showMsg(msg,'err',res.mensaje||'Error'); }
+  } catch(ex){showMsg(msg,'err','Error de conexión');}
+}
+
+async function toggleUser(usuario,activo){
+  await apiFetch('updateUser',{usuario,activo:activo==='SI'});
+  loadUsers();
+}
+
+async function deleteUser(usuario){
+  if(!confirm('¿Eliminar usuario "'+usuario+'"?')) return;
+  const res=await apiFetch('deleteUser',{usuario});
+  if(res.result==='ok') loadUsers();
+  else alert(res.mensaje||'Error');
+}
+
+// ── HELPERS ───────────────────────────────────────────────────
+async function apiFetch(action,payload){
+  const res=await fetch(SCRIPT_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action,...payload,token:session.token})
+  });
+  return res.json();
+}
+
+function showMsg(el,type,text){
+  el.className='msg '+type;el.textContent=text;el.style.display='block';
+  setTimeout(()=>el.style.display='none',4000);
+}
+
+function switchTab(name){
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+name));
+}
+
+function e(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+</script>
+</body>
+</html>

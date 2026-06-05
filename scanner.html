@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>EventoScan · Verificación</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080a10;--s1:#10131c;--s2:#181c28;--border:#252b3b;
+  --gold:#f5c842;--coral:#ff6b4a;--mint:#3ddba0;--lavender:#8b8fff;
+  --text:#dde2f0;--muted:#6b748f;--danger:#ff4466;
+  --r:12px;--font-h:'Syne',sans-serif;--font-b:'Outfit',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:15px;min-height:100vh}
+
+/* ─── TOPBAR ─────────────────────────────────────────────── */
+.topbar{
+  background:var(--s1);border-bottom:1px solid var(--border);
+  padding:12px 18px;display:flex;align-items:center;justify-content:space-between;
+}
+.brand{font-family:var(--font-h);font-size:16px;font-weight:800;color:var(--gold)}
+.session-area{display:flex;align-items:center;gap:8px}
+.session-pill{background:var(--s2);border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.role-dot{width:7px;height:7px;border-radius:50%}
+.dot-asistencia{background:var(--mint)}
+.dot-entrega{background:var(--coral)}
+.dot-admin{background:var(--gold)}
+.btn-sm-link{background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s}
+.btn-sm-link:hover{border-color:var(--danger);color:var(--danger)}
+
+/* ─── WRAPPER ────────────────────────────────────────────── */
+.wrap{max-width:460px;margin:0 auto;padding:20px 16px}
+
+/* ─── LOGIN MINI ─────────────────────────────────────────── */
+.login-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:16px}
+.login-card h2{font-family:var(--font-h);font-size:18px;font-weight:800;color:var(--gold);margin-bottom:4px}
+.login-card p{color:var(--muted);font-size:12px;margin-bottom:20px;line-height:1.6}
+.field{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;color:var(--text);font-family:var(--font-b);font-size:14px;outline:none;transition:border-color .15s;margin-bottom:10px}
+.field:focus{border-color:var(--gold)}
+.field::placeholder{color:var(--muted)}
+.btn{display:block;width:100%;padding:13px;border:none;border-radius:9px;font-family:var(--font-h);font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:opacity .15s;text-align:center}
+.btn:hover{opacity:.85}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-gold{background:var(--gold);color:#000}
+.btn-mint{background:var(--mint);color:#000}
+.btn-coral{background:var(--coral);color:#fff}
+.btn-ghost{background:var(--s2);border:1px solid var(--border);color:var(--text)}
+.msg{padding:11px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;display:none;line-height:1.5}
+.msg.ok{background:rgba(61,219,160,.1);border:1px solid rgba(61,219,160,.3);color:var(--mint)}
+.msg.err{background:rgba(255,68,102,.1);border:1px solid rgba(255,68,102,.3);color:var(--danger)}
+.msg.warn{background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.3);color:var(--gold)}
+
+/* ─── PERSON CARD ────────────────────────────────────────── */
+.person-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px;animation:fadeUp .35s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.card-header{padding:18px 20px;background:var(--s2);border-bottom:1px solid var(--border)}
+.card-tipo{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.tipo-t{color:var(--gold)}
+.tipo-a{color:var(--mint)}
+.card-name{font-family:var(--font-h);font-size:22px;font-weight:800;line-height:1.1}
+.card-dep{color:var(--muted);font-size:13px;margin-top:4px}
+
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0}
+.info-item{padding:14px 18px;border-bottom:1px solid var(--border)}
+.info-item:nth-child(odd){border-right:1px solid var(--border)}
+.info-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:4px}
+.info-val{font-size:14px;font-weight:500;color:var(--text)}
+.info-val.highlight{color:var(--gold);font-weight:600}
+
+/* Status check indicators */
+.status-row{display:flex;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.status-item{flex:1;background:var(--bg);border-radius:8px;padding:10px 12px;text-align:center}
+.status-item .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:4px}
+.status-item .val{font-size:13px;font-weight:600}
+.check-yes{color:var(--mint)}
+.check-no{color:var(--muted)}
+
+/* ─── TITULAR REF ────────────────────────────────────────── */
+.titular-ref{background:rgba(245,200,66,.05);border:1px solid rgba(245,200,66,.15);border-radius:10px;padding:13px 16px;margin:14px 18px}
+.titular-ref-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--gold);margin-bottom:6px;font-weight:600}
+.titular-ref-name{font-size:15px;font-weight:600;color:var(--text)}
+.titular-ref-info{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* ─── ACTION BUTTONS ─────────────────────────────────────── */
+.actions{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.action-btn{
+  padding:14px 18px;border-radius:10px;border:none;
+  font-family:var(--font-h);font-size:15px;font-weight:700;
+  cursor:pointer;transition:all .2s;letter-spacing:.3px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.action-btn:disabled{opacity:.4;cursor:not-allowed}
+.action-btn.done{opacity:.5;cursor:default;text-decoration:line-through}
+.ab-ingreso{background:var(--mint);color:#000}
+.ab-entrega{background:var(--coral);color:#fff}
+.ab-ingreso:hover:not(:disabled):not(.done){background:#2fcf90;transform:scale(1.01)}
+.ab-entrega:hover:not(:disabled):not(.done){background:#ff5535;transform:scale(1.01)}
+
+/* ─── NO SESSION INFO ────────────────────────────────────── */
+.info-banner{background:rgba(139,143,255,.07);border:1px solid rgba(139,143,255,.2);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px}
+.info-banner strong{color:var(--lavender)}
+
+/* ─── LOADER ─────────────────────────────────────────────── */
+.loader{display:flex;align-items:center;justify-content:center;padding:60px;flex-direction:column;gap:14px;color:var(--muted)}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── QR ID ──────────────────────────────────────────────── */
+.qrid-box{font-size:10px;color:var(--muted);padding:8px 18px 14px;font-family:monospace;letter-spacing:.5px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">SCAN</div>
+  <div class="session-area" id="session-area">
+    <span style="color:var(--muted);font-size:12px">Sin sesión</span>
+    <button class="btn-sm-link" onclick="showLoginPanel()">Iniciar sesión</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- Login panel -->
+  <div id="login-panel" style="display:none">
+    <div class="login-card">
+      <h2>Acceso verificador</h2>
+      <p>Inicia sesión para poder registrar ingresos o entregas de comida al escanear un QR.</p>
+      <div id="sc-msg" class="msg"></div>
+      <input class="field" id="sc-user" type="text" placeholder="Usuario" autocomplete="username">
+      <input class="field" id="sc-pass" type="password" placeholder="Contraseña" onkeydown="if(event.key==='Enter')scLogin()">
+      <button class="btn btn-gold" onclick="scLogin()" id="sc-btn">Ingresar</button>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div id="main-content">
+    <div class="loader"><div class="spinner"></div><span>Cargando...</span></div>
+  </div>
+</div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbydxrR656OAebv0sPa5tjgdk6c-SvMuIa4Pe9mxqalO0FUNUsEBdM9h-Px43rqPHfHZVA/exec';
+
+const C = {FechaHora:0,Tipo:1,Nombre:2,Dependencia:3,Celular:4,Padrino:5,TipoPersona:6,TipoParticipacion:7,Disciplina:8,Comida:9,Bebida:10,Observaciones:11,Registro:12,QR_ID:13};
+
+let scSession = JSON.parse(localStorage.getItem('sc_session')||'null');
+let qrid = new URLSearchParams(window.location.search).get('qrid')||'';
+let personaData = null;
+
+window.onload = function(){
+  renderSessionArea();
+  if(qrid) loadPersona();
+  else document.getElementById('main-content').innerHTML=`
+    <div style="text-align:center;padding:60px 20px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:16px">📱</div>
+      <div style="font-family:var(--font-h);font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px">Escáner de QR</div>
+      <div style="font-size:13px;line-height:1.7">Escanea el código QR de un participante<br>para ver su información y registrar su asistencia.</div>
+    </div>`;
+};
+
+// ── SESSION AREA ──────────────────────────────────────────────
+function renderSessionArea(){
+  const sa=document.getElementById('session-area');
+  if(scSession&&scSession.token){
+    const rmap={administrador:['Administrador','dot-admin'],verificadorasistencia:['Asistencia','dot-asistencia'],verificadorentrega:['Entrega','dot-entrega'],delegado:['Delegado','dot-admin']};
+    const rm=rmap[scSession.rol]||[scSession.rol,'dot-admin'];
+    sa.innerHTML=`
+      <div class="session-pill">
+        <span class="role-dot ${rm[1]}"></span>
+        <span>${e(scSession.usuario)}</span>
+        <span style="color:var(--gold);font-weight:600">${rm[0]}</span>
+      </div>
+      <button class="btn-sm-link" onclick="scLogout()">Salir</button>`;
+  } else {
+    sa.innerHTML=`
+      <span style="color:var(--muted);font-size:12px">Sin sesión</span>
+      <button class="btn-sm-link" onclick="showLoginPanel()">Iniciar sesión</button>`;
+  }
+}
+
+function showLoginPanel(){
+  const p=document.getElementById('login-panel');
+  p.style.display=p.style.display==='none'?'block':'none';
+}
+
+async function scLogin(){
+  const btn=document.getElementById('sc-btn');
+  const msg=document.getElementById('sc-msg');
+  const user=document.getElementById('sc-user').value.trim();
+  const pass=document.getElementById('sc-pass').value.trim();
+  if(!user||!pass){showMsg(msg,'err','Completa los campos');return;}
+  btn.textContent='...';btn.disabled=true;
+  try{
+    const r=await fetch(`${SCRIPT_URL}?action=login&usuario=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`);
+    const d=await r.json();
+    if(d.result==='ok'){
+      scSession={token:d.token,rol:d.rol,usuario:d.usuario};
+      localStorage.setItem('sc_session',JSON.stringify(scSession));
+      document.getElementById('login-panel').style.display='none';
+      renderSessionArea();
+      if(personaData) renderPersona(personaData);
+    } else { showMsg(msg,'err',d.mensaje||'Error'); }
+  } catch(ex){showMsg(msg,'err','Error de conexión');}
+  btn.textContent='Ingresar';btn.disabled=false;
+}
+
+function scLogout(){
+  localStorage.removeItem('sc_session');
+  scSession=null;
+  renderSessionArea();
+  if(personaData) renderPersona(personaData);
+}
+
+// ── LOAD PERSONA ──────────────────────────────────────────────
+async function loadPersona(){
+  document.getElementById('main-content').innerHTML='<div class="loader"><div class="spinner"></div><span>Cargando info...</span></div>';
+  try{
+    const r=await fetch(`${SCRIPT_URL}?action=getQR&qrid=${encodeURIComponent(qrid)}&t=${Date.now()}`);
+    const d=await r.json();
+    if(d.result!=='ok'){
+      document.getElementById('main-content').innerHTML=`<div class="msg err" style="display:block">❌ ${d.mensaje||'QR no encontrado'}</div>`;
+      return;
+    }
+    personaData=d;
+    renderPersona(d);
+  } catch(ex){
+    document.getElementById('main-content').innerHTML=`<div class="msg err" style="display:block">Error de conexión. Verifica tu internet.</div>`;
+  }
+}
+
+// ── RENDER PERSONA ────────────────────────────────────────────
+function renderPersona(d){
+  const p=d.persona;
+  const titular=d.titular;
+  const chks=d.checkins||{ingreso:null,entrega:null};
+  const tipo=p[C.TipoPersona]||'';
+  const esTitular=tipo==='Titular';
+
+  // Permisos del verificador
+  const canIngreso=scSession&&(scSession.rol==='verificadorasistencia'||scSession.rol==='administrador');
+  const canEntrega=scSession&&(scSession.rol==='verificadorentrega'||scSession.rol==='administrador');
+  const hasSession=!!scSession;
+
+  let html='';
+
+  // Info banner si no hay sesión
+  if(!hasSession){
+    html+=`<div class="info-banner">
+      <strong>ℹ️ Información del participante</strong><br>
+      Para registrar ingreso o entrega de comida, inicia sesión como verificador.
+    </div>`;
+  }
+
+  // Card principal
+  html+=`<div class="person-card">
+    <div class="card-header">
+      <div class="card-tipo ${esTitular?'tipo-t':'tipo-a'}">
+        ${esTitular?'👤 Titular':'👥 Acompañante'}
+      </div>
+      <div class="card-name">${e(p[C.Nombre]||'—')}</div>
+      <div class="card-dep">${e(p[C.Dependencia]||'—')}</div>
+    </div>`;
+
+  // Si es acompañante, mostrar info del titular
+  if(!esTitular&&titular){
+    html+=`<div class="titular-ref">
+      <div class="titular-ref-lbl">Titular de referencia</div>
+      <div class="titular-ref-name">${e(titular[C.Nombre]||'—')}</div>
+      <div class="titular-ref-info">${e(titular[C.Dependencia]||'—')} · ${e(titular[C.Celular]||'—')}</div>
+    </div>`;
+  }
+
+  // Info grid
+  html+=`<div class="info-grid">
+    <div class="info-item">
+      <div class="info-lbl">Comida</div>
+      <div class="info-val highlight">${e(p[C.Comida]||'—')}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-lbl">Bebida</div>
+      <div class="info-val highlight">${e(p[C.Bebida]||'—')}</div>
+    </div>`;
+
+  if(esTitular){
+    html+=`<div class="info-item">
+      <div class="info-lbl">Celular</div>
+      <div class="info-val">${e(p[C.Celular]||'—')}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-lbl">Tipo Participación</div>
+      <div class="info-val">${e(p[C.TipoParticipacion]||'—')}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-lbl">Disciplina</div>
+      <div class="info-val">${e(p[C.Disciplina]||'—')}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-lbl">Registro</div>
+      <div class="info-val">${e(p[C.Registro]||'—')}</div>
+    </div>`;
+  }
+
+  html+=`</div>`;
+
+  // Status checks
+  html+=`<div class="status-row">
+    <div class="status-item">
+      <div class="lbl">🚪 Ingreso</div>
+      <div class="val ${chks.ingreso?'check-yes':'check-no'}">${chks.ingreso?'✓ '+formatHora(chks.ingreso):'Pendiente'}</div>
+    </div>
+    <div class="status-item">
+      <div class="lbl">🍽️ Entrega</div>
+      <div class="val ${chks.entrega?'check-yes':'check-no'}">${chks.entrega?'✓ '+formatHora(chks.entrega):'Pendiente'}</div>
+    </div>
+  </div>`;
+
+  // Botones de acción
+  if(hasSession&&(canIngreso||canEntrega)){
+    html+=`<div class="actions" id="action-btns">`;
+    if(canIngreso){
+      if(chks.ingreso){
+        html+=`<button class="action-btn ab-ingreso done" disabled>🚪 Ingreso ya registrado (${formatHora(chks.ingreso)})</button>`;
+      } else {
+        html+=`<button class="action-btn ab-ingreso" id="btn-ingreso" onclick="doCheckin('ingreso')">🚪 Registrar Ingreso</button>`;
+      }
+    }
+    if(canEntrega){
+      if(chks.entrega){
+        html+=`<button class="action-btn ab-entrega done" disabled>🍽️ Entrega ya registrada (${formatHora(chks.entrega)})</button>`;
+      } else {
+        html+=`<button class="action-btn ab-entrega" id="btn-entrega" onclick="doCheckin('entrega')">🍽️ Registrar Entrega de Comida</button>`;
+      }
+    }
+    html+=`</div>`;
+  }
+
+  html+=`<div class="qrid-box">ID: ${e(qrid)}</div>`;
+  html+=`</div>`;
+
+  document.getElementById('main-content').innerHTML=html;
+}
+
+// ── CHECKIN ───────────────────────────────────────────────────
+async function doCheckin(tipo){
+  const btn=document.getElementById('btn-'+tipo);
+  if(btn){btn.disabled=true;btn.textContent='Registrando...';}
+
+  try{
+    const res=await fetch(SCRIPT_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'checkin',token:scSession.token,qrid,tipo})
+    });
+    const d=await res.json();
+
+    if(d.result==='ok'){
+      // Reload persona data to refresh status
+      const r2=await fetch(`${SCRIPT_URL}?action=getQR&qrid=${encodeURIComponent(qrid)}&t=${Date.now()}`);
+      const d2=await r2.json();
+      if(d2.result==='ok'){ personaData=d2; renderPersona(d2); }
+      // Show success overlay briefly
+      showToast(tipo==='ingreso'?'✓ Ingreso registrado':'✓ Entrega registrada', 'ok');
+    } else if(d.result==='duplicado'){
+      showToast('Ya fue registrado anteriormente', 'warn');
+      setTimeout(()=>loadPersona(),800);
+    } else {
+      if(btn){btn.disabled=false;btn.textContent=tipo==='ingreso'?'🚪 Registrar Ingreso':'🍽️ Registrar Entrega';}
+      showToast(d.mensaje||'Error al registrar','err');
+    }
+  } catch(ex){
+    if(btn){btn.disabled=false;btn.textContent=tipo==='ingreso'?'🚪 Registrar Ingreso':'🍽️ Registrar Entrega';}
+    showToast('Error de conexión','err');
+  }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────
+function showToast(text,type){
+  let t=document.getElementById('toast');
+  if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t);}
+  const colors={ok:'var(--mint)',err:'var(--danger)',warn:'var(--gold)'};
+  t.style.cssText=`position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--s2);border:1px solid ${colors[type]||'var(--border)'};color:${colors[type]||'var(--text)'};padding:12px 22px;border-radius:30px;font-family:var(--font-h);font-size:15px;font-weight:700;z-index:999;animation:fadeUp .25s ease;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.4)`;
+  t.textContent=text;
+  clearTimeout(t._tm);
+  t._tm=setTimeout(()=>t.remove(),2800);
+}
+
+function formatHora(str){
+  if(!str) return '';
+  return String(str).split(' ')[1]||String(str);
+}
+
+function showMsg(el,type,text){
+  el.className='msg '+type;el.textContent=text;el.style.display='block';
+  setTimeout(()=>el.style.display='none',4000);
+}
+
+function e(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>
