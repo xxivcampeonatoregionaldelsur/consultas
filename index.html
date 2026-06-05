@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EventoDash · Panel de Control</title>
+<title>Consultas · Panel de Control</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
@@ -166,17 +166,32 @@ tr:hover td{background:rgba(255,255,255,.015)}
 .prog-lbl{color:var(--muted);font-size:12px;white-space:nowrap}
 .prog-lbl strong{color:var(--mint);font-family:var(--font-h)}
 /* ─── QR MODAL ───────────────────────────────────────────── */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
-.modal{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:420px;width:100%;position:relative;max-height:90vh;overflow-y:auto}
-.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
-.modal-close:hover{color:var(--text)}
-.modal h2{font-family:var(--font-h);font-size:17px;font-weight:700;margin-bottom:4px}
-.modal .sub{color:var(--muted);font-size:12px;margin-bottom:20px}
-#qr-canvas{display:flex;justify-content:center;margin:16px 0}
-#qr-canvas canvas,#qr-canvas img{border-radius:8px;border:6px solid #fff}
-.qr-info{background:var(--bg);border-radius:8px;padding:14px;font-size:12px;line-height:1.8;margin-bottom:14px}
-.qr-info strong{color:var(--text);font-weight:600}
-.qr-info span{color:var(--muted)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:20px;padding:0;max-width:400px;width:100%;position:relative;max-height:92vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.7)}
+.modal-close{position:absolute;top:14px;right:16px;background:rgba(255,255,255,.07);border:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:2}
+.modal-close:hover{background:rgba(255,255,255,.14);color:var(--text)}
+/* QR card header */
+.qr-header{padding:22px 24px 18px;border-bottom:1px solid var(--border)}
+.qr-tipo-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.qr-tipo-t{background:rgba(245,200,66,.15);color:var(--gold)}
+.qr-tipo-a{background:rgba(61,219,160,.15);color:var(--mint)}
+.qr-header h2{font-family:var(--font-h);font-size:19px;font-weight:800;margin-bottom:2px;line-height:1.1}
+.qr-header .qr-dep{color:var(--muted);font-size:12px}
+/* QR visual area */
+.qr-visual{background:#fff;padding:20px;display:flex;justify-content:center;position:relative}
+.qr-visual-inner{position:relative;display:inline-block}
+#qr-canvas canvas,#qr-canvas img{display:block;border-radius:4px}
+.qr-logo-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-h);font-size:11px;font-weight:800;color:#000;letter-spacing:-.3px;border:3px solid #fff}
+/* QR info pills */
+.qr-pills{display:flex;gap:8px;padding:14px 20px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.qr-pill{flex:1;min-width:100px;background:var(--s2);border-radius:10px;padding:10px 12px;text-align:center}
+.qr-pill-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:4px}
+.qr-pill-val{font-size:13px;font-weight:600;color:var(--text)}
+.qr-pill-val.food{color:var(--gold)}
+.qr-pill-val.drink{color:var(--coral)}
+/* QR actions */
+.qr-actions{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.qr-id-chip{text-align:center;font-size:10px;color:var(--muted);font-family:monospace;letter-spacing:.5px;padding-bottom:4px}
 /* ─── USER MANAGEMENT ────────────────────────────────────── */
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
 @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
@@ -211,7 +226,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 <!-- ══ LOGIN ═══════════════════════════════════════════════ -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">EVENT<span style="color:var(--text)">DASH</span></div>
+    <div class="login-logo">Consultas<span style="color:var(--text)">Campeonato Regional Del SUR</span></div>
     <div class="login-sub">Panel de gestión de evento</div>
     <input class="login-field" id="l-user" type="text" placeholder="Usuario" autocomplete="username">
     <input class="login-field" id="l-pass" type="password" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
@@ -223,7 +238,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 <!-- ══ APP ═════════════════════════════════════════════════ -->
 <div id="app" style="display:none;flex-direction:column">
   <header>
-    <div class="brand">EVENT<span>DASH</span></div>
+    <div class="brand">Consultas<span>Campeonato Regional Del Sur</span></div>
     <div class="header-right">
       <div class="user-pill">
         <span id="user-display"></span>
@@ -307,21 +322,49 @@ tr:hover td{background:rgba(255,255,255,.015)}
 <div id="qr-modal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeQR()">
   <div class="modal">
     <button class="modal-close" onclick="closeQR()">✕</button>
-    <h2 id="qr-title">Código QR</h2>
-    <div class="sub" id="qr-sub"></div>
-    <div id="qr-canvas"></div>
-    <div class="qr-info" id="qr-info"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-gold" onclick="downloadQR()">⬇ Descargar QR</button>
-      <button class="btn btn-ghost btn-sm" onclick="copyQRUrl()">🔗 Copiar URL</button>
+    <!-- header -->
+    <div class="qr-header">
+      <div class="qr-tipo-badge" id="qr-tipo-badge"></div>
+      <h2 id="qr-title"></h2>
+      <div class="qr-dep" id="qr-dep"></div>
     </div>
-    <div class="url-box" id="qr-url-box"></div>
+    <!-- QR image -->
+    <div class="qr-visual">
+      <div class="qr-visual-inner">
+        <div id="qr-canvas"></div>
+        <div class="qr-logo-overlay">QR</div>
+      </div>
+    </div>
+    <!-- info pills -->
+    <div class="qr-pills">
+      <div class="qr-pill">
+        <div class="qr-pill-lbl">🍽️ Comida</div>
+        <div class="qr-pill-val food" id="qr-pill-comida">—</div>
+      </div>
+      <div class="qr-pill">
+        <div class="qr-pill-lbl">🥤 Bebida</div>
+        <div class="qr-pill-val drink" id="qr-pill-bebida">—</div>
+      </div>
+      <div class="qr-pill">
+        <div class="qr-pill-lbl">👤 Tipo</div>
+        <div class="qr-pill-val" id="qr-pill-tipo">—</div>
+      </div>
+    </div>
+    <!-- actions -->
+    <div class="qr-actions">
+      <button class="btn btn-gold" onclick="downloadQR()" style="justify-content:center;padding:12px">⬇ Descargar QR (PNG)</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="copyQRUrl()">🔗 Copiar enlace</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="shareQR()">📤 Compartir</button>
+      </div>
+      <div class="qr-id-chip" id="qr-id-chip"></div>
+    </div>
   </div>
 </div>
 
 <script>
 // ── CONFIG ───────────────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbydxrR656OAebv0sPa5tjgdk6c-SvMuIa4Pe9mxqalO0FUNUsEBdM9h-Px43rqPHfHZVA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQkaPXCIuk3xs81wS8ytGR7cW5uieqLZ3cibe1pk91zujctWzRnWx5WYyrHVGz5y5JEA/exec';
 // Cambia esto por la URL donde estará tu scanner.html
 const SCANNER_URL = window.location.href.replace('dashboard.html','scanner.html');
 
@@ -495,7 +538,7 @@ function renderParticipants(s,f){
       <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
       <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
       <td>
-        ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(tp)}')">QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
+        ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(tp)}','${e(r[C.Dependencia]||'')}')">🔲 QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
       </td>
     </tr>`;
   }).join('');
@@ -536,41 +579,79 @@ function formatHora(str){
 }
 
 // ── QR MODAL ──────────────────────────────────────────────────
-function showQR(qrid, nombre, comida, bebida, tipo){
-  currentQRId=qrid;
-  const url=`${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
-  currentQRUrl=url;
+function showQR(qrid, nombre, comida, bebida, tipo, dependencia){
+  currentQRId = qrid;
+  const url = `${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
+  currentQRUrl = url;
 
-  document.getElementById('qr-title').textContent='QR de ' + nombre;
-  document.getElementById('qr-sub').textContent=(tipo==='Titular'?'👤 Titular':'👥 Acompañante') + ' · ID: '+qrid;
-  document.getElementById('qr-info').innerHTML=`
-    <strong>Nombre:</strong> <span>${e(nombre)}</span><br>
-    <strong>Comida:</strong> <span>${e(comida||'—')}</span><br>
-    <strong>Bebida:</strong> <span>${e(bebida||'—')}</span><br>
-    <strong>Tipo:</strong> <span>${e(tipo||'—')}</span>`;
-  document.getElementById('qr-url-box').innerHTML=`URL del QR: <a href="${e(url)}" target="_blank">${e(url)}</a>`;
+  const esTitular = tipo === 'Titular';
 
-  const canvas=document.getElementById('qr-canvas');
-  canvas.innerHTML='';
-  new QRCode(canvas,{text:url,width:220,height:220,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.H});
+  // Header
+  const badge = document.getElementById('qr-tipo-badge');
+  badge.textContent = esTitular ? '👤 Titular' : '👥 Acompañante';
+  badge.className = 'qr-tipo-badge ' + (esTitular ? 'qr-tipo-t' : 'qr-tipo-a');
+  document.getElementById('qr-title').textContent = nombre || '—';
+  document.getElementById('qr-dep').textContent = dependencia || '';
 
-  document.getElementById('qr-modal').style.display='flex';
+  // Pills
+  document.getElementById('qr-pill-comida').textContent = comida || '—';
+  document.getElementById('qr-pill-bebida').textContent = bebida || '—';
+  document.getElementById('qr-pill-tipo').textContent = tipo || '—';
+  document.getElementById('qr-id-chip').textContent = 'ID: ' + qrid;
+
+  // QR code — tamaño generoso, fondo blanco, alta corrección de error
+  const canvas = document.getElementById('qr-canvas');
+  canvas.innerHTML = '';
+  new QRCode(canvas, {
+    text: url,
+    width: 260,
+    height: 260,
+    colorDark: '#000000',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+
+  document.getElementById('qr-modal').style.display = 'flex';
 }
 
 function closeQR(){ document.getElementById('qr-modal').style.display='none'; }
 
 function downloadQR(){
-  const img=document.querySelector('#qr-canvas img')||document.querySelector('#qr-canvas canvas');
-  if(!img) return;
-  const a=document.createElement('a');
-  a.download='QR_'+currentQRId+'.png';
-  if(img.tagName==='IMG') a.href=img.src;
-  else a.href=img.toDataURL();
-  a.click();
+  // Espera a que QRCode termine de renderizar
+  setTimeout(() => {
+    const img = document.querySelector('#qr-canvas img');
+    const cvs = document.querySelector('#qr-canvas canvas');
+    const a = document.createElement('a');
+    a.download = 'QR_' + currentQRId + '.png';
+    if(img){ a.href = img.src; }
+    else if(cvs){ a.href = cvs.toDataURL('image/png'); }
+    else { alert('QR aún no generado, intenta de nuevo'); return; }
+    a.click();
+  }, 150);
 }
 
 function copyQRUrl(){
-  navigator.clipboard.writeText(currentQRUrl).then(()=>alert('URL copiada al portapapeles'));
+  navigator.clipboard.writeText(currentQRUrl)
+    .then(()=>showToast('🔗 Enlace copiado'))
+    .catch(()=>{ prompt('Copia este enlace:', currentQRUrl); });
+}
+
+function shareQR(){
+  if(navigator.share){
+    navigator.share({ title: 'QR Evento', url: currentQRUrl })
+      .catch(()=>{});
+  } else {
+    copyQRUrl();
+  }
+}
+
+function showToast(msg){
+  let t=document.getElementById('dash-toast');
+  if(!t){ t=document.createElement('div'); t.id='dash-toast';
+    t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--s2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:30px;font-family:var(--font-h);font-size:13px;font-weight:700;z-index:999;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.4)';
+    document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._t); t._t=setTimeout(()=>t.style.opacity='0',2500);
 }
 
 // ── USERS ─────────────────────────────────────────────────────
