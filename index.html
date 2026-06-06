@@ -1127,8 +1127,7 @@ async function downloadQRFull(btn){
 }
 
 async function shareQRFull(){
-  // Solo en móvil con navigator.share
-  if(!navigator.share) { copyQRUrl(); return; }
+  if(!navigator.share){ copyQRUrl(); return; }
 
   try{
     const currentRow=allRows.find(r=>r[C.QR_ID]===currentQRId);
@@ -1136,79 +1135,117 @@ async function shareQRFull(){
 
     const celular=currentRow[C.Celular]||'';
     const grupoCelular=celular?allRows.filter(r=>(r[C.Celular]||'')===celular):[];
-
     const titularRow=grupoCelular.find(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r))||currentRow;
     const acompRows=grupoCelular.filter(r=>esAcompananteRow(r));
 
     const primerNombre=(titularRow[C.Nombre]||'—').split(/\s+/)[0];
     const primerNombreCap=primerNombre.charAt(0).toUpperCase()+primerNombre.slice(1).toLowerCase();
-
-    const qrTitular=`${SCANNER_URL}?qrid=${encodeURIComponent(titularRow[C.QR_ID]||'')}`;
-    const edecanNombre=session.usuario||'su edecán';
-    const dependencia=session.dependencia||titularRow[C.Dependencia]||'su dependencia';
+    const edecanNombre=session.usuario||'tu edecán';
+    const dependencia=session.dependencia||titularRow[C.Dependencia]||'la dependencia';
     const comidaTitular=titularRow[C.Comida]||'—';
     const bebidaTitular=titularRow[C.Bebida]||'—';
 
-    let listaAcomp='';
-    if(acompRows.length>0){
-      listaAcomp='\n'+acompRows.map((a)=>{
-        const qrA=`${SCANNER_URL}?qrid=${encodeURIComponent(a[C.QR_ID]||'')}`;
-        return `  • ${a[C.Nombre]||'—'}\n    Plato: ${a[C.Comida]||'—'} | Bebida: ${a[C.Bebida]||'—'}\n    QR: ${qrA}`;
-      }).join('\n');
-    }
-
-    const mensaje=
-`Hola ${primerNombreCap} 😊 Mi nombre es ${edecanNombre}, edecán de la dependencia ${dependencia}, y estaré acompañándote durante el evento.
-Te comparto el detalle de tu registro para el evento del 28.06.2026:
-
-🔹 Titular: ${titularRow[C.Nombre]||'—'}
-   Plato: ${comidaTitular} | Bebida: ${bebidaTitular}
-   QR de acceso: ${qrTitular}
-🔹 Acompañantes:${listaAcomp||' —'}
-
-📌 Por favor, conserva estos QR ya que serán necesarios para tu ingreso.
-Si tienes alguna consulta, cambio o necesitas apoyo con algún detalle, con toda confianza puedes escribirme. Estaré encantado(a) de ayudarte 😊
-¡Nos vemos muy pronto! 🙌`;
-
-    // ── Generar imagen QR del titular ────────────────────────────
+    // ── Generar canvas del titular ─────────────────────────────
     const canvasTitular=await buildQRCanvas();
 
-    // ── Generar imágenes QR de cada acompañante ──────────────────
-    // Para cada acompañante generamos un canvas temporal con su QR
-    const acompCanvases=[];
-    for(const ac of acompRows){
-      const acCanvas=await buildQRCanvasForRow(ac);
-      if(acCanvas) acompCanvases.push({canvas:acCanvas,row:ac});
+    // ── CASO 1: Sin acompañantes → 1 solo mensaje ─────────────
+    if(acompRows.length===0){
+      const mensajeUnico=
+`Hola ${primerNombreCap} 😊 Mi nombre es ${edecanNombre} y seré tu edecán de la dependencia ${dependencia} durante el evento del 28/06/2026.
+
+🎟️ Tu registro:
+• Titular: ${titularRow[C.Nombre]||'—'}
+• Plato: ${comidaTitular} | Bebida: ${bebidaTitular}
+
+Te adjunto tu QR de acceso 👆 Preséntalo tanto en el ingreso como al momento de recibir tu comida (es reutilizable 😊).
+
+Si tienes alguna consulta o necesitas apoyo, con toda confianza puedes escribirme. Estaré feliz de ayudarte 🙌
+¡Nos vemos muy pronto!`;
+
+      const files=[];
+      if(canvasTitular){
+        const blob=await new Promise(res=>canvasTitular.toBlob(b=>res(b),'image/png',1.0));
+        if(blob){
+          const fname=`QR_${titularRow[C.QR_ID]||'titular'}.png`;
+          files.push(new File([blob],fname,{type:'image/png'}));
+        }
+      }
+      await _compartir(files,`QR - ${primerNombreCap}`,mensajeUnico);
+      return;
     }
 
-    // ── Armar lista de archivos para compartir ───────────────────
-    const files=[];
+    // ── CASO 2: Con acompañantes → múltiples mensajes ─────────
+    // MENSAJE 1: Titular + aviso de seguimiento
+    const msg1=
+`Hola ${primerNombreCap} 😊 Mi nombre es ${edecanNombre} y seré tu edecán de la dependencia ${dependencia} durante el evento del 28/06/2026.
+
+🎟️ Tu registro (Titular):
+• ${titularRow[C.Nombre]||'—'}
+• Plato: ${comidaTitular} | Bebida: ${bebidaTitular}
+
+Te adjunto tu QR de acceso 👆
+
+En los siguientes mensajes te envío los datos y QR de cada uno de tus acompañantes 🙌`;
+
+    const filesMsg1=[];
     if(canvasTitular){
       const blob=await new Promise(res=>canvasTitular.toBlob(b=>res(b),'image/png',1.0));
-      if(blob){
-        const fname=`QR_${titularRow[C.QR_ID]||'titular'}_${(titularRow[C.Nombre]||'').replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)}.png`;
-        files.push(new File([blob],fname,{type:'image/png'}));
-      }
+      if(blob) filesMsg1.push(new File([blob],`QR_titular_${titularRow[C.QR_ID]||''}.png`,{type:'image/png'}));
     }
-    for(const {canvas,row} of acompCanvases){
-      const blob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/png',1.0));
-      if(blob){
-        const fname=`QR_${row[C.QR_ID]||'acomp'}_${(row[C.Nombre]||'').replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)}.png`;
-        files.push(new File([blob],fname,{type:'image/png'}));
+    await _compartir(filesMsg1,`QR Titular - ${primerNombreCap}`,msg1);
+
+    // MENSAJES POR ACOMPAÑANTE
+    for(let i=0;i<acompRows.length;i++){
+      const ac=acompRows[i];
+      const nomAc=(ac[C.Nombre]||'—');
+      const comAc=ac[C.Comida]||'—';
+      const bebAc=ac[C.Bebida]||'—';
+      const numAc=i+1;
+      const acCanvas=await buildQRCanvasForRow(ac);
+      const msgAc=
+`👥 Acompañante ${numAc}: ${nomAc}
+• Plato: ${comAc} | Bebida: ${bebAc}
+
+Te adjunto su QR de acceso 👆 (válido para ingreso y comida)`;
+
+      const filesAc=[];
+      if(acCanvas){
+        const blob=await new Promise(res=>acCanvas.toBlob(b=>res(b),'image/png',1.0));
+        if(blob) filesAc.push(new File([blob],`QR_acomp${numAc}_${ac[C.QR_ID]||''}.png`,{type:'image/png'}));
       }
+      await _compartir(filesAc,`QR Acompañante ${numAc} - ${nomAc}`,msgAc);
     }
 
-    if(files.length>0&&navigator.canShare&&navigator.canShare({files})){
-      try{
-        await navigator.share({files,title:`QR - ${primerNombreCap}`,text:mensaje});
-        return;
-      } catch(ex){if(ex.name==='AbortError') return;}
-    }
-    // Fallback: solo texto
+    // MENSAJE FINAL: Cierre
+    const msgCierre=
+`📌 Recuerda guardar todos los QR que te envié — los necesitarás tanto para el ingreso como para recibir tu comida.
+
+Si tienes alguna consulta, cambio o necesitas apoyo con cualquier detalle, con toda confianza puedes escribirme, estaré feliz de ayudarte 😊
+
+¡Nos vemos el 28 de junio! 🙌🎉`;
+    await _compartir([],`Cierre - ${primerNombreCap}`,msgCierre);
+
+  } catch(ex){ copyQRUrl(); }
+}
+
+// Helper interno: comparte un mensaje con archivos opcionales
+// Si no hay archivos o navigator.canShare no los soporta, comparte solo texto
+async function _compartir(files, title, text){
+  if(files.length>0 && navigator.canShare && navigator.canShare({files})){
     try{
-      await navigator.share({title:`QR - ${primerNombreCap}`,text:mensaje});
-    } catch(ex){if(ex.name!=='AbortError') copyQRUrl();}
-  } catch(ex){copyQRUrl();}
+      await navigator.share({files,title,text});
+      return;
+    } catch(ex){
+      if(ex.name==='AbortError') return;
+      // Si falla el share con archivos, intenta sin archivos
+    }
+  }
+  // Fallback: solo texto
+  try{
+    await navigator.share({title,text});
+  } catch(ex){
+    if(ex.name!=='AbortError') showToast('No se pudo compartir');
+  }
 }
 
 // Genera un canvas QR para una fila específica (sin necesitar que esté en el modal)
@@ -1417,13 +1454,9 @@ async function doChangePassword(){
   if(new1.length<6){showMsg(msg,'err','La nueva contraseña debe tener al menos 6 caracteres');return;}
   if(new1!==new2){showMsg(msg,'err','Las contraseñas no coinciden');return;}
   try{
-    // Verificar contraseña actual via login
-    const check=await fetch(`${SCRIPT_URL}?action=login&usuario=${encodeURIComponent(session.usuario)}&password=${encodeURIComponent(current)}`,{redirect:'follow'});
-    const ck=await check.json();
-    if(ck.result!=='ok'){showMsg(msg,'err','Contraseña actual incorrecta');return;}
-    // Actualizar con updateUser
-    const res=await apiFetch('updateUser',{usuario:session.usuario,newPassword:new1});
-    if(res.result==='ok'){showMsg(msg,'ok','Contraseña cambiada correctamente');setTimeout(closeChangePass,2000);}
+    // Usa la nueva acción changeOwnPassword que verifica la contraseña actual en el servidor
+    const res=await apiFetch('changeOwnPassword',{currentPassword:current,newPassword:new1});
+    if(res.result==='ok'){showMsg(msg,'ok','✓ Contraseña cambiada correctamente');setTimeout(closeChangePass,2000);}
     else{showMsg(msg,'err',res.mensaje||'Error al cambiar contraseña');}
   } catch(ex){showMsg(msg,'err','Error de conexión');}
 }
