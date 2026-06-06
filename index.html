@@ -66,6 +66,7 @@ header{background:var(--s1);border-bottom:3px solid var(--gold);padding:0 24px;
 .user-pill .role-badge{padding:3px 8px;border-radius:2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;}
 .role-admin{background:rgba(255,215,0,.15);color:var(--gold)}
 .role-delegado{background:rgba(0,102,204,.2);color:#60a5fa}
+.role-edecan{background:rgba(100,120,220,.2);color:#a78bfa}
 .role-vasistencia{background:rgba(0,230,118,.15);color:var(--mint)}
 .role-ventrega{background:rgba(232,0,45,.15);color:#ff6b6b}
 #btn-refresh{background:transparent;border:1px solid var(--border2);color:var(--gold);border-radius:3px;padding:8px 16px;
@@ -146,6 +147,7 @@ tr:hover td{background:rgba(255,215,0,.025)}
 .bdg{display:inline-block;padding:3px 8px;border-radius:2px;font-family:var(--font-h);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
 .bdg-t{background:rgba(255,215,0,.12);color:var(--gold);border:1px solid rgba(255,215,0,.2)}
 .bdg-a{background:rgba(0,230,118,.1);color:var(--mint);border:1px solid rgba(0,230,118,.2)}
+.bdg-p{background:rgba(255,165,0,.12);color:var(--gold2);border:1px solid rgba(255,165,0,.25)}
 .bdg-chk{background:rgba(0,230,118,.12);color:var(--mint);border:1px solid rgba(0,230,118,.2)}
 .bdg-no{background:rgba(90,98,128,.1);color:var(--muted);border:1px solid var(--border)}
 .role-badge{padding:3px 8px;border-radius:2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;}
@@ -320,13 +322,16 @@ tr:hover td{background:rgba(255,215,0,.025)}
             <option value="">— Seleccionar rol —</option>
             <option value="administrador">Administrador</option>
             <option value="delegado">Delegado</option>
+            <option value="edecan">Edecán</option>
             <option value="verificadorasistencia">Verificador de Asistencia</option>
             <option value="verificadorentrega">Verificador de Entrega</option>
           </select>
         </div>
         <div class="form-group" id="dep-field-group" style="display:none">
           <label>Dependencia</label>
-          <input id="nu-dep" type="text" placeholder="Indicar dependencia del edecan">
+          <select id="nu-dep">
+            <option value="">— Seleccionar dependencia —</option>
+          </select>
         </div>
       </div>
       <button class="btn btn-gold" onclick="createUser()">+ Crear usuario</button>
@@ -392,6 +397,7 @@ tr:hover td{background:rgba(255,215,0,.025)}
       <div class="qr-pill"><div class="qr-pill-lbl">🍽️ Comida</div><div class="qr-pill-val food" id="qr-pill-comida">—</div></div>
       <div class="qr-pill"><div class="qr-pill-lbl">🥤 Bebida</div><div class="qr-pill-val drink" id="qr-pill-bebida">—</div></div>
       <div class="qr-pill"><div class="qr-pill-lbl">👤 Tipo</div><div class="qr-pill-val" id="qr-pill-tipo">—</div></div>
+      <div class="qr-pill"><div class="qr-pill-lbl">🎯 Disciplina</div><div class="qr-pill-val" id="qr-pill-disciplina">—</div></div>
     </div>
     <div class="qr-actions">
       <button class="btn btn-gold" onclick="downloadQRFull()" style="justify-content:center;padding:12px">⬇ Descargar imagen completa</button>
@@ -461,14 +467,15 @@ function startApp(){
   document.getElementById('user-display').textContent=session.usuario;
   const rb=document.getElementById('role-badge');
   const rmap={administrador:['Administrador','role-admin'],delegado:['Delegado','role-delegado'],
+    edecan:['Edecán','role-edecan'],
     verificadorasistencia:['Ver. Asistencia','role-vasistencia'],verificadorentrega:['Ver. Entrega','role-ventrega']};
   const rm=rmap[session.rol]||[session.rol,'role-admin'];
   rb.textContent=rm[0];rb.className='role-badge '+rm[1];
   if(session.rol!=='administrador'){
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='none');
   }
-  // Show change password button in header for non-admin, non-delegado
-  if(session.rol!=='administrador'&&session.rol!=='delegado'){
+  // Show change password button in header for non-admin, non-delegado, non-edecan
+  if(session.rol!=='administrador'&&session.rol!=='delegado'&&session.rol!=='edecan'){
     addChangePassBtn();
   }
   loadData();
@@ -620,6 +627,42 @@ function renderDepsDashboard(){
     </div>`;
 }
 
+// ── DEBOUNCE ──────────────────────────────────────────────────
+let _searchDebounceTimer=null;
+function debouncedSearch(val){
+  if(_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
+  _searchDebounceTimer=setTimeout(()=>{
+    requestAnimationFrame(()=>renderParticipants(val));
+  },300);
+}
+
+// ── DISCIPLINE ICON MAP ────────────────────────────────────────
+const DISC_ICON={
+  'Baloncesto':'🏀','Danza':'💃','Fútbol':'⚽','Sapo':'🐸',
+  'Vóley Mixto':'🏐','Ajedrez':'♟️','Cubilete':'🎲',
+  '100 Metros':'🏃','Futbolín':'🎯','Maratón':'🏅',
+  'Tenis de Mesa':'🏓','Barra':'📣'
+};
+function discIcon(disc){
+  if(!disc||disc==='—') return '';
+  for(const k of Object.keys(DISC_ICON)){if(disc.toLowerCase().includes(k.toLowerCase()))return DISC_ICON[k];}
+  return '🎽';
+}
+
+// ── TIPO HELPERS ───────────────────────────────────────────────
+function esPadrinoRow(row){
+  const padrino=row[C.Padrino]||'';
+  return padrino&&padrino!=='NO'&&padrino!=='—'&&padrino.toLowerCase()!=='no';
+}
+function getTipoDisplay(row){
+  const esPadrino=esPadrinoRow(row);
+  const tipoPersona=row[C.TipoPersona]||'';
+  if(esPadrino) return {label:'Padrino',cls:'bdg-p',icon:'👑'};
+  if(tipoPersona==='Titular') return {label:'Titular',cls:'bdg-t',icon:'🥇'};
+  if(tipoPersona==='Acompañante') return {label:'Acompañante',cls:'bdg-a',icon:'👥'};
+  return {label:tipoPersona||'—',cls:'bdg-no',icon:''};
+}
+
 // ── PARTICIPANTS ───────────────────────────────────────────────
 function renderParticipants(s,f){
   if(s!==undefined) currentSearch=s.toLowerCase();
@@ -628,11 +671,13 @@ function renderParticipants(s,f){
     const nm=(r[C.Nombre]||'').toLowerCase(),dp=(r[C.Dependencia]||'').toLowerCase(),
           cl=(r[C.Celular]||'').toLowerCase(),rg=(r[C.Registro]||'').toLowerCase();
     const ms=!currentSearch||nm.includes(currentSearch)||dp.includes(currentSearch)||cl.includes(currentSearch)||rg.includes(currentSearch);
-    const tp=r[C.TipoPersona]||'',qid=r[C.QR_ID]||'';
+    const qid=r[C.QR_ID]||'',tp=r[C.TipoPersona]||'';
     const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
+    const isPadrino=esPadrinoRow(r);
     const mf=currentFilter==='todos'||(currentFilter==='titulares'&&tp==='Titular')||
-      (currentFilter==='acompanantes'&&tp==='Acompañante')||(currentFilter==='ingreso'&&hasIngreso)||
-      (currentFilter==='entrega'&&hasEntrega)||(currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
+      (currentFilter==='acompanantes'&&tp==='Acompañante')||(currentFilter==='padrinos'&&isPadrino)||
+      (currentFilter==='ingreso'&&hasIngreso)||(currentFilter==='entrega'&&hasEntrega)||
+      (currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
     return ms&&mf;
   });
   const total=rows.length;
@@ -640,38 +685,19 @@ function renderParticipants(s,f){
   const withEntrega=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].entrega}).length;
   const isAdmin=session.rol==='administrador';
 
-  const tbody=rows.map(r=>{
-    const qid=r[C.QR_ID]||'',hasI=checkins[qid]&&checkins[qid].ingreso,hasE=checkins[qid]&&checkins[qid].entrega,tp=r[C.TipoPersona]||'';
-    const padrino=r[C.Padrino]||'';
-    const esPadrino=padrino&&padrino!=='NO'&&padrino!=='—'&&padrino.toLowerCase()!=='no';
-    return `
-    <tr class="${hasI&&hasE?'attended':''}">
-      <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${esPadrino?'<span class="bdg" style="background:rgba(255,215,0,.1);color:var(--gold);font-size:9px;margin-left:4px">👑 Padrino</span>':''}</td>
-      <td><span class="bdg ${tp==='Titular'?'bdg-t':'bdg-a'}">${e(tp||'—')}</span></td>
-      <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
-      <td style="font-size:12px">${e(r[C.Comida]||'—')}</td>
-      <td style="font-size:12px">${e(r[C.Bebida]||'—')}</td>
-      <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
-      <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
-      <td style="white-space:nowrap">
-        ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(tp)}','${e(r[C.Dependencia]||'')}','${e(padrino)}')">🔲 QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
-        ${isAdmin?`<button class="btn btn-danger btn-sm" onclick="deleteRegistro('${e(qid)}','${e(r[C.Nombre]||'')}')">🗑</button>`:''}
-      </td>
-    </tr>`;
-  }).join('');
-
-  document.getElementById('part-inner').innerHTML=`
+  const headerHtml=`
     <div class="prog-wrap">
       <div class="prog-lbl">Ingresos: <strong>${withIngreso}/${total}</strong></div>
       <div class="prog-track"><div class="prog-fill" style="width:${total>0?Math.round(withIngreso/total*100):0}%"></div></div>
       <div class="prog-lbl">Entregas: <strong>${withEntrega}/${total}</strong></div>
     </div>
     <div class="toolbar">
-      <input class="search" type="text" placeholder="🔍 Buscar nombre, dependencia, celular..." value="${e(currentSearch)}" oninput="renderParticipants(this.value)">
+      <input class="search" type="text" placeholder="🔍 Buscar nombre, dependencia, celular..." value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
       <select class="filter" onchange="renderParticipants(undefined,this.value)">
         <option value="todos" ${currentFilter==='todos'?'selected':''}>Todos (${allRows.length})</option>
         <option value="titulares" ${currentFilter==='titulares'?'selected':''}>Titulares</option>
         <option value="acompanantes" ${currentFilter==='acompanantes'?'selected':''}>Acompañantes</option>
+        <option value="padrinos" ${currentFilter==='padrinos'?'selected':''}>Padrinos 👑</option>
         <option value="ingreso" ${currentFilter==='ingreso'?'selected':''}>Con ingreso ✓</option>
         <option value="entrega" ${currentFilter==='entrega'?'selected':''}>Con entrega ✓</option>
         <option value="pendientes" ${currentFilter==='pendientes'?'selected':''}>Sin check</option>
@@ -681,14 +707,50 @@ function renderParticipants(s,f){
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Comida</th><th>Bebida</th>
+          <th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
           <th>Ingreso</th><th>Entrega</th><th>Acciones</th>
         </tr></thead>
-        <tbody>${tbody||`<tr><td colspan="8"><div class="empty">Sin resultados</div></td></tr>`}</tbody>
+        <tbody id="part-tbody"></tbody>
       </table>
     </div>`;
-}
 
+  document.getElementById('part-inner').innerHTML=headerHtml;
+
+  const tbody=document.getElementById('part-tbody');
+  const frag=document.createDocumentFragment();
+
+  if(!rows.length){
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td colspan="9"><div class="empty">Sin resultados</div></td>';
+    frag.appendChild(tr);
+  } else {
+    rows.forEach(r=>{
+      const qid=r[C.QR_ID]||'',hasI=checkins[qid]&&checkins[qid].ingreso,hasE=checkins[qid]&&checkins[qid].entrega;
+      const padrino=r[C.Padrino]||'';
+      const isPadrino=esPadrinoRow(r);
+      const tipoInfo=getTipoDisplay(r);
+      const disc=r[C.Disciplina]||'—';
+      const dicon=discIcon(disc);
+      const tr=document.createElement('tr');
+      if(hasI&&hasE) tr.className='attended';
+      tr.innerHTML=`
+        <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${isPadrino?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">👑 Padrino</span>':''}</td>
+        <td><span class="bdg ${tipoInfo.cls}">${tipoInfo.icon} ${e(tipoInfo.label)}</span></td>
+        <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
+        <td style="font-size:12px">${dicon} ${disc!=='—'?e(disc):disc}</td>
+        <td style="font-size:12px">${e(r[C.Comida]||'—')}</td>
+        <td style="font-size:12px">${e(r[C.Bebida]||'—')}</td>
+        <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
+        <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
+        <td style="white-space:nowrap">
+          ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(r[C.TipoPersona]||'')}','${e(r[C.Dependencia]||'')}','${e(padrino)}','${e(disc)}')">🔲 QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
+          ${isAdmin?`<button class="btn btn-danger btn-sm" onclick="deleteRegistro('${e(qid)}','${e(r[C.Nombre]||'')}')">🗑</button>`:''}
+        </td>`;
+      frag.appendChild(tr);
+    });
+  }
+  tbody.appendChild(frag);
+}
 function formatHora(str){
   if(!str) return '';const parts=String(str).split(' ');return parts[1]||parts[0]||'';
 }
@@ -707,24 +769,44 @@ async function deleteRegistro(qrid, nombre){
 }
 
 // ── QR MODAL ───────────────────────────────────────────────────
-function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino){
+let currentQRDisc='';
+function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   currentQRId=qrid;currentQRNombre=nombre;currentQRTipo=tipo;currentQRPadrino=padrino||'';
+  currentQRDisc=disc||'';
   const url=`${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
   currentQRUrl=url;
-  const esTitular=tipo==='Titular';
   const esPadrino=padrino&&padrino!=='NO'&&padrino!=='—'&&padrino.toLowerCase()!=='no';
+  const esTitular=tipo==='Titular';
 
+  // Badge: Padrino > Titular > Acompañante
   const badge=document.getElementById('qr-tipo-badge');
-  badge.textContent=esTitular?'👤 Titular':'👥 Acompañante';
-  badge.className='qr-tipo-badge '+(esTitular?'qr-tipo-t':'qr-tipo-a');
+  if(esPadrino){
+    badge.textContent='👑 Padrino';
+    badge.className='qr-tipo-badge qr-tipo-p';
+    badge.style.background='rgba(255,165,0,.18)';badge.style.color='#FFA500';
+  } else if(esTitular){
+    badge.textContent='🥇 Titular';
+    badge.className='qr-tipo-badge qr-tipo-t';
+    badge.style.background='';badge.style.color='';
+  } else {
+    badge.textContent='👥 Acompañante';
+    badge.className='qr-tipo-badge qr-tipo-a';
+    badge.style.background='';badge.style.color='';
+  }
+
   document.getElementById('qr-title').textContent=nombre||'—';
   document.getElementById('qr-dep').textContent=dependencia||'';
   document.getElementById('qr-pill-comida').textContent=comida||'—';
   document.getElementById('qr-pill-bebida').textContent=bebida||'—';
-  document.getElementById('qr-pill-tipo').textContent=tipo||'—';
+  // Show correct tipo label in pill
+  const tipoLabel=esPadrino?'👑 Padrino':esTitular?'Titular':'Acompañante';
+  document.getElementById('qr-pill-tipo').textContent=tipoLabel;
+  // Discipline pill with icon
+  const dEl=document.getElementById('qr-pill-disciplina');
+  if(dEl){const dicon=discIcon(disc||'');dEl.textContent=dicon?(dicon+' '+(disc||'—')):(disc||'—');}
   document.getElementById('qr-id-chip').textContent='ID: '+qrid;
 
-  // Background overlay: crown for padrino, medal for participant
+  // Background overlay: CROWN for padrino, MEDAL for participant
   const bgImg=document.getElementById('qr-bg-img');
   bgImg.src=esPadrino?CROWN_SVG:MEDAL_SVG;
 
@@ -738,95 +820,159 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino){
 function closeQR(){document.getElementById('qr-modal').style.display='none';}
 
 // Download FULL image (QR + name + event name + logo + background)
-async function downloadQRFull(){
-  await new Promise(r=>setTimeout(r,200));
+// ── QR CANVAS BUILDER (shared between download and share) ─────
+async function buildQRCanvas(){
+  await new Promise(r=>setTimeout(r,250));
   const qrImg=document.querySelector('#qr-canvas img')||document.querySelector('#qr-canvas canvas');
-  if(!qrImg){alert('QR aún no generado, intenta de nuevo');return;}
+  if(!qrImg) return null;
 
+  const W=360,H=480;
   const canvas=document.createElement('canvas');
-  const W=320,H=430;canvas.width=W;canvas.height=H;
+  canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');
 
   // White background
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
 
-  // Draw BG overlay (crown or medal)
-  const esPadrino=currentQRPadrino&&currentQRPadrino!=='NO'&&currentQRPadrino!=='—'&&currentQRPadrino.toLowerCase()!=='no';
-  const svgBlob=new Blob([esPadrino?
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><path d="M100 20 L30 90 L50 160 L150 160 L170 90 Z" fill="none" stroke="#FFD700" stroke-width="6" stroke-linejoin="round" opacity="0.25"/><circle cx="100" cy="18" r="10" fill="#FFD700" opacity="0.25"/><circle cx="30" cy="88" r="8" fill="#FFD700" opacity="0.25"/><circle cx="170" cy="88" r="8" fill="#FFD700" opacity="0.25"/><rect x="45" y="155" width="110" height="14" rx="4" fill="#FFD700" opacity="0.15"/></svg>`:
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle cx="100" cy="120" r="65" fill="none" stroke="#FFD700" stroke-width="6" opacity="0.2"/><circle cx="100" cy="120" r="50" fill="none" stroke="#FFA500" stroke-width="3" opacity="0.15"/><path d="M80 20 L90 55 L100 20 L110 55 L120 20" fill="none" stroke="#FFD700" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.2"/><line x1="80" y1="55" x2="120" y2="55" stroke="#FFD700" stroke-width="4" opacity="0.2"/><text x="100" y="128" text-anchor="middle" font-size="38" font-family="Arial" font-weight="bold" fill="#FFD700" opacity="0.15">1</text></svg>`
-  ],{type:'image/svg+xml'});
-  const svgUrl=URL.createObjectURL(svgBlob);
-  await new Promise(res=>{const i=new Image();i.onload=()=>{ctx.drawImage(i,60,60,200,200);URL.revokeObjectURL(svgUrl);res();};i.src=svgUrl;});
+  // Light gradient background tint
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(240,235,210,0.18)');
+  grad.addColorStop(1,'rgba(200,200,220,0.08)');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
 
-  // Draw QR
+  const esPadrino=currentQRPadrino&&currentQRPadrino!=='NO'&&currentQRPadrino!=='—'&&currentQRPadrino.toLowerCase()!=='no';
+
+  // Draw background overlay SVG (crown or medal) — centered, large, translucent
+  const overlaySVG=esPadrino?
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><path d="M100 20 L30 90 L50 160 L150 160 L170 90 Z" fill="none" stroke="#FFD700" stroke-width="7" stroke-linejoin="round" opacity="0.22"/><circle cx="100" cy="18" r="11" fill="#FFD700" opacity="0.22"/><circle cx="30" cy="88" r="9" fill="#FFD700" opacity="0.22"/><circle cx="170" cy="88" r="9" fill="#FFD700" opacity="0.22"/><rect x="45" y="155" width="110" height="14" rx="4" fill="#FFD700" opacity="0.15"/></svg>`:
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle cx="100" cy="120" r="65" fill="none" stroke="#FFD700" stroke-width="7" opacity="0.18"/><circle cx="100" cy="120" r="50" fill="none" stroke="#FFA500" stroke-width="3" opacity="0.12"/><path d="M80 20 L90 55 L100 20 L110 55 L120 20" fill="none" stroke="#FFD700" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.18"/><line x1="80" y1="55" x2="120" y2="55" stroke="#FFD700" stroke-width="4" opacity="0.18"/><text x="100" y="128" text-anchor="middle" font-size="38" font-family="Arial" font-weight="bold" fill="#FFD700" opacity="0.12">1</text></svg>`;
+
+  const svgBlob=new Blob([overlaySVG],{type:'image/svg+xml'});
+  const svgUrl=URL.createObjectURL(svgBlob);
+  await new Promise(res=>{
+    const i=new Image();
+    i.onload=()=>{ctx.drawImage(i,(W-220)/2,(H-300)/2,220,220);URL.revokeObjectURL(svgUrl);res();};
+    i.onerror=()=>{URL.revokeObjectURL(svgUrl);res();};
+    i.src=svgUrl;
+  });
+
+  // Draw QR code (centered, leaving room for header logo and footer banner)
+  const QR_SIZE=260,QR_X=(W-QR_SIZE)/2,QR_Y=50;
   await new Promise(res=>{
     const src=qrImg instanceof HTMLCanvasElement?qrImg.toDataURL():qrImg.src;
-    const i=new Image();i.onload=()=>{ctx.drawImage(i,30,30,260,260);res();};i.src=src;
+    const i=new Image();
+    i.onload=()=>{ctx.drawImage(i,QR_X,QR_Y,QR_SIZE,QR_SIZE);res();};
+    i.src=src;
   });
 
-  // Draw logo top center
+  // Logo overlay centered on QR
+  const LOGO_R=30;
   await new Promise(res=>{
-    const i=new Image();i.onload=()=>{
-      ctx.save();ctx.beginPath();ctx.arc(W/2,30,26,0,Math.PI*2);ctx.clip();
-      ctx.drawImage(i,W/2-26,4,52,52);ctx.restore();res();
-    };i.src=LOGO_SRC;
+    const i=new Image();
+    i.onload=()=>{
+      ctx.save();
+      // White circle behind logo
+      ctx.beginPath();ctx.arc(W/2,QR_Y+QR_SIZE/2,LOGO_R+3,0,Math.PI*2);
+      ctx.fillStyle='#fff';ctx.fill();
+      ctx.beginPath();ctx.arc(W/2,QR_Y+QR_SIZE/2,LOGO_R,0,Math.PI*2);ctx.clip();
+      ctx.drawImage(i,W/2-LOGO_R,QR_Y+QR_SIZE/2-LOGO_R,LOGO_R*2,LOGO_R*2);
+      ctx.restore();res();
+    };
+    i.onerror=()=>res();
+    i.src=LOGO_SRC;
   });
 
-  // Event name banner bottom
-  ctx.fillStyle='#1a1a2e';ctx.fillRect(0,295,W,135);
-  ctx.fillStyle='#FFD700';ctx.font='bold 11px Barlow Condensed, Arial';ctx.textAlign='center';
-  ctx.fillText('XXIV CAMPEONATO REGIONAL DEL SUR',W/2,318);
-  ctx.fillStyle='#ffffff';ctx.font='bold 10px Barlow Condensed, Arial';
-  ctx.fillText('ELIANA AMPARO R. MOLINA DEL CARPIO',W/2,336);
-  ctx.fillStyle='#aab0cc';ctx.font='10px Arial';
-  ctx.fillText('MDD 2026',W/2,352);
-  // Participant name
-  ctx.fillStyle='#ffffff';ctx.font='bold 15px Barlow Condensed, Arial';
-  const nm=currentQRNombre.length>30?currentQRNombre.slice(0,28)+'…':currentQRNombre;
-  ctx.fillText(nm.toUpperCase(),W/2,376);
-  ctx.fillStyle=currentQRTipo==='Titular'?'#FFD700':'#00E676';
-  ctx.font='bold 11px Arial';ctx.fillText(currentQRTipo.toUpperCase(),W/2,394);
-  if(esPadrino){ctx.fillStyle='#FFD700';ctx.font='11px Arial';ctx.fillText('👑 PADRINO',W/2,412);}
+  // Discipline icon above QR (top area)
+  const dicon=discIcon(currentQRDisc||'');
+  if(dicon){
+    ctx.font='22px Arial';ctx.textAlign='center';
+    ctx.fillText(dicon,W/2,38);
+  }
 
-  const a=document.createElement('a');a.download=`QR_${currentQRId}_${(currentQRNombre||'participante').replace(/\s/g,'_')}.png`;
-  a.href=canvas.toDataURL('image/png');a.click();
+  // Dark footer banner
+  const BANNER_Y=QR_Y+QR_SIZE+16;
+  const BANNER_H=H-BANNER_Y;
+  ctx.fillStyle='#0f1220';ctx.fillRect(0,BANNER_Y,W,BANNER_H);
+
+  // Gold top stripe on banner
+  const bannerGrad=ctx.createLinearGradient(0,0,W,0);
+  bannerGrad.addColorStop(0,'#FFA500');bannerGrad.addColorStop(1,'#FFD700');
+  ctx.fillStyle=bannerGrad;ctx.fillRect(0,BANNER_Y,W,3);
+
+  ctx.textAlign='center';
+  // Event name
+  ctx.fillStyle='#FFD700';ctx.font='bold 10px Barlow Condensed, Arial';
+  ctx.fillText('XXIV CAMPEONATO REGIONAL DEL SUR',W/2,BANNER_Y+16);
+  ctx.fillStyle='#aab0cc';ctx.font='9px Arial';
+  ctx.fillText('Eliana Amparo R. Molina del Carpio · MDD 2026',W/2,BANNER_Y+30);
+
+  // Separator line
+  ctx.strokeStyle='rgba(255,215,0,.2)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(20,BANNER_Y+38);ctx.lineTo(W-20,BANNER_Y+38);ctx.stroke();
+
+  // Participant name
+  ctx.fillStyle='#ffffff';ctx.font='bold 14px Barlow Condensed, Arial';
+  const nm=(currentQRNombre||'').length>34?(currentQRNombre||'').slice(0,32)+'…':(currentQRNombre||'');
+  ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
+
+  // Tipo + discipline row
+  const tipoLabel=esPadrino?'👑 PADRINO':currentQRTipo==='Titular'?'🥇 TITULAR':'👥 ACOMPAÑANTE';
+  ctx.fillStyle=esPadrino?'#FFA500':currentQRTipo==='Titular'?'#FFD700':'#00E676';
+  ctx.font='bold 11px Arial';
+  ctx.fillText(tipoLabel,W/2,BANNER_Y+72);
+
+  // Discipline
+  if(currentQRDisc&&currentQRDisc!=='—'){
+    ctx.fillStyle='#8890b0';ctx.font='10px Arial';
+    const discLabel=(dicon?dicon+' ':'')+currentQRDisc;
+    ctx.fillText(discLabel,W/2,BANNER_Y+88);
+  }
+
+  return canvas;
+}
+
+async function downloadQRFull(){
+  const canvas=await buildQRCanvas();
+  if(!canvas){alert('QR aún no generado, intenta de nuevo');return;}
+  const fname=`QR_${currentQRId}_${(currentQRNombre||'participante').replace(/[^a-zA-Z0-9]/g,'_')}.png`;
+
+  // Use canvas.toBlob for best compatibility
+  canvas.toBlob(async blob=>{
+    if(!blob){alert('Error generando imagen');return;}
+    // Mobile: try Web Share API first
+    const file=new File([blob],fname,{type:'image/png'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file],title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato · MDD 2026`});
+        return;
+      } catch(ex){/* fallthrough to download */}
+    }
+    // Desktop/fallback: anchor download
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.download=fname;a.href=url;
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
+  },'image/png');
 }
 
 async function shareQRFull(){
-  if(!navigator.share&&!navigator.canShare){copyQRUrl();return;}
-  // Generate image blob for sharing
-  await new Promise(r=>setTimeout(r,200));
-  const qrImg=document.querySelector('#qr-canvas img')||document.querySelector('#qr-canvas canvas');
-  if(!qrImg){if(navigator.share)navigator.share({title:`QR - ${currentQRNombre}`,text:`Acceso al evento: ${currentQRNombre}`,url:currentQRUrl}).catch(()=>{});return;}
-
-  const canvas=document.createElement('canvas');
-  const W=320,H=430;canvas.width=W;canvas.height=H;
-  const ctx=canvas.getContext('2d');
-  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
-
-  const src=qrImg instanceof HTMLCanvasElement?qrImg.toDataURL():qrImg.src;
-  await new Promise(res=>{const i=new Image();i.onload=()=>{ctx.drawImage(i,30,30,260,260);res();};i.src=src;});
-  await new Promise(res=>{const i=new Image();i.onload=()=>{ctx.save();ctx.beginPath();ctx.arc(W/2,30,26,0,Math.PI*2);ctx.clip();ctx.drawImage(i,W/2-26,4,52,52);ctx.restore();res();};i.src=LOGO_SRC;});
-  ctx.fillStyle='#1a1a2e';ctx.fillRect(0,295,W,135);
-  ctx.fillStyle='#FFD700';ctx.font='bold 11px Arial';ctx.textAlign='center';
-  ctx.fillText('XXIV CAMPEONATO REGIONAL DEL SUR',W/2,318);
-  ctx.fillStyle='#ffffff';ctx.font='10px Arial';ctx.fillText('ELIANA AMPARO R. MOLINA DEL CARPIO',W/2,336);
-  ctx.fillStyle='#aab0cc';ctx.font='10px Arial';ctx.fillText('MDD 2026',W/2,352);
-  ctx.fillStyle='#ffffff';ctx.font='bold 15px Arial';
-  const nm=currentQRNombre.length>30?currentQRNombre.slice(0,28)+'…':currentQRNombre;
-  ctx.fillText(nm.toUpperCase(),W/2,376);
-  ctx.fillStyle=currentQRTipo==='Titular'?'#FFD700':'#00E676';
-  ctx.font='bold 11px Arial';ctx.fillText(currentQRTipo.toUpperCase(),W/2,394);
-
+  const canvas=await buildQRCanvas();
+  if(!canvas){copyQRUrl();return;}
+  const fname=`QR_${currentQRId}.png`;
   canvas.toBlob(async blob=>{
     if(!blob){copyQRUrl();return;}
-    const file=new File([blob],`QR_${currentQRId}.png`,{type:'image/png'});
+    const file=new File([blob],fname,{type:'image/png'});
     try{
       if(navigator.canShare&&navigator.canShare({files:[file]})){
-        await navigator.share({files:[file],title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato Regional del Sur\nMDD 2026`});
-      } else {
+        await navigator.share({files:[file],title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato Regional del Sur · MDD 2026`});
+      } else if(navigator.share){
         await navigator.share({title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato Regional del Sur · MDD 2026`,url:currentQRUrl});
+      } else {
+        // Fallback: download
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');a.download=fname;a.href=url;
+        document.body.appendChild(a);a.click();
+        setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
       }
     } catch(ex){copyQRUrl();}
   },'image/png');
@@ -835,6 +981,7 @@ async function shareQRFull(){
 function copyQRUrl(){
   navigator.clipboard.writeText(currentQRUrl).then(()=>showToast('🔗 Enlace copiado')).catch(()=>{prompt('Copia este enlace:',currentQRUrl);});
 }
+
 
 // ── CHANGE PASSWORD (non-admin users) ─────────────────────────
 function openChangePass(){
@@ -885,8 +1032,8 @@ async function loadUsers(){
     const r=await fetch(`${SCRIPT_URL}?action=getUsers&token=${session.token}`,{redirect:'follow'});
     const d=await r.json();
     if(!d.users){document.getElementById('users-table').innerHTML='<div class="empty">Error cargando usuarios</div>';return;}
-    const rmap={administrador:'role-admin',delegado:'role-delegado',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega'};
-    const rlbl={administrador:'Administrador',delegado:'Delegado',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega'};
+    const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega'};
+    const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega'};
     const rows=d.users.map(u=>`
       <tr>
         <td><strong>${e(u.usuario)}</strong></td>
@@ -905,9 +1052,30 @@ async function loadUsers(){
   } catch(ex){document.getElementById('users-table').innerHTML='<div class="empty">Error de conexión</div>';}
 }
 
+// Get unique dependencias from loaded data
+function getDependencias(){
+  const deps=new Set();
+  allRows.forEach(r=>{const d=r[C.Dependencia];if(d&&d!=='—')deps.add(d);});
+  return Array.from(deps).sort();
+}
+
 function toggleDepField(){
   const rol=document.getElementById('nu-rol').value;
-  document.getElementById('dep-field-group').style.display=rol==='delegado'?'block':'none';
+  const needsDep=rol==='delegado'||rol==='edecan';
+  const grp=document.getElementById('dep-field-group');
+  grp.style.display=needsDep?'block':'none';
+  if(needsDep){
+    // Populate dependencias dynamically from participants data
+    const sel=document.getElementById('nu-dep');
+    const current=sel.value;
+    sel.innerHTML='<option value="">— Seleccionar dependencia —</option>';
+    getDependencias().forEach(dep=>{
+      const opt=document.createElement('option');
+      opt.value=dep;opt.textContent=dep;
+      if(dep===current)opt.selected=true;
+      sel.appendChild(opt);
+    });
+  }
 }
 
 async function createUser(){
@@ -915,15 +1083,19 @@ async function createUser(){
   const u=document.getElementById('nu-user').value.trim();
   const p=document.getElementById('nu-pass').value.trim();
   const r=document.getElementById('nu-rol').value;
-  const d=r==='delegado'?document.getElementById('nu-dep').value.trim():'';
+  const needsDep=r==='delegado'||r==='edecan';
+  const d=needsDep?document.getElementById('nu-dep').value.trim():'';
   if(!u||!p||!r){showMsg(msg,'err','Completa todos los campos obligatorios');return;}
   if(p.length<6){showMsg(msg,'err','La contraseña debe tener al menos 6 caracteres');return;}
+  if(needsDep&&!d){showMsg(msg,'err','Selecciona una dependencia para este rol');return;}
   try{
     const res=await apiFetch('createUser',{usuario:u,password:p,rol:r,dependencia:d});
     if(res.result==='ok'){
       showMsg(msg,'ok','Usuario creado correctamente');
       document.getElementById('nu-user').value='';document.getElementById('nu-pass').value='';
-      document.getElementById('nu-rol').value='';document.getElementById('nu-dep').value='';
+      document.getElementById('nu-rol').value='';
+      const depSel=document.getElementById('nu-dep');
+      if(depSel) depSel.value='';
       toggleDepField();loadUsers();
     } else{showMsg(msg,'err',res.mensaje||'Error');}
   } catch(ex){showMsg(msg,'err','Error de conexión');}
