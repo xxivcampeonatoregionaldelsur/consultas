@@ -1104,12 +1104,68 @@ async function deleteUser(usuario){
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
-async function apiFetch(action,payload){
-  // Google Apps Script no acepta preflight CORS (POST+JSON).
-  // Se envía todo como parámetros GET con redirect:follow para evitar el error.
-  const params=new URLSearchParams({action,token:session.token,...payload});
-  const res=await fetch(`${SCRIPT_URL}?${params.toString()}`,{redirect:'follow'});
-  return res.json();
+// apiFetch — proxy via iframe para evitar el bloqueo CORS en POST a Google Apps Script.
+// fetch() con POST recibe un 302 hacia script.googleusercontent.com que el navegador
+// no puede seguir cross-origin. Un <form> nativo con target a un <iframe> no tiene
+// esa restricción: el browser sigue el redirect y carga la respuesta JSON en el iframe.
+// Después de la carga leemos el texto del iframe y lo parseamos.
+function apiFetch(action, payload) {
+  return new Promise((resolve, reject) => {
+    // Crear iframe oculto como destino de la respuesta
+    const iframeId = 'api_iframe_' + Date.now();
+    const formId   = 'api_form_'   + Date.now();
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeId;
+    iframe.id   = iframeId;
+    iframe.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;';
+    document.body.appendChild(iframe);
+
+    // Crear formulario oculto que apunta al iframe
+    const form = document.createElement('form');
+    form.id     = formId;
+    form.method = 'POST';
+    form.action = SCRIPT_URL;
+    form.target = iframeId;
+    form.style.display = 'none';
+
+    // Un solo campo "data" con el JSON — doPost lee: e.parameter.data
+    const input = document.createElement('input');
+    input.type  = 'hidden';
+    input.name  = 'data';
+    input.value = JSON.stringify({action, ...payload, token: session.token});
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    // Timeout de seguridad
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timeout'));
+    }, 15000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      iframe.onload = null;
+      try { document.body.removeChild(form);   } catch(_) {}
+      try { document.body.removeChild(iframe); } catch(_) {}
+    }
+
+    iframe.onload = () => {
+      try {
+        // Leer el texto del iframe (funciona porque Google Apps Script devuelve
+        // el redirect final en script.googleusercontent.com con CORS abierto: *)
+        const raw = iframe.contentDocument
+          ? iframe.contentDocument.body.innerText || iframe.contentDocument.body.textContent
+          : iframe.contentWindow.document.body.innerText;
+        cleanup();
+        resolve(JSON.parse(raw));
+      } catch(err) {
+        cleanup();
+        reject(err);
+      }
+    };
+
+    form.submit();
+  });
 }
 
 function showMsg(el,type,text){
