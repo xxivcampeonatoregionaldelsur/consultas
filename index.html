@@ -403,7 +403,7 @@ tr:hover td{background:rgba(255,215,0,.025)}
       <button class="btn btn-gold" id="btn-qr-download" onclick="downloadQRFull(this)" style="justify-content:center;padding:12px">⬇ Descargar imagen completa</button>
       <div style="display:flex;gap:8px">
         <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="copyQRUrl()">🔗 Copiar enlace</button>
-        <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="shareQRFull()">📤 Compartir</button>
+        <button class="btn btn-ghost btn-sm" id="btn-qr-share" style="flex:1;justify-content:center;display:none" onclick="shareQRFull()">📤 Compartir</button>
       </div>
       <div class="qr-id-chip" id="qr-id-chip"></div>
     </div>
@@ -537,8 +537,12 @@ async function loadData(){
 
 // ── DASHBOARD ──────────────────────────────────────────────────
 function renderDashboard(){
-  const titulares=allRows.filter(r=>r[C.TipoPersona]==='Titular');
-  const acomps=allRows.filter(r=>r[C.TipoPersona]==='Acompañante');
+  // Titulares: TipoPersona=Titular y Tipo != Padrino e Tipo != Invitado
+  const titulares=allRows.filter(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r));
+  // Acompañantes: Tipo = "Invitado"
+  const acomps=allRows.filter(r=>esAcompananteRow(r));
+  // Padrinos: Tipo = "Padrino"
+  const padrinos=allRows.filter(r=>esPadrinoRow(r));
   const countIngresos=Object.values(checkins).filter(c=>c.ingreso).length;
   const countEntregas=Object.values(checkins).filter(c=>c.entrega).length;
   const count=arr=>arr.reduce((m,v)=>{if(v)m[v]=(m[v]||0)+1;return m},{});
@@ -560,9 +564,10 @@ function renderDashboard(){
       <span class="last-upd"></span>
     </div>
     <div class="stats">
-      <div class="stat g"><div class="stat-lbl">Total Atletas</div><div class="stat-val">${allRows.length}</div><div class="stat-icon">🏟️</div></div>
+      <div class="stat g"><div class="stat-lbl">Total Registrados</div><div class="stat-val">${allRows.length}</div><div class="stat-icon">🏟️</div></div>
       <div class="stat c"><div class="stat-lbl">Titulares</div><div class="stat-val">${titulares.length}</div><div class="stat-icon">🥇</div></div>
       <div class="stat m"><div class="stat-lbl">Acompañantes</div><div class="stat-val">${acomps.length}</div><div class="stat-icon">👥</div></div>
+      <div class="stat g"><div class="stat-lbl">Padrinos</div><div class="stat-val">${padrinos.length}</div><div class="stat-icon">👑</div></div>
       <div class="stat l"><div class="stat-lbl">Ingresos ✓</div><div class="stat-val">${countIngresos}</div><div class="stat-icon">🎫</div></div>
       <div class="stat g"><div class="stat-lbl">Entregas</div><div class="stat-val">${countEntregas}</div><div class="stat-icon">🍽️</div></div>
     </div>
@@ -650,17 +655,23 @@ function discIcon(disc){
 }
 
 // ── TIPO HELPERS ───────────────────────────────────────────────
+// Reglas de tipo (columna Tipo es la fuente principal):
+//   Tipo === "Invitado"  → Acompañante
+//   Tipo === "Padrino"   → Padrino (aunque TipoPersona sea Titular)
+//   TipoPersona === "Titular" → Participante/Titular
 function esPadrinoRow(row){
-  const padrino=row[C.Padrino]||'';
-  return padrino&&padrino!=='NO'&&padrino!=='—'&&padrino.toLowerCase()!=='no';
+  const tipo=(row[C.Tipo]||'').trim();
+  return tipo.toLowerCase()==='padrino';
+}
+function esAcompananteRow(row){
+  const tipo=(row[C.Tipo]||'').trim();
+  return tipo.toLowerCase()==='invitado';
 }
 function getTipoDisplay(row){
-  const esPadrino=esPadrinoRow(row);
-  if(esPadrino) return {label:'Padrino',cls:'bdg-p',icon:'👑'};
+  if(esPadrinoRow(row)) return {label:'Padrino',cls:'bdg-p',icon:'👑'};
+  if(esAcompananteRow(row)) return {label:'Acompañante',cls:'bdg-a',icon:'👥'};
   const tipoPersona=row[C.TipoPersona]||'';
-  const tipoPartic=(row[C.TipoParticipacion]||'').toLowerCase();
-  if(tipoPersona==='Titular'||tipoPartic.includes('titular')) return {label:'Titular',cls:'bdg-t',icon:'🥇'};
-  if(tipoPersona==='Acompañante'||tipoPartic.includes('acomp')) return {label:'Acompañante',cls:'bdg-a',icon:'👥'};
+  if(tipoPersona==='Titular') return {label:'Titular',cls:'bdg-t',icon:'🥇'};
   return {label:tipoPersona||'—',cls:'bdg-no',icon:''};
 }
 
@@ -672,17 +683,42 @@ function renderParticipants(s,f){
     const nm=(r[C.Nombre]||'').toLowerCase(),dp=(r[C.Dependencia]||'').toLowerCase(),
           cl=(r[C.Celular]||'').toLowerCase(),rg=(r[C.Registro]||'').toLowerCase();
     const ms=!currentSearch||nm.includes(currentSearch)||dp.includes(currentSearch)||cl.includes(currentSearch)||rg.includes(currentSearch);
-    const qid=r[C.QR_ID]||'',tp=r[C.TipoPersona]||'';
+    const qid=r[C.QR_ID]||'';
     const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
     const isPadrino=esPadrinoRow(r);
+    const isAcomp=esAcompananteRow(r);
+    const isTitular=r[C.TipoPersona]==='Titular'&&!isPadrino&&!isAcomp;
     const mf=currentFilter==='todos'||
-      (currentFilter==='titulares'&&tp==='Titular'&&!isPadrino)||
-      (currentFilter==='acompanantes'&&tp==='Acompañante')||
+      (currentFilter==='titulares'&&isTitular)||
+      (currentFilter==='acompanantes'&&isAcomp)||
       (currentFilter==='padrinos'&&isPadrino)||
       (currentFilter==='ingreso'&&hasIngreso)||(currentFilter==='entrega'&&hasEntrega)||
       (currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
     return ms&&mf;
   });
+
+  // Cuando hay búsqueda: agrupar por celular (titular primero, luego sus acompañantes)
+  if(currentSearch){
+    const matchedCelulares=new Set(rows.map(r=>r[C.Celular]||'').filter(c=>c));
+    const expanded=[];
+    const seen=new Set();
+    rows.forEach(r=>{
+      const cel=r[C.Celular]||'';
+      if(!seen.has(cel)&&cel){
+        seen.add(cel);
+        // titular del grupo
+        const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
+        if(titular&&!expanded.find(x=>x[C.QR_ID]===titular[C.QR_ID])) expanded.push(titular);
+        // padrinos del mismo celular
+        allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>{if(!expanded.find(y=>y[C.QR_ID]===x[C.QR_ID]))expanded.push(x);});
+        // acompañantes del mismo celular
+        allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>{if(!expanded.find(y=>y[C.QR_ID]===x[C.QR_ID]))expanded.push(x);});
+      } else if(!cel&&!expanded.find(x=>x[C.QR_ID]===r[C.QR_ID])){
+        expanded.push(r);
+      }
+    });
+    rows=expanded;
+  }
   const total=rows.length;
   const withIngreso=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].ingreso}).length;
   const withEntrega=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].entrega}).length;
@@ -733,20 +769,19 @@ function renderParticipants(s,f){
       const isPadrino=esPadrinoRow(r);
       const tipoInfo=getTipoDisplay(r);
       const disc=r[C.Disciplina]||'—';
-      const dicon=discIcon(disc);
       const tr=document.createElement('tr');
       if(hasI&&hasE) tr.className='attended';
       tr.innerHTML=`
-        <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${isPadrino?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">👑 Padrino</span>':''}</td>
-        <td><span class="bdg ${tipoInfo.cls}">${tipoInfo.icon} ${e(tipoInfo.label)}</span></td>
+        <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${esPadrinoRow(r)?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">Padrino</span>':''}</td>
+        <td><span class="bdg ${tipoInfo.cls}">${e(tipoInfo.label)}</span></td>
         <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
-        <td style="font-size:14px;text-align:center">${dicon||e(disc)}</td>
+        <td style="font-size:13px">${e(disc)}</td>
         <td style="font-size:12px">${e(r[C.Comida]||'—')}</td>
         <td style="font-size:12px">${e(r[C.Bebida]||'—')}</td>
         <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
         <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
         <td style="white-space:nowrap">
-          ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(r[C.TipoPersona]||'')}','${e(r[C.Dependencia]||'')}','${e(padrino)}','${e(disc)}')">🔲 QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
+          ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(r[C.TipoPersona]||'')}','${e(r[C.Dependencia]||'')}','${e(r[C.Tipo]||'')}','${e(r[C.Disciplina]||'')}')">🔲 QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
           ${isAdmin?`<button class="btn btn-danger btn-sm" onclick="deleteRegistro('${e(qid)}','${e(r[C.Nombre]||'')}')">🗑</button>`:''}
         </td>`;
       frag.appendChild(tr);
@@ -778,8 +813,9 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   currentQRDisc=disc||'';
   const url=`${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
   currentQRUrl=url;
-  const esPadrino=padrino&&padrino!=='NO'&&padrino!=='—'&&padrino.toLowerCase()!=='no';
-  const esTitular=tipo==='Titular';
+  // Padrino se determina por el Tipo que viene del row (columna Tipo)
+  const esPadrino=(padrino||'').toLowerCase()==='padrino';
+  const esTitular=tipo==='Titular'&&!esPadrino;
 
   // Badge: Padrino > Titular > Acompañante
   const badge=document.getElementById('qr-tipo-badge');
@@ -802,12 +838,18 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   document.getElementById('qr-pill-comida').textContent=comida||'—';
   document.getElementById('qr-pill-bebida').textContent=bebida||'—';
   // Show correct tipo label in pill
-  const tipoLabel=esPadrino?'👑 Padrino':esTitular?'Titular':'Acompañante';
+  const tipoLabel=esPadrino?'Padrino':esTitular?'Titular':'Acompañante';
   document.getElementById('qr-pill-tipo').textContent=tipoLabel;
-  // Discipline pill: icon only (no text)
+  // Discipline pill: solo texto
   const dEl=document.getElementById('qr-pill-disciplina');
-  if(dEl){const dicon=discIcon(disc||'');dEl.textContent=dicon||disc||'—';}
+  if(dEl){dEl.textContent=disc||'—';}
   document.getElementById('qr-id-chip').textContent='ID: '+qrid;
+
+  // Botón compartir: solo admin/edecan en móvil (navigator.share disponible)
+  const canShare=navigator.share&&typeof navigator.share==='function';
+  const rolPuedeCompartir=session.rol==='administrador'||session.rol==='edecan';
+  const shareBtn=document.getElementById('btn-qr-share');
+  if(shareBtn) shareBtn.style.display=(canShare&&rolPuedeCompartir)?'':'none';
 
   // Background overlay: CROWN for padrino, MEDAL for participant
   const bgImg=document.getElementById('qr-bg-img');
@@ -869,43 +911,58 @@ async function buildQRCanvas(){
   }
   if(!qrImg) return null;
 
+  // Alta resolución: factor 3x para nitidez
+  const SCALE=3;
   const W=360,H=480;
   const canvas=document.createElement('canvas');
-  canvas.width=W;canvas.height=H;
+  canvas.width=W*SCALE;canvas.height=H*SCALE;
   const ctx=canvas.getContext('2d');
+  ctx.scale(SCALE,SCALE);
 
   // White background
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
 
-  const esPadrino=currentQRPadrino&&currentQRPadrino!=='NO'&&currentQRPadrino!=='—'&&currentQRPadrino.toLowerCase()!=='no';
+  const esPadrino=(currentQRPadrino||'').toLowerCase()==='padrino';
 
-  // Draw crown or medal overlay (pure canvas, no taint)
+  // Marca de agua muy sutil (sin texto visible, solo símbolo geométrico tenue)
   const QR_SIZE=260,QR_X=(W-QR_SIZE)/2,QR_Y=50;
   const overlaySize=220;
   const overlayCX=W/2, overlayCY=QR_Y+QR_SIZE/2;
   if(esPadrino){
-    drawCrownCanvas(ctx,overlayCX,overlayCY,overlaySize,0.15);
+    drawCrownCanvas(ctx,overlayCX,overlayCY,overlaySize,0.06);
   } else {
-    drawMedalCanvas(ctx,overlayCX,overlayCY,overlaySize,0.12);
+    drawMedalCanvas(ctx,overlayCX,overlayCY,overlaySize,0.05);
   }
 
-  // Draw QR code
+  // Draw QR code en alta calidad
   try{
     const src=qrImg instanceof HTMLCanvasElement?qrImg.toDataURL('image/png'):qrImg.src;
     await new Promise((res,rej)=>{
       if(!src){rej();return;}
       const img=new Image();
       img.crossOrigin='anonymous';
-      img.onload=()=>{ctx.drawImage(img,QR_X,QR_Y,QR_SIZE,QR_SIZE);res();};
+      img.onload=()=>{
+        ctx.imageSmoothingEnabled=false; // pixeles nítidos para QR
+        ctx.drawImage(img,QR_X,QR_Y,QR_SIZE,QR_SIZE);
+        ctx.imageSmoothingEnabled=true;
+        res();
+      };
       img.onerror=()=>{
-        // If qrImg is a canvas, draw directly
-        if(qrImg instanceof HTMLCanvasElement){ctx.drawImage(qrImg,QR_X,QR_Y,QR_SIZE,QR_SIZE);}
+        if(qrImg instanceof HTMLCanvasElement){
+          ctx.imageSmoothingEnabled=false;
+          ctx.drawImage(qrImg,QR_X,QR_Y,QR_SIZE,QR_SIZE);
+          ctx.imageSmoothingEnabled=true;
+        }
         res();
       };
       img.src=src;
     });
   } catch(ex){
-    if(qrImg instanceof HTMLCanvasElement) ctx.drawImage(qrImg,QR_X,QR_Y,QR_SIZE,QR_SIZE);
+    if(qrImg instanceof HTMLCanvasElement){
+      ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(qrImg,QR_X,QR_Y,QR_SIZE,QR_SIZE);
+      ctx.imageSmoothingEnabled=true;
+    }
   }
 
   // Logo overlay centered on QR
@@ -924,11 +981,11 @@ async function buildQRCanvas(){
     img.src=LOGO_SRC;
   });
 
-  // Discipline icon only (no text) in top area
-  const dicon=discIcon(currentQRDisc||'');
-  if(dicon){
-    ctx.font='20px serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(dicon,W/2,28);
+  // Discipline text in top area (sin icono, solo texto si existe)
+  if(currentQRDisc&&currentQRDisc!=='—'){
+    ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(100,110,150,0.6)';
+    ctx.fillText(currentQRDisc.toUpperCase(),W/2,22);
   }
 
   // Dark footer banner
@@ -956,16 +1013,16 @@ async function buildQRCanvas(){
   const nm=(currentQRNombre||'').length>34?(currentQRNombre||'').slice(0,32)+'…':(currentQRNombre||'');
   ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
 
-  // Tipo label
-  const tipoLabel=esPadrino?'👑 PADRINO':currentQRTipo==='Titular'?'🥇 TITULAR':'👥 ACOMPAÑANTE';
+  // Tipo label - solo texto, sin emojis
+  const tipoLabelCanvas=esPadrino?'PADRINO':currentQRTipo==='Titular'?'TITULAR':'ACOMPANANTE';
   ctx.fillStyle=esPadrino?'#FFA500':currentQRTipo==='Titular'?'#FFD700':'#00E676';
   ctx.font='bold 11px Arial';
-  ctx.fillText(tipoLabel,W/2,BANNER_Y+71);
+  ctx.fillText(tipoLabelCanvas,W/2,BANNER_Y+71);
 
-  // Discipline icon only in footer (no text)
-  if(dicon){
-    ctx.font='14px serif';
-    ctx.fillText(dicon,W/2,BANNER_Y+88);
+  // Disciplina como texto en footer
+  if(currentQRDisc&&currentQRDisc!=='—'){
+    ctx.fillStyle='rgba(180,185,210,0.9)';ctx.font='10px Arial';
+    ctx.fillText(currentQRDisc.toUpperCase(),W/2,BANNER_Y+88);
   }
 
   return canvas;
@@ -1002,28 +1059,66 @@ async function downloadQRFull(btn){
 }
 
 async function shareQRFull(){
+  // Solo proceder si navigator.share disponible (móvil)
+  if(!navigator.share) { copyQRUrl(); return; }
+
   try{
+    // Buscar datos del titular actual
+    const currentRow=allRows.find(r=>r[C.QR_ID]===currentQRId);
+    if(!currentRow){ copyQRUrl(); return; }
+
+    // Encontrar titular y acompañantes del mismo celular
+    const celular=currentRow[C.Celular]||'';
+    const grupoCelular=celular?allRows.filter(r=>(r[C.Celular]||'')===celular):[];
+
+    // Identificar titular del grupo
+    const titularRow=grupoCelular.find(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r))||currentRow;
+    const acompRows=grupoCelular.filter(r=>esAcompananteRow(r));
+
+    const nombreTitular=titularRow[C.Nombre]||'—';
+    const qrTitular=`${SCANNER_URL}?qrid=${encodeURIComponent(titularRow[C.QR_ID]||'')}`;
+    const comidaTitular=titularRow[C.Comida]||'—';
+    const edecanNombre=session.usuario||'su edecán';
+    const dependencia=session.dependencia||titularRow[C.Dependencia]||'su dependencia';
+
+    // Construir lista de acompañantes
+    let listaAcomp='';
+    if(acompRows.length>0){
+      listaAcomp=acompRows.map(a=>{
+        const qrA=`${SCANNER_URL}?qrid=${encodeURIComponent(a[C.QR_ID]||'')}`;
+        return `- ${a[C.Nombre]||'—'}: ${qrA}`;
+      }).join('\n');
+    }
+
+    const mensaje=
+`Hola ${nombreTitular} 😊 Mi nombre es ${edecanNombre}, edecán de la dependencia ${dependencia}, y estaré acompañándote durante el evento.
+Te comparto el detalle de tu registro para el evento del 28.06.2026:
+🔹 Participante titular: Plato elegido: ${comidaTitular}
+🔹 Códigos QR de acceso: Titular: ${qrTitular}
+🔹 Acompañantes: ${listaAcomp||'—'}
+📌 Por favor, conserva estos QR ya que serán necesarios para tu ingreso.
+Si tienes alguna consulta, cambio o necesitas apoyo con algún detalle, con toda confianza puedes escribirme. Estaré encantado(a) de ayudarte 😊
+¡Nos vemos muy pronto! 🙌`;
+
+    // Intentar compartir con imagen + mensaje
     const canvas=await buildQRCanvas();
-    if(!canvas){copyQRUrl();return;}
-    const fname=`QR_${currentQRId}.png`;
-    const blob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/png',1.0));
-    if(!blob){copyQRUrl();return;}
-    const file=new File([blob],fname,{type:'image/png'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({files:[file],title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato Regional del Sur · MDD 2026`});
-        return;
-      } catch(ex){if(ex.name==='AbortError') return;}
+    if(canvas){
+      const fname=`QR_${currentQRId}.png`;
+      const blob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/png',1.0));
+      if(blob){
+        const file=new File([blob],fname,{type:'image/png'});
+        if(navigator.canShare&&navigator.canShare({files:[file]})){
+          try{
+            await navigator.share({files:[file],title:`QR - ${currentQRNombre}`,text:mensaje});
+            return;
+          } catch(ex){if(ex.name==='AbortError') return;}
+        }
+      }
     }
-    if(navigator.share){
-      try{await navigator.share({title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato · MDD 2026`,url:currentQRUrl});return;}
-      catch(ex){if(ex.name==='AbortError') return;}
-    }
-    // Last resort: download
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download=fname;a.style.display='none';
-    document.body.appendChild(a);a.click();
-    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},2000);
+    // Fallback: compartir solo texto
+    try{
+      await navigator.share({title:`QR - ${currentQRNombre}`,text:mensaje});
+    } catch(ex){if(ex.name!=='AbortError') copyQRUrl();}
   } catch(ex){copyQRUrl();}
 }
 
