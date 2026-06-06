@@ -399,6 +399,20 @@ tr:hover td{background:rgba(255,215,0,.025)}
       <div class="qr-pill"><div class="qr-pill-lbl">👤 Tipo</div><div class="qr-pill-val" id="qr-pill-tipo">—</div></div>
       <div class="qr-pill"><div class="qr-pill-lbl">🎯 Disciplina</div><div class="qr-pill-val" id="qr-pill-disciplina">—</div></div>
     </div>
+    <div style="display:flex;gap:8px;padding:10px 20px;border-bottom:1px solid var(--border);background:var(--field)">
+      <div style="flex:1;text-align:center;border-radius:4px;padding:8px 6px;" id="qr-status-ingreso">
+        <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🎫 Ingreso</div>
+        <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-ingreso-val">—</div>
+      </div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div style="flex:1;text-align:center;border-radius:4px;padding:8px 6px;" id="qr-status-entrega">
+        <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🍽️ Comida/Entrega</div>
+        <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-entrega-val">—</div>
+      </div>
+    </div>
+    <div style="padding:6px 20px 2px;text-align:center">
+      <span style="font-family:var(--font-h);font-size:10px;color:var(--muted);letter-spacing:1px">♻️ QR REUTILIZABLE · válido para ingreso y comida</span>
+    </div>
     <div class="qr-actions">
       <button class="btn btn-gold" id="btn-qr-download" onclick="downloadQRFull(this)" style="justify-content:center;padding:12px">⬇ Descargar imagen completa</button>
       <div style="display:flex;gap:8px">
@@ -636,6 +650,12 @@ function renderDepsDashboard(){
 let _searchDebounceTimer=null;
 function debouncedSearch(val){
   if(_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
+  // Solo buscar cuando hay exactamente 4 o más caracteres, o cuando se borra (0 chars)
+  const trimmed=val.trim();
+  if(trimmed.length>0 && trimmed.length<4){
+    // Mostrar indicador de espera pero no buscar aún
+    return;
+  }
   _searchDebounceTimer=setTimeout(()=>{
     requestAnimationFrame(()=>renderParticipants(val));
   },300);
@@ -684,8 +704,10 @@ function renderParticipants(s,f){
   // Con búsqueda: buscar SOLO por número de registro y mostrar titular + sus acompañantes
   let rows=[];
   if(currentSearch){
-    // Buscar filas cuyo Registro coincide con la búsqueda
-    const matched=allRows.filter(r=>(r[C.Registro]||'').toLowerCase().includes(currentSearch));
+    // Búsqueda case-insensitive: convierte tanto el término como el campo a minúsculas
+    const searchLower=currentSearch.toLowerCase();
+    // Buscar filas cuyo Registro coincide (insensible a mayúsculas/minúsculas)
+    const matched=allRows.filter(r=>(r[C.Registro]||'').toLowerCase().includes(searchLower));
     // Por cada coincidencia agrupar por celular: titular primero, luego acompañantes
     const seen=new Set();
     matched.forEach(r=>{
@@ -733,7 +755,7 @@ function renderParticipants(s,f){
       <div class="prog-lbl">Entregas: <strong>${withEntrega}/${total}</strong></div>
     </div>
     <div class="toolbar">
-      <input class="search" type="text" placeholder="🔍 Buscar por número de registro..." value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
+      <input class="search" type="text" placeholder="🔍 Ingresa 4 dígitos del registro (ej: AK76)..." value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
       <span style="color:var(--muted);font-size:12px">${total} resultado${total!==1?'s':''}</span>
     </div>
     <div class="tbl-wrap">
@@ -837,6 +859,25 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   const dEl=document.getElementById('qr-pill-disciplina');
   if(dEl){dEl.textContent=disc||'—';}
   document.getElementById('qr-id-chip').textContent='ID: '+qrid;
+
+  // ── Estado de uso del QR (ingreso y entrega) ─────────────────
+  const qrCheckins=checkins[qrid]||{};
+  const hasIngreso=!!(qrCheckins.ingreso);
+  const hasEntrega=!!(qrCheckins.entrega);
+  const ingresoEl=document.getElementById('qr-status-ingreso-val');
+  const entregaEl=document.getElementById('qr-status-entrega-val');
+  const ingresoBox=document.getElementById('qr-status-ingreso');
+  const entregaBox=document.getElementById('qr-status-entrega');
+  if(ingresoEl){
+    ingresoEl.textContent=hasIngreso?('✓ '+formatHora(qrCheckins.ingreso)):'Pendiente';
+    ingresoEl.style.color=hasIngreso?'var(--mint)':'var(--muted)';
+    if(ingresoBox) ingresoBox.style.background=hasIngreso?'rgba(0,230,118,.07)':'transparent';
+  }
+  if(entregaEl){
+    entregaEl.textContent=hasEntrega?('✓ '+formatHora(qrCheckins.entrega)):'Pendiente';
+    entregaEl.style.color=hasEntrega?'var(--mint)':'var(--muted)';
+    if(entregaBox) entregaBox.style.background=hasEntrega?'rgba(0,230,118,.07)':'transparent';
+  }
 
   // Botón compartir: solo admin/edecan en móvil (navigator.share disponible)
   const canShare=navigator.share&&typeof navigator.share==='function';
@@ -997,7 +1038,7 @@ async function buildQRCanvas(){
   ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
 
   // Tipo (solo texto)
-  const tipoLabelCanvas=esPadrino?'PADRINO':currentQRTipo==='Titular'?'TITULAR':'ACOMPANANTE';
+  const tipoLabelCanvas=esPadrino?'PADRINO':currentQRTipo==='Titular'?'TITULAR':'ACOMPAÑANTE';
   ctx.fillStyle=esPadrino?'#FFA500':currentQRTipo==='Titular'?'#FFD700':'#00E676';
   ctx.font='bold 11px Arial';
   ctx.fillText(tipoLabelCanvas,W/2,BANNER_Y+71);
