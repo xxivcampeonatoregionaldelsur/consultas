@@ -1104,16 +1104,18 @@ async function deleteUser(usuario){
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
-// apiFetch — proxy via iframe para evitar el bloqueo CORS en POST a Google Apps Script.
-// fetch() con POST recibe un 302 hacia script.googleusercontent.com que el navegador
-// no puede seguir cross-origin. Un <form> nativo con target a un <iframe> no tiene
-// esa restricción: el browser sigue el redirect y carga la respuesta JSON en el iframe.
-// Después de la carga leemos el texto del iframe y lo parseamos.
-async function apiFetch(action, payload){
-  // GET con todos los parámetros en la URL — igual que el login.
-  // Ahora doGet también maneja createUser, updateUser, deleteUser.
-  const params = new URLSearchParams({action, token: session.token, ...payload});
-  const res = await fetch(`${SCRIPT_URL}?${params.toString()}`, {redirect:'follow'});
+async function apiFetch(action,payload){
+  // POST con Content-Type:application/json dispara preflight CORS → 302/bloqueo.
+  // El script ya parsea e.parameter.data en doPost, así que enviamos el JSON
+  // serializado en un campo "data" como form-urlencoded (sin preflight).
+  const body = new URLSearchParams({
+    data: JSON.stringify({action, ...payload, token: session.token})
+  });
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    body  // URLSearchParams → browser pone Content-Type: application/x-www-form-urlencoded
+  });
   return res.json();
 }
 
