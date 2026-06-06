@@ -400,7 +400,7 @@ tr:hover td{background:rgba(255,215,0,.025)}
       <div class="qr-pill"><div class="qr-pill-lbl">🎯 Disciplina</div><div class="qr-pill-val" id="qr-pill-disciplina">—</div></div>
     </div>
     <div class="qr-actions">
-      <button class="btn btn-gold" onclick="downloadQRFull()" style="justify-content:center;padding:12px">⬇ Descargar imagen completa</button>
+      <button class="btn btn-gold" id="btn-qr-download" onclick="downloadQRFull(this)" style="justify-content:center;padding:12px">⬇ Descargar imagen completa</button>
       <div style="display:flex;gap:8px">
         <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="copyQRUrl()">🔗 Copiar enlace</button>
         <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="shareQRFull()">📤 Compartir</button>
@@ -656,10 +656,11 @@ function esPadrinoRow(row){
 }
 function getTipoDisplay(row){
   const esPadrino=esPadrinoRow(row);
-  const tipoPersona=row[C.TipoPersona]||'';
   if(esPadrino) return {label:'Padrino',cls:'bdg-p',icon:'👑'};
-  if(tipoPersona==='Titular') return {label:'Titular',cls:'bdg-t',icon:'🥇'};
-  if(tipoPersona==='Acompañante') return {label:'Acompañante',cls:'bdg-a',icon:'👥'};
+  const tipoPersona=row[C.TipoPersona]||'';
+  const tipoPartic=(row[C.TipoParticipacion]||'').toLowerCase();
+  if(tipoPersona==='Titular'||tipoPartic.includes('titular')) return {label:'Titular',cls:'bdg-t',icon:'🥇'};
+  if(tipoPersona==='Acompañante'||tipoPartic.includes('acomp')) return {label:'Acompañante',cls:'bdg-a',icon:'👥'};
   return {label:tipoPersona||'—',cls:'bdg-no',icon:''};
 }
 
@@ -674,8 +675,10 @@ function renderParticipants(s,f){
     const qid=r[C.QR_ID]||'',tp=r[C.TipoPersona]||'';
     const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
     const isPadrino=esPadrinoRow(r);
-    const mf=currentFilter==='todos'||(currentFilter==='titulares'&&tp==='Titular')||
-      (currentFilter==='acompanantes'&&tp==='Acompañante')||(currentFilter==='padrinos'&&isPadrino)||
+    const mf=currentFilter==='todos'||
+      (currentFilter==='titulares'&&tp==='Titular'&&!isPadrino)||
+      (currentFilter==='acompanantes'&&tp==='Acompañante')||
+      (currentFilter==='padrinos'&&isPadrino)||
       (currentFilter==='ingreso'&&hasIngreso)||(currentFilter==='entrega'&&hasEntrega)||
       (currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
     return ms&&mf;
@@ -737,7 +740,7 @@ function renderParticipants(s,f){
         <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${isPadrino?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">👑 Padrino</span>':''}</td>
         <td><span class="bdg ${tipoInfo.cls}">${tipoInfo.icon} ${e(tipoInfo.label)}</span></td>
         <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
-        <td style="font-size:12px">${dicon} ${disc!=='—'?e(disc):disc}</td>
+        <td style="font-size:14px;text-align:center">${dicon||e(disc)}</td>
         <td style="font-size:12px">${e(r[C.Comida]||'—')}</td>
         <td style="font-size:12px">${e(r[C.Bebida]||'—')}</td>
         <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
@@ -801,9 +804,9 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   // Show correct tipo label in pill
   const tipoLabel=esPadrino?'👑 Padrino':esTitular?'Titular':'Acompañante';
   document.getElementById('qr-pill-tipo').textContent=tipoLabel;
-  // Discipline pill with icon
+  // Discipline pill: icon only (no text)
   const dEl=document.getElementById('qr-pill-disciplina');
-  if(dEl){const dicon=discIcon(disc||'');dEl.textContent=dicon?(dicon+' '+(disc||'—')):(disc||'—');}
+  if(dEl){const dicon=discIcon(disc||'');dEl.textContent=dicon||disc||'—';}
   document.getElementById('qr-id-chip').textContent='ID: '+qrid;
 
   // Background overlay: CROWN for padrino, MEDAL for participant
@@ -821,9 +824,49 @@ function closeQR(){document.getElementById('qr-modal').style.display='none';}
 
 // Download FULL image (QR + name + event name + logo + background)
 // ── QR CANVAS BUILDER (shared between download and share) ─────
+// ── QR CANVAS BUILDER ─────────────────────────────────────────
+// Draws crown/medal using pure canvas (no SVG blob → no canvas taint)
+function drawCrownCanvas(ctx, cx, cy, size, alpha){
+  ctx.save();ctx.globalAlpha=alpha;
+  const s=size/200;
+  ctx.translate(cx-100*s,cy-100*s);ctx.scale(s,s);
+  ctx.strokeStyle='#FFD700';ctx.lineWidth=6;ctx.lineJoin='round';
+  // Crown body
+  ctx.beginPath();ctx.moveTo(100,20);ctx.lineTo(30,90);ctx.lineTo(50,160);ctx.lineTo(150,160);ctx.lineTo(170,90);ctx.closePath();ctx.stroke();
+  // Jewels
+  ctx.fillStyle='#FFD700';
+  [[100,18,10],[30,88,8],[170,88,8]].forEach(([x,y,r])=>{ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();});
+  // Base bar
+  ctx.fillRect(45,155,110,14);
+  ctx.restore();
+}
+function drawMedalCanvas(ctx, cx, cy, size, alpha){
+  ctx.save();ctx.globalAlpha=alpha;
+  const s=size/200;
+  ctx.translate(cx-100*s,cy-100*s);ctx.scale(s,s);
+  ctx.strokeStyle='#FFD700';ctx.lineWidth=6;
+  // Outer ring
+  ctx.beginPath();ctx.arc(100,120,65,0,Math.PI*2);ctx.stroke();
+  ctx.strokeStyle='#FFA500';ctx.lineWidth=3;
+  ctx.beginPath();ctx.arc(100,120,50,0,Math.PI*2);ctx.stroke();
+  // Ribbon
+  ctx.strokeStyle='#FFD700';ctx.lineWidth=5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(80,20);ctx.lineTo(90,55);ctx.lineTo(100,20);ctx.lineTo(110,55);ctx.lineTo(120,20);ctx.stroke();
+  ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(80,55);ctx.lineTo(120,55);ctx.stroke();
+  // "1"
+  ctx.fillStyle='#FFD700';ctx.font='bold 38px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('1',100,120);
+  ctx.restore();
+}
+
 async function buildQRCanvas(){
-  await new Promise(r=>setTimeout(r,250));
-  const qrImg=document.querySelector('#qr-canvas img')||document.querySelector('#qr-canvas canvas');
+  // Wait for QR to render
+  let qrImg=null;
+  for(let i=0;i<20;i++){
+    qrImg=document.querySelector('#qr-canvas img')||document.querySelector('#qr-canvas canvas');
+    if(qrImg) break;
+    await new Promise(r=>setTimeout(r,100));
+  }
   if(!qrImg) return null;
 
   const W=360,H=480;
@@ -834,149 +877,156 @@ async function buildQRCanvas(){
   // White background
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
 
-  // Light gradient background tint
-  const grad=ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0,'rgba(240,235,210,0.18)');
-  grad.addColorStop(1,'rgba(200,200,220,0.08)');
-  ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
-
   const esPadrino=currentQRPadrino&&currentQRPadrino!=='NO'&&currentQRPadrino!=='—'&&currentQRPadrino.toLowerCase()!=='no';
 
-  // Draw background overlay SVG (crown or medal) — centered, large, translucent
-  const overlaySVG=esPadrino?
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><path d="M100 20 L30 90 L50 160 L150 160 L170 90 Z" fill="none" stroke="#FFD700" stroke-width="7" stroke-linejoin="round" opacity="0.22"/><circle cx="100" cy="18" r="11" fill="#FFD700" opacity="0.22"/><circle cx="30" cy="88" r="9" fill="#FFD700" opacity="0.22"/><circle cx="170" cy="88" r="9" fill="#FFD700" opacity="0.22"/><rect x="45" y="155" width="110" height="14" rx="4" fill="#FFD700" opacity="0.15"/></svg>`:
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle cx="100" cy="120" r="65" fill="none" stroke="#FFD700" stroke-width="7" opacity="0.18"/><circle cx="100" cy="120" r="50" fill="none" stroke="#FFA500" stroke-width="3" opacity="0.12"/><path d="M80 20 L90 55 L100 20 L110 55 L120 20" fill="none" stroke="#FFD700" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.18"/><line x1="80" y1="55" x2="120" y2="55" stroke="#FFD700" stroke-width="4" opacity="0.18"/><text x="100" y="128" text-anchor="middle" font-size="38" font-family="Arial" font-weight="bold" fill="#FFD700" opacity="0.12">1</text></svg>`;
-
-  const svgBlob=new Blob([overlaySVG],{type:'image/svg+xml'});
-  const svgUrl=URL.createObjectURL(svgBlob);
-  await new Promise(res=>{
-    const i=new Image();
-    i.onload=()=>{ctx.drawImage(i,(W-220)/2,(H-300)/2,220,220);URL.revokeObjectURL(svgUrl);res();};
-    i.onerror=()=>{URL.revokeObjectURL(svgUrl);res();};
-    i.src=svgUrl;
-  });
-
-  // Draw QR code (centered, leaving room for header logo and footer banner)
+  // Draw crown or medal overlay (pure canvas, no taint)
   const QR_SIZE=260,QR_X=(W-QR_SIZE)/2,QR_Y=50;
-  await new Promise(res=>{
-    const src=qrImg instanceof HTMLCanvasElement?qrImg.toDataURL():qrImg.src;
-    const i=new Image();
-    i.onload=()=>{ctx.drawImage(i,QR_X,QR_Y,QR_SIZE,QR_SIZE);res();};
-    i.src=src;
-  });
+  const overlaySize=220;
+  const overlayCX=W/2, overlayCY=QR_Y+QR_SIZE/2;
+  if(esPadrino){
+    drawCrownCanvas(ctx,overlayCX,overlayCY,overlaySize,0.15);
+  } else {
+    drawMedalCanvas(ctx,overlayCX,overlayCY,overlaySize,0.12);
+  }
+
+  // Draw QR code
+  try{
+    const src=qrImg instanceof HTMLCanvasElement?qrImg.toDataURL('image/png'):qrImg.src;
+    await new Promise((res,rej)=>{
+      if(!src){rej();return;}
+      const img=new Image();
+      img.crossOrigin='anonymous';
+      img.onload=()=>{ctx.drawImage(img,QR_X,QR_Y,QR_SIZE,QR_SIZE);res();};
+      img.onerror=()=>{
+        // If qrImg is a canvas, draw directly
+        if(qrImg instanceof HTMLCanvasElement){ctx.drawImage(qrImg,QR_X,QR_Y,QR_SIZE,QR_SIZE);}
+        res();
+      };
+      img.src=src;
+    });
+  } catch(ex){
+    if(qrImg instanceof HTMLCanvasElement) ctx.drawImage(qrImg,QR_X,QR_Y,QR_SIZE,QR_SIZE);
+  }
 
   // Logo overlay centered on QR
-  const LOGO_R=30;
   await new Promise(res=>{
-    const i=new Image();
-    i.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      const LOGO_R=28;
       ctx.save();
-      // White circle behind logo
       ctx.beginPath();ctx.arc(W/2,QR_Y+QR_SIZE/2,LOGO_R+3,0,Math.PI*2);
       ctx.fillStyle='#fff';ctx.fill();
       ctx.beginPath();ctx.arc(W/2,QR_Y+QR_SIZE/2,LOGO_R,0,Math.PI*2);ctx.clip();
-      ctx.drawImage(i,W/2-LOGO_R,QR_Y+QR_SIZE/2-LOGO_R,LOGO_R*2,LOGO_R*2);
+      ctx.drawImage(img,W/2-LOGO_R,QR_Y+QR_SIZE/2-LOGO_R,LOGO_R*2,LOGO_R*2);
       ctx.restore();res();
     };
-    i.onerror=()=>res();
-    i.src=LOGO_SRC;
+    img.onerror=()=>res();
+    img.src=LOGO_SRC;
   });
 
-  // Discipline icon above QR (top area)
+  // Discipline icon only (no text) in top area
   const dicon=discIcon(currentQRDisc||'');
   if(dicon){
-    ctx.font='22px Arial';ctx.textAlign='center';
-    ctx.fillText(dicon,W/2,38);
+    ctx.font='20px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(dicon,W/2,28);
   }
 
   // Dark footer banner
-  const BANNER_Y=QR_Y+QR_SIZE+16;
+  const BANNER_Y=QR_Y+QR_SIZE+14;
   const BANNER_H=H-BANNER_Y;
   ctx.fillStyle='#0f1220';ctx.fillRect(0,BANNER_Y,W,BANNER_H);
 
-  // Gold top stripe on banner
+  // Gold top stripe
   const bannerGrad=ctx.createLinearGradient(0,0,W,0);
   bannerGrad.addColorStop(0,'#FFA500');bannerGrad.addColorStop(1,'#FFD700');
   ctx.fillStyle=bannerGrad;ctx.fillRect(0,BANNER_Y,W,3);
 
-  ctx.textAlign='center';
-  // Event name
-  ctx.fillStyle='#FFD700';ctx.font='bold 10px Barlow Condensed, Arial';
-  ctx.fillText('XXIV CAMPEONATO REGIONAL DEL SUR',W/2,BANNER_Y+16);
-  ctx.fillStyle='#aab0cc';ctx.font='9px Arial';
+  ctx.textAlign='center';ctx.textBaseline='alphabetic';
+  ctx.fillStyle='#FFD700';ctx.font='bold 10px Arial';
+  ctx.fillText('XXIV CAMPEONATO REGIONAL DEL SUR',W/2,BANNER_Y+17);
+  ctx.fillStyle='#8890b0';ctx.font='9px Arial';
   ctx.fillText('Eliana Amparo R. Molina del Carpio · MDD 2026',W/2,BANNER_Y+30);
 
-  // Separator line
-  ctx.strokeStyle='rgba(255,215,0,.2)';ctx.lineWidth=1;
+  // Separator
+  ctx.strokeStyle='rgba(255,215,0,.25)';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(20,BANNER_Y+38);ctx.lineTo(W-20,BANNER_Y+38);ctx.stroke();
 
-  // Participant name
-  ctx.fillStyle='#ffffff';ctx.font='bold 14px Barlow Condensed, Arial';
+  // Name
+  ctx.fillStyle='#ffffff';ctx.font='bold 13px Arial';
   const nm=(currentQRNombre||'').length>34?(currentQRNombre||'').slice(0,32)+'…':(currentQRNombre||'');
   ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
 
-  // Tipo + discipline row
+  // Tipo label
   const tipoLabel=esPadrino?'👑 PADRINO':currentQRTipo==='Titular'?'🥇 TITULAR':'👥 ACOMPAÑANTE';
   ctx.fillStyle=esPadrino?'#FFA500':currentQRTipo==='Titular'?'#FFD700':'#00E676';
   ctx.font='bold 11px Arial';
-  ctx.fillText(tipoLabel,W/2,BANNER_Y+72);
+  ctx.fillText(tipoLabel,W/2,BANNER_Y+71);
 
-  // Discipline
-  if(currentQRDisc&&currentQRDisc!=='—'){
-    ctx.fillStyle='#8890b0';ctx.font='10px Arial';
-    const discLabel=(dicon?dicon+' ':'')+currentQRDisc;
-    ctx.fillText(discLabel,W/2,BANNER_Y+88);
+  // Discipline icon only in footer (no text)
+  if(dicon){
+    ctx.font='14px serif';
+    ctx.fillText(dicon,W/2,BANNER_Y+88);
   }
 
   return canvas;
 }
 
-async function downloadQRFull(){
-  const canvas=await buildQRCanvas();
-  if(!canvas){alert('QR aún no generado, intenta de nuevo');return;}
-  const fname=`QR_${currentQRId}_${(currentQRNombre||'participante').replace(/[^a-zA-Z0-9]/g,'_')}.png`;
-
-  // Use canvas.toBlob for best compatibility
-  canvas.toBlob(async blob=>{
-    if(!blob){alert('Error generando imagen');return;}
-    // Mobile: try Web Share API first
+async function downloadQRFull(btn){
+  btn=btn||document.getElementById('btn-qr-download');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Generando...';}
+  try{
+    const canvas=await buildQRCanvas();
+    if(!canvas){showToast('❌ QR aún no generado, intenta de nuevo');return;}
+    const fname=`QR_${currentQRId}_${(currentQRNombre||'participante').replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ]/g,'_')}.png`;
+    // toBlob with async/await via Promise wrapper
+    const blob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/png',1.0));
+    if(!blob){showToast('❌ Error generando imagen');return;}
+    // Try Web Share API with file (mobile)
     const file=new File([blob],fname,{type:'image/png'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       try{
         await navigator.share({files:[file],title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato · MDD 2026`});
         return;
-      } catch(ex){/* fallthrough to download */}
+      } catch(ex){if(ex.name==='AbortError') return;/* User cancelled, fall through to download */}
     }
-    // Desktop/fallback: anchor download
+    // Anchor download (desktop + Android fallback)
     const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.download=fname;a.href=url;
-    document.body.appendChild(a);a.click();
-    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
-  },'image/png');
+    const a=document.createElement('a');
+    a.href=url;a.download=fname;a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},2000);
+    showToast('✅ Descargando QR...');
+  } catch(ex){showToast('❌ Error: '+ex.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='⬇ Descargar imagen completa';}}
 }
 
 async function shareQRFull(){
-  const canvas=await buildQRCanvas();
-  if(!canvas){copyQRUrl();return;}
-  const fname=`QR_${currentQRId}.png`;
-  canvas.toBlob(async blob=>{
+  try{
+    const canvas=await buildQRCanvas();
+    if(!canvas){copyQRUrl();return;}
+    const fname=`QR_${currentQRId}.png`;
+    const blob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/png',1.0));
     if(!blob){copyQRUrl();return;}
     const file=new File([blob],fname,{type:'image/png'});
-    try{
-      if(navigator.canShare&&navigator.canShare({files:[file]})){
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{
         await navigator.share({files:[file],title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato Regional del Sur · MDD 2026`});
-      } else if(navigator.share){
-        await navigator.share({title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato Regional del Sur · MDD 2026`,url:currentQRUrl});
-      } else {
-        // Fallback: download
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');a.download=fname;a.href=url;
-        document.body.appendChild(a);a.click();
-        setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
-      }
-    } catch(ex){copyQRUrl();}
-  },'image/png');
+        return;
+      } catch(ex){if(ex.name==='AbortError') return;}
+    }
+    if(navigator.share){
+      try{await navigator.share({title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato · MDD 2026`,url:currentQRUrl});return;}
+      catch(ex){if(ex.name==='AbortError') return;}
+    }
+    // Last resort: download
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=fname;a.style.display='none';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},2000);
+  } catch(ex){copyQRUrl();}
 }
+
 
 function copyQRUrl(){
   navigator.clipboard.writeText(currentQRUrl).then(()=>showToast('🔗 Enlace copiado')).catch(()=>{prompt('Copia este enlace:',currentQRUrl);});
