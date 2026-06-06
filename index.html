@@ -677,47 +677,49 @@ function getTipoDisplay(row){
 
 // ── PARTICIPANTS ───────────────────────────────────────────────
 function renderParticipants(s,f){
-  if(s!==undefined) currentSearch=s.toLowerCase();
+  if(s!==undefined) currentSearch=s.toLowerCase().trim();
   if(f!==undefined) currentFilter=f;
-  let rows=allRows.filter(r=>{
-    const nm=(r[C.Nombre]||'').toLowerCase(),dp=(r[C.Dependencia]||'').toLowerCase(),
-          cl=(r[C.Celular]||'').toLowerCase(),rg=(r[C.Registro]||'').toLowerCase();
-    const ms=!currentSearch||nm.includes(currentSearch)||dp.includes(currentSearch)||cl.includes(currentSearch)||rg.includes(currentSearch);
-    const qid=r[C.QR_ID]||'';
-    const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
-    const isPadrino=esPadrinoRow(r);
-    const isAcomp=esAcompananteRow(r);
-    const isTitular=r[C.TipoPersona]==='Titular'&&!isPadrino&&!isAcomp;
-    const mf=currentFilter==='todos'||
-      (currentFilter==='titulares'&&isTitular)||
-      (currentFilter==='acompanantes'&&isAcomp)||
-      (currentFilter==='padrinos'&&isPadrino)||
-      (currentFilter==='ingreso'&&hasIngreso)||(currentFilter==='entrega'&&hasEntrega)||
-      (currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
-    return ms&&mf;
-  });
 
-  // Cuando hay búsqueda: agrupar por celular (titular primero, luego sus acompañantes)
+  // Sin búsqueda: mostrar todos según filtro
+  // Con búsqueda: buscar SOLO por número de registro y mostrar titular + sus acompañantes
+  let rows=[];
   if(currentSearch){
-    const matchedCelulares=new Set(rows.map(r=>r[C.Celular]||'').filter(c=>c));
-    const expanded=[];
+    // Buscar filas cuyo Registro coincide con la búsqueda
+    const matched=allRows.filter(r=>(r[C.Registro]||'').toLowerCase().includes(currentSearch));
+    // Por cada coincidencia agrupar por celular: titular primero, luego acompañantes
     const seen=new Set();
-    rows.forEach(r=>{
+    matched.forEach(r=>{
       const cel=r[C.Celular]||'';
-      if(!seen.has(cel)&&cel){
-        seen.add(cel);
-        // titular del grupo
-        const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
-        if(titular&&!expanded.find(x=>x[C.QR_ID]===titular[C.QR_ID])) expanded.push(titular);
-        // padrinos del mismo celular
-        allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>{if(!expanded.find(y=>y[C.QR_ID]===x[C.QR_ID]))expanded.push(x);});
-        // acompañantes del mismo celular
-        allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>{if(!expanded.find(y=>y[C.QR_ID]===x[C.QR_ID]))expanded.push(x);});
-      } else if(!cel&&!expanded.find(x=>x[C.QR_ID]===r[C.QR_ID])){
-        expanded.push(r);
+      const key=cel||r[C.QR_ID]||'';
+      if(!seen.has(key)){
+        seen.add(key);
+        if(cel){
+          // titular del grupo
+          const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
+          if(titular) rows.push(titular);
+          // padrinos del mismo celular
+          allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>rows.push(x));
+          // acompañantes del mismo celular
+          allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>rows.push(x));
+        } else {
+          rows.push(r);
+        }
       }
     });
-    rows=expanded;
+  } else {
+    rows=allRows.filter(r=>{
+      const qid=r[C.QR_ID]||'';
+      const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
+      const isPadrino=esPadrinoRow(r);
+      const isAcomp=esAcompananteRow(r);
+      const isTitular=r[C.TipoPersona]==='Titular'&&!isPadrino&&!isAcomp;
+      return currentFilter==='todos'||
+        (currentFilter==='titulares'&&isTitular)||
+        (currentFilter==='acompanantes'&&isAcomp)||
+        (currentFilter==='padrinos'&&isPadrino)||
+        (currentFilter==='ingreso'&&hasIngreso)||(currentFilter==='entrega'&&hasEntrega)||
+        (currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
+    });
   }
   const total=rows.length;
   const withIngreso=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].ingreso}).length;
@@ -731,16 +733,7 @@ function renderParticipants(s,f){
       <div class="prog-lbl">Entregas: <strong>${withEntrega}/${total}</strong></div>
     </div>
     <div class="toolbar">
-      <input class="search" type="text" placeholder="🔍 Buscar nombre, dependencia, celular..." value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
-      <select class="filter" onchange="renderParticipants(undefined,this.value)">
-        <option value="todos" ${currentFilter==='todos'?'selected':''}>Todos (${allRows.length})</option>
-        <option value="titulares" ${currentFilter==='titulares'?'selected':''}>Titulares</option>
-        <option value="acompanantes" ${currentFilter==='acompanantes'?'selected':''}>Acompañantes</option>
-        <option value="padrinos" ${currentFilter==='padrinos'?'selected':''}>Padrinos 👑</option>
-        <option value="ingreso" ${currentFilter==='ingreso'?'selected':''}>Con ingreso ✓</option>
-        <option value="entrega" ${currentFilter==='entrega'?'selected':''}>Con entrega ✓</option>
-        <option value="pendientes" ${currentFilter==='pendientes'?'selected':''}>Sin check</option>
-      </select>
+      <input class="search" type="text" placeholder="🔍 Buscar por número de registro..." value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
       <span style="color:var(--muted);font-size:12px">${total} resultado${total!==1?'s':''}</span>
     </div>
     <div class="tbl-wrap">
@@ -902,70 +895,67 @@ function drawMedalCanvas(ctx, cx, cy, size, alpha){
 }
 
 async function buildQRCanvas(){
-  // Wait for QR to render
-  let qrImg=null;
-  for(let i=0;i<20;i++){
-    qrImg=document.querySelector('#qr-canvas img')||document.querySelector('#qr-canvas canvas');
-    if(qrImg) break;
+  // Esperar a que el QR renderice
+  let qrEl=null;
+  for(let i=0;i<30;i++){
+    qrEl=document.querySelector('#qr-canvas canvas')||document.querySelector('#qr-canvas img');
+    if(qrEl) break;
     await new Promise(r=>setTimeout(r,100));
   }
-  if(!qrImg) return null;
+  if(!qrEl) return null;
 
-  // Alta resolución: factor 3x para nitidez
-  const SCALE=3;
+  // Dimensiones lógicas del diseño
   const W=360,H=480;
+  // Canvas en alta resolución (3x)
+  const SCALE=3;
   const canvas=document.createElement('canvas');
   canvas.width=W*SCALE;canvas.height=H*SCALE;
   const ctx=canvas.getContext('2d');
+
+  // Escalar todo el contexto para que las coordenadas sean en px lógicos
   ctx.scale(SCALE,SCALE);
 
-  // White background
+  // Fondo blanco
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
 
   const esPadrino=(currentQRPadrino||'').toLowerCase()==='padrino';
 
-  // Marca de agua muy sutil (sin texto visible, solo símbolo geométrico tenue)
   const QR_SIZE=260,QR_X=(W-QR_SIZE)/2,QR_Y=50;
-  const overlaySize=220;
-  const overlayCX=W/2, overlayCY=QR_Y+QR_SIZE/2;
-  if(esPadrino){
-    drawCrownCanvas(ctx,overlayCX,overlayCY,overlaySize,0.06);
-  } else {
-    drawMedalCanvas(ctx,overlayCX,overlayCY,overlaySize,0.05);
-  }
 
-  // Draw QR code en alta calidad
-  try{
-    const src=qrImg instanceof HTMLCanvasElement?qrImg.toDataURL('image/png'):qrImg.src;
-    await new Promise((res,rej)=>{
-      if(!src){rej();return;}
-      const img=new Image();
-      img.crossOrigin='anonymous';
-      img.onload=()=>{
-        ctx.imageSmoothingEnabled=false; // pixeles nítidos para QR
-        ctx.drawImage(img,QR_X,QR_Y,QR_SIZE,QR_SIZE);
-        ctx.imageSmoothingEnabled=true;
-        res();
-      };
-      img.onerror=()=>{
-        if(qrImg instanceof HTMLCanvasElement){
-          ctx.imageSmoothingEnabled=false;
-          ctx.drawImage(qrImg,QR_X,QR_Y,QR_SIZE,QR_SIZE);
-          ctx.imageSmoothingEnabled=true;
+  // ── Dibujar QR ──────────────────────────────────────────────
+  // Dibujar directamente desde el elemento canvas del QRCode (sin crossOrigin, sin taint)
+  ctx.imageSmoothingEnabled=false;
+  if(qrEl instanceof HTMLCanvasElement){
+    ctx.drawImage(qrEl,QR_X,QR_Y,QR_SIZE,QR_SIZE);
+  } else {
+    // Fallback: img tag (puede fallar crossOrigin; si falla, redibujar via canvas intermedio)
+    try{
+      await new Promise((res,rej)=>{
+        if(qrEl.complete&&qrEl.naturalWidth>0){
+          try{ctx.drawImage(qrEl,QR_X,QR_Y,QR_SIZE,QR_SIZE);res();}catch(ex){rej(ex);}
+        } else {
+          qrEl.onload=()=>{try{ctx.drawImage(qrEl,QR_X,QR_Y,QR_SIZE,QR_SIZE);res();}catch(ex){rej(ex);}};
+          qrEl.onerror=()=>rej(new Error('img load error'));
         }
-        res();
-      };
-      img.src=src;
-    });
-  } catch(ex){
-    if(qrImg instanceof HTMLCanvasElement){
-      ctx.imageSmoothingEnabled=false;
-      ctx.drawImage(qrImg,QR_X,QR_Y,QR_SIZE,QR_SIZE);
-      ctx.imageSmoothingEnabled=true;
+      });
+    } catch(ex){
+      // Si img falla por CORS, generar QR nuevo en canvas temporal
+      const tmpDiv=document.createElement('div');
+      tmpDiv.style.cssText='position:fixed;left:-9999px;top:-9999px;visibility:hidden';
+      document.body.appendChild(tmpDiv);
+      await new Promise(res=>{
+        new QRCode(tmpDiv,{text:currentQRUrl,width:QR_SIZE,height:QR_SIZE,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+        setTimeout(()=>{
+          const c=tmpDiv.querySelector('canvas');
+          if(c){ctx.imageSmoothingEnabled=false;ctx.drawImage(c,QR_X,QR_Y,QR_SIZE,QR_SIZE);}
+          document.body.removeChild(tmpDiv);res();
+        },300);
+      });
     }
   }
+  ctx.imageSmoothingEnabled=true;
 
-  // Logo overlay centered on QR
+  // ── Logo centrado sobre el QR ─────────────────────────────
   await new Promise(res=>{
     const img=new Image();
     img.onload=()=>{
@@ -981,19 +971,12 @@ async function buildQRCanvas(){
     img.src=LOGO_SRC;
   });
 
-  // Discipline text in top area (sin icono, solo texto si existe)
-  if(currentQRDisc&&currentQRDisc!=='—'){
-    ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle='rgba(100,110,150,0.6)';
-    ctx.fillText(currentQRDisc.toUpperCase(),W/2,22);
-  }
-
-  // Dark footer banner
+  // ── Banner oscuro inferior ────────────────────────────────
   const BANNER_Y=QR_Y+QR_SIZE+14;
   const BANNER_H=H-BANNER_Y;
   ctx.fillStyle='#0f1220';ctx.fillRect(0,BANNER_Y,W,BANNER_H);
 
-  // Gold top stripe
+  // Franja dorada
   const bannerGrad=ctx.createLinearGradient(0,0,W,0);
   bannerGrad.addColorStop(0,'#FFA500');bannerGrad.addColorStop(1,'#FFD700');
   ctx.fillStyle=bannerGrad;ctx.fillRect(0,BANNER_Y,W,3);
@@ -1004,22 +987,22 @@ async function buildQRCanvas(){
   ctx.fillStyle='#8890b0';ctx.font='9px Arial';
   ctx.fillText('Eliana Amparo R. Molina del Carpio · MDD 2026',W/2,BANNER_Y+30);
 
-  // Separator
+  // Separador
   ctx.strokeStyle='rgba(255,215,0,.25)';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(20,BANNER_Y+38);ctx.lineTo(W-20,BANNER_Y+38);ctx.stroke();
 
-  // Name
+  // Nombre
   ctx.fillStyle='#ffffff';ctx.font='bold 13px Arial';
   const nm=(currentQRNombre||'').length>34?(currentQRNombre||'').slice(0,32)+'…':(currentQRNombre||'');
   ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
 
-  // Tipo label - solo texto, sin emojis
+  // Tipo (solo texto)
   const tipoLabelCanvas=esPadrino?'PADRINO':currentQRTipo==='Titular'?'TITULAR':'ACOMPANANTE';
   ctx.fillStyle=esPadrino?'#FFA500':currentQRTipo==='Titular'?'#FFD700':'#00E676';
   ctx.font='bold 11px Arial';
   ctx.fillText(tipoLabelCanvas,W/2,BANNER_Y+71);
 
-  // Disciplina como texto en footer
+  // Disciplina
   if(currentQRDisc&&currentQRDisc!=='—'){
     ctx.fillStyle='rgba(180,185,210,0.9)';ctx.font='10px Arial';
     ctx.fillText(currentQRDisc.toUpperCase(),W/2,BANNER_Y+88);
@@ -1035,18 +1018,9 @@ async function downloadQRFull(btn){
     const canvas=await buildQRCanvas();
     if(!canvas){showToast('❌ QR aún no generado, intenta de nuevo');return;}
     const fname=`QR_${currentQRId}_${(currentQRNombre||'participante').replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ]/g,'_')}.png`;
-    // toBlob with async/await via Promise wrapper
     const blob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/png',1.0));
     if(!blob){showToast('❌ Error generando imagen');return;}
-    // Try Web Share API with file (mobile)
-    const file=new File([blob],fname,{type:'image/png'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({files:[file],title:`QR - ${currentQRNombre}`,text:`${currentQRNombre} · XXIV Campeonato · MDD 2026`});
-        return;
-      } catch(ex){if(ex.name==='AbortError') return;/* User cancelled, fall through to download */}
-    }
-    // Anchor download (desktop + Android fallback)
+    // Siempre descargar como archivo (escritorio y móvil)
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;a.download=fname;a.style.display='none';
@@ -1059,48 +1033,59 @@ async function downloadQRFull(btn){
 }
 
 async function shareQRFull(){
-  // Solo proceder si navigator.share disponible (móvil)
+  // Solo en móvil con navigator.share
   if(!navigator.share) { copyQRUrl(); return; }
 
   try{
-    // Buscar datos del titular actual
     const currentRow=allRows.find(r=>r[C.QR_ID]===currentQRId);
     if(!currentRow){ copyQRUrl(); return; }
 
-    // Encontrar titular y acompañantes del mismo celular
     const celular=currentRow[C.Celular]||'';
     const grupoCelular=celular?allRows.filter(r=>(r[C.Celular]||'')===celular):[];
 
-    // Identificar titular del grupo
+    // Titular del grupo
     const titularRow=grupoCelular.find(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r))||currentRow;
     const acompRows=grupoCelular.filter(r=>esAcompananteRow(r));
 
-    const nombreTitular=titularRow[C.Nombre]||'—';
+    // Primer nombre del titular (primera palabra)
+    const primerNombre=(titularRow[C.Nombre]||'—').split(/\s+/)[0];
+    // Capitalizar primera letra
+    const primerNombreCap=primerNombre.charAt(0).toUpperCase()+primerNombre.slice(1).toLowerCase();
+
     const qrTitular=`${SCANNER_URL}?qrid=${encodeURIComponent(titularRow[C.QR_ID]||'')}`;
-    const comidaTitular=titularRow[C.Comida]||'—';
     const edecanNombre=session.usuario||'su edecán';
     const dependencia=session.dependencia||titularRow[C.Dependencia]||'su dependencia';
 
-    // Construir lista de acompañantes
+    // Titular: comida y bebida
+    const comidaTitular=titularRow[C.Comida]||'—';
+    const bebidaTitular=titularRow[C.Bebida]||'—';
+
+    // Acompañantes con nombre, comida, bebida y QR
     let listaAcomp='';
     if(acompRows.length>0){
-      listaAcomp=acompRows.map(a=>{
+      listaAcomp='\n'+acompRows.map((a,i)=>{
         const qrA=`${SCANNER_URL}?qrid=${encodeURIComponent(a[C.QR_ID]||'')}`;
-        return `- ${a[C.Nombre]||'—'}: ${qrA}`;
+        const nomA=(a[C.Nombre]||'—');
+        const comA=a[C.Comida]||'—';
+        const bebA=a[C.Bebida]||'—';
+        return `  • ${nomA}\n    Plato: ${comA} | Bebida: ${bebA}\n    QR: ${qrA}`;
       }).join('\n');
     }
 
     const mensaje=
-`Hola ${nombreTitular} 😊 Mi nombre es ${edecanNombre}, edecán de la dependencia ${dependencia}, y estaré acompañándote durante el evento.
+`Hola ${primerNombreCap} 😊 Mi nombre es ${edecanNombre}, edecán de la dependencia ${dependencia}, y estaré acompañándote durante el evento.
 Te comparto el detalle de tu registro para el evento del 28.06.2026:
-🔹 Participante titular: Plato elegido: ${comidaTitular}
-🔹 Códigos QR de acceso: Titular: ${qrTitular}
-🔹 Acompañantes: ${listaAcomp||'—'}
+
+🔹 Titular: ${titularRow[C.Nombre]||'—'}
+   Plato: ${comidaTitular} | Bebida: ${bebidaTitular}
+   QR de acceso: ${qrTitular}
+🔹 Acompañantes:${listaAcomp||' —'}
+
 📌 Por favor, conserva estos QR ya que serán necesarios para tu ingreso.
 Si tienes alguna consulta, cambio o necesitas apoyo con algún detalle, con toda confianza puedes escribirme. Estaré encantado(a) de ayudarte 😊
 ¡Nos vemos muy pronto! 🙌`;
 
-    // Intentar compartir con imagen + mensaje
+    // Compartir con imagen del QR + mensaje
     const canvas=await buildQRCanvas();
     if(canvas){
       const fname=`QR_${currentQRId}.png`;
@@ -1109,15 +1094,15 @@ Si tienes alguna consulta, cambio o necesitas apoyo con algún detalle, con toda
         const file=new File([blob],fname,{type:'image/png'});
         if(navigator.canShare&&navigator.canShare({files:[file]})){
           try{
-            await navigator.share({files:[file],title:`QR - ${currentQRNombre}`,text:mensaje});
+            await navigator.share({files:[file],title:`QR - ${primerNombreCap}`,text:mensaje});
             return;
           } catch(ex){if(ex.name==='AbortError') return;}
         }
       }
     }
-    // Fallback: compartir solo texto
+    // Fallback: solo texto
     try{
-      await navigator.share({title:`QR - ${currentQRNombre}`,text:mensaje});
+      await navigator.share({title:`QR - ${primerNombreCap}`,text:mensaje});
     } catch(ex){if(ex.name!=='AbortError') copyQRUrl();}
   } catch(ex){copyQRUrl();}
 }
