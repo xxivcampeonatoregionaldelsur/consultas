@@ -353,6 +353,55 @@ tr:hover td{background:rgba(255,215,0,.025)}
   </main>
 </div>
 
+<!-- REGISTRO MODAL (admin only) -->
+<div id="reg-modal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeRegistroModal()">
+  <div class="modal" style="max-width:580px">
+    <button class="modal-close" onclick="closeRegistroModal()">✕</button>
+    <div class="qr-header">
+      <h2 style="font-size:18px">➕ Nuevo Registro</h2>
+      <div class="qr-dep">Complete los datos del participante</div>
+    </div>
+    <div style="padding:20px">
+      <div id="reg-msg" class="msg"></div>
+      <!-- Datos principales -->
+      <div class="sec-title" style="font-size:12px;margin-bottom:10px">Datos del Titular</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Nombre completo *</label><input id="reg-nombre" type="text" placeholder="Apellidos y nombres"></div>
+        <div class="form-group"><label>Celular *</label><input id="reg-celular" type="text" placeholder="Número de celular"></div>
+        <div class="form-group">
+          <label>Dependencia *</label>
+          <select id="reg-dependencia">
+            <option value="">— Seleccionar —</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Registro (código 4 dígitos) *</label><input id="reg-codigo" type="text" placeholder="ej: AK76" maxlength="10"></div>
+        <div class="form-group">
+          <label>Tipo *</label>
+          <select id="reg-tipo">
+            <option value="Titular">Titular</option>
+            <option value="Padrino">Padrino</option>
+            <option value="Invitado">Acompañante/Invitado</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Disciplina</label><input id="reg-disciplina" type="text" placeholder="ej: Fútbol, Danza..."></div>
+        <div class="form-group"><label>Comida</label><input id="reg-comida" type="text" placeholder="Plato principal"></div>
+        <div class="form-group"><label>Bebida</label><input id="reg-bebida" type="text" placeholder="Tipo de bebida"></div>
+        <div class="form-group"><label>Tipo de participación</label><input id="reg-tipo-part" type="text" placeholder="ej: Competidor, Delegado..."></div>
+        <div class="form-group"><label>Observaciones</label><input id="reg-obs" type="text" placeholder="Notas adicionales"></div>
+      </div>
+      <!-- Acompañantes -->
+      <div class="sec-title" style="font-size:12px;margin-bottom:10px;margin-top:4px">Acompañantes <span id="reg-acomp-count" style="color:var(--gold);font-size:11px"></span></div>
+      <div id="reg-acompanantes-list"></div>
+      <button class="btn btn-ghost btn-sm" onclick="addAcompanante()" style="margin-bottom:14px">+ Agregar acompañante</button>
+      <!-- Acciones -->
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button class="btn btn-gold" style="flex:1;justify-content:center" onclick="submitRegistro()">✓ Guardar Registro</button>
+        <button class="btn btn-ghost" onclick="closeRegistroModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- CHANGE PASSWORD MODAL (non-admin users) -->
 <div id="chpass-modal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeChangePass()">
   <div class="modal" style="max-width:360px">
@@ -488,10 +537,8 @@ function startApp(){
   if(session.rol!=='administrador'){
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='none');
   }
-  // Show change password button in header for non-admin, non-delegado, non-edecan
-  if(session.rol!=='administrador'&&session.rol!=='delegado'&&session.rol!=='edecan'){
-    addChangePassBtn();
-  }
+  // Mostrar botón de cambiar contraseña para TODOS los usuarios
+  addChangePassBtn();
   loadData();
 }
 
@@ -603,10 +650,8 @@ function renderDepsDashboard(){
   const max=Math.max(...Object.values(deps),1);
   const colors=['bf-gold','bf-coral','bf-mint','bf-lav','bf-purple'];
 
-  // Also compute padrinos per dep
-  const padrinosByDep=count(allRows.filter(r=>{
-    const p=r[C.Padrino]||'';return p&&p!=='NO'&&p!=='—'&&p.toLowerCase()!=='no';
-  }).map(r=>r[C.Dependencia]).filter(v=>v&&v!=='—'));
+  // Corrección: padrino se detecta por la columna Tipo === 'Padrino', igual que esPadrinoRow()
+  const padrinosByDep=count(allRows.filter(r=>esPadrinoRow(r)).map(r=>r[C.Dependencia]).filter(v=>v&&v!=='—'));
 
   const rows=sorted.map(([dep,cnt],i)=>{
     const pct=Math.round(cnt/total*100);
@@ -650,12 +695,10 @@ function renderDepsDashboard(){
 let _searchDebounceTimer=null;
 function debouncedSearch(val){
   if(_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
-  // Solo buscar cuando hay exactamente 4 o más caracteres, o cuando se borra (0 chars)
   const trimmed=val.trim();
-  if(trimmed.length>0 && trimmed.length<4){
-    // Mostrar indicador de espera pero no buscar aún
-    return;
-  }
+  const isAdmin=session&&session.rol==='administrador';
+  // Admin: busca desde 1 carácter. Resto: espera 4 caracteres
+  if(!isAdmin && trimmed.length>0 && trimmed.length<4) return;
   _searchDebounceTimer=setTimeout(()=>{
     requestAnimationFrame(()=>renderParticipants(val));
   },300);
@@ -703,31 +746,37 @@ function renderParticipants(s,f){
   // Sin búsqueda: mostrar todos según filtro
   // Con búsqueda: buscar SOLO por número de registro y mostrar titular + sus acompañantes
   let rows=[];
+  const isAdmin=session.rol==='administrador';
   if(currentSearch){
-    // Búsqueda case-insensitive: convierte tanto el término como el campo a minúsculas
     const searchLower=currentSearch.toLowerCase();
-    // Buscar filas cuyo Registro coincide (insensible a mayúsculas/minúsculas)
-    const matched=allRows.filter(r=>(r[C.Registro]||'').toLowerCase().includes(searchLower));
-    // Por cada coincidencia agrupar por celular: titular primero, luego acompañantes
-    const seen=new Set();
-    matched.forEach(r=>{
-      const cel=r[C.Celular]||'';
-      const key=cel||r[C.QR_ID]||'';
-      if(!seen.has(key)){
-        seen.add(key);
-        if(cel){
-          // titular del grupo
-          const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
-          if(titular) rows.push(titular);
-          // padrinos del mismo celular
-          allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>rows.push(x));
-          // acompañantes del mismo celular
-          allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>rows.push(x));
-        } else {
-          rows.push(r);
+    if(isAdmin){
+      // Admin: busca en Registro, Nombre, Tipo, Dependencia, Disciplina
+      rows=allRows.filter(r=>{
+        return (r[C.Registro]||'').toLowerCase().includes(searchLower)||
+               (r[C.Nombre]||'').toLowerCase().includes(searchLower)||
+               (r[C.Tipo]||'').toLowerCase().includes(searchLower)||
+               (r[C.Dependencia]||'').toLowerCase().includes(searchLower)||
+               (r[C.Disciplina]||'').toLowerCase().includes(searchLower)||
+               getTipoDisplay(r).label.toLowerCase().includes(searchLower);
+      });
+    } else {
+      // Otros roles: busca SOLO por Registro (4+ chars) y agrupa con acompañantes
+      const matched=allRows.filter(r=>(r[C.Registro]||'').toLowerCase().includes(searchLower));
+      const seen=new Set();
+      matched.forEach(r=>{
+        const cel=r[C.Celular]||'';
+        const key=cel||r[C.QR_ID]||'';
+        if(!seen.has(key)){
+          seen.add(key);
+          if(cel){
+            const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
+            if(titular) rows.push(titular);
+            allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>rows.push(x));
+            allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>rows.push(x));
+          } else { rows.push(r); }
         }
-      }
-    });
+      });
+    }
   } else {
     rows=allRows.filter(r=>{
       const qid=r[C.QR_ID]||'';
@@ -746,7 +795,10 @@ function renderParticipants(s,f){
   const total=rows.length;
   const withIngreso=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].ingreso}).length;
   const withEntrega=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].entrega}).length;
-  const isAdmin=session.rol==='administrador';
+
+  const searchPlaceholder=isAdmin
+    ?'🔍 Buscar por nombre, tipo, dependencia, registro...'
+    :'🔍 Ingresa 4 dígitos del registro (ej: AK76)...';
 
   const headerHtml=`
     <div class="prog-wrap">
@@ -755,7 +807,8 @@ function renderParticipants(s,f){
       <div class="prog-lbl">Entregas: <strong>${withEntrega}/${total}</strong></div>
     </div>
     <div class="toolbar">
-      <input class="search" type="text" placeholder="🔍 Ingresa 4 dígitos del registro (ej: AK76)..." value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
+      <input class="search" type="text" placeholder="${searchPlaceholder}" value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
+      ${isAdmin?`<button class="btn btn-gold btn-sm" onclick="openRegistroModal()" style="white-space:nowrap">➕ Registrar</button>`:''}
       <span style="color:var(--muted);font-size:12px">${total} resultado${total!==1?'s':''}</span>
     </div>
     <div class="tbl-wrap">
@@ -1084,32 +1137,23 @@ async function shareQRFull(){
     const celular=currentRow[C.Celular]||'';
     const grupoCelular=celular?allRows.filter(r=>(r[C.Celular]||'')===celular):[];
 
-    // Titular del grupo
     const titularRow=grupoCelular.find(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r))||currentRow;
     const acompRows=grupoCelular.filter(r=>esAcompananteRow(r));
 
-    // Primer nombre del titular (primera palabra)
     const primerNombre=(titularRow[C.Nombre]||'—').split(/\s+/)[0];
-    // Capitalizar primera letra
     const primerNombreCap=primerNombre.charAt(0).toUpperCase()+primerNombre.slice(1).toLowerCase();
 
     const qrTitular=`${SCANNER_URL}?qrid=${encodeURIComponent(titularRow[C.QR_ID]||'')}`;
     const edecanNombre=session.usuario||'su edecán';
     const dependencia=session.dependencia||titularRow[C.Dependencia]||'su dependencia';
-
-    // Titular: comida y bebida
     const comidaTitular=titularRow[C.Comida]||'—';
     const bebidaTitular=titularRow[C.Bebida]||'—';
 
-    // Acompañantes con nombre, comida, bebida y QR
     let listaAcomp='';
     if(acompRows.length>0){
-      listaAcomp='\n'+acompRows.map((a,i)=>{
+      listaAcomp='\n'+acompRows.map((a)=>{
         const qrA=`${SCANNER_URL}?qrid=${encodeURIComponent(a[C.QR_ID]||'')}`;
-        const nomA=(a[C.Nombre]||'—');
-        const comA=a[C.Comida]||'—';
-        const bebA=a[C.Bebida]||'—';
-        return `  • ${nomA}\n    Plato: ${comA} | Bebida: ${bebA}\n    QR: ${qrA}`;
+        return `  • ${a[C.Nombre]||'—'}\n    Plato: ${a[C.Comida]||'—'} | Bebida: ${a[C.Bebida]||'—'}\n    QR: ${qrA}`;
       }).join('\n');
     }
 
@@ -1126,26 +1170,225 @@ Te comparto el detalle de tu registro para el evento del 28.06.2026:
 Si tienes alguna consulta, cambio o necesitas apoyo con algún detalle, con toda confianza puedes escribirme. Estaré encantado(a) de ayudarte 😊
 ¡Nos vemos muy pronto! 🙌`;
 
-    // Compartir con imagen del QR + mensaje
-    const canvas=await buildQRCanvas();
-    if(canvas){
-      const fname=`QR_${currentQRId}.png`;
+    // ── Generar imagen QR del titular ────────────────────────────
+    const canvasTitular=await buildQRCanvas();
+
+    // ── Generar imágenes QR de cada acompañante ──────────────────
+    // Para cada acompañante generamos un canvas temporal con su QR
+    const acompCanvases=[];
+    for(const ac of acompRows){
+      const acCanvas=await buildQRCanvasForRow(ac);
+      if(acCanvas) acompCanvases.push({canvas:acCanvas,row:ac});
+    }
+
+    // ── Armar lista de archivos para compartir ───────────────────
+    const files=[];
+    if(canvasTitular){
+      const blob=await new Promise(res=>canvasTitular.toBlob(b=>res(b),'image/png',1.0));
+      if(blob){
+        const fname=`QR_${titularRow[C.QR_ID]||'titular'}_${(titularRow[C.Nombre]||'').replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)}.png`;
+        files.push(new File([blob],fname,{type:'image/png'}));
+      }
+    }
+    for(const {canvas,row} of acompCanvases){
       const blob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/png',1.0));
       if(blob){
-        const file=new File([blob],fname,{type:'image/png'});
-        if(navigator.canShare&&navigator.canShare({files:[file]})){
-          try{
-            await navigator.share({files:[file],title:`QR - ${primerNombreCap}`,text:mensaje});
-            return;
-          } catch(ex){if(ex.name==='AbortError') return;}
-        }
+        const fname=`QR_${row[C.QR_ID]||'acomp'}_${(row[C.Nombre]||'').replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)}.png`;
+        files.push(new File([blob],fname,{type:'image/png'}));
       }
+    }
+
+    if(files.length>0&&navigator.canShare&&navigator.canShare({files})){
+      try{
+        await navigator.share({files,title:`QR - ${primerNombreCap}`,text:mensaje});
+        return;
+      } catch(ex){if(ex.name==='AbortError') return;}
     }
     // Fallback: solo texto
     try{
       await navigator.share({title:`QR - ${primerNombreCap}`,text:mensaje});
     } catch(ex){if(ex.name!=='AbortError') copyQRUrl();}
   } catch(ex){copyQRUrl();}
+}
+
+// Genera un canvas QR para una fila específica (sin necesitar que esté en el modal)
+async function buildQRCanvasForRow(row){
+  const qrid=row[C.QR_ID]||'';
+  if(!qrid) return null;
+  const url=`${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
+  const nombre=row[C.Nombre]||'—';
+  const disc=row[C.Disciplina]||'';
+  const tipo=row[C.TipoPersona]||'';
+  const esPadrino_=esPadrinoRow(row);
+  const tipoLabel=esPadrino_?'PADRINO':tipo==='Titular'?'TITULAR':'ACOMPAÑANTE';
+
+  // Crear div temporal para el QR
+  const tmpDiv=document.createElement('div');
+  tmpDiv.style.cssText='position:fixed;left:-9999px;top:-9999px;visibility:hidden;width:260px;height:260px';
+  document.body.appendChild(tmpDiv);
+
+  const W=360,H=480,SCALE=3;
+  const canvas=document.createElement('canvas');
+  canvas.width=W*SCALE;canvas.height=H*SCALE;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(SCALE,SCALE);
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
+
+  // Generar QR en div temporal
+  await new Promise(res=>{
+    new QRCode(tmpDiv,{text:url,width:260,height:260,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+    setTimeout(res,400);
+  });
+
+  const QR_SIZE=260,QR_X=(W-QR_SIZE)/2,QR_Y=50;
+  const qrEl=tmpDiv.querySelector('canvas')||tmpDiv.querySelector('img');
+  if(qrEl){
+    ctx.imageSmoothingEnabled=false;
+    try{ctx.drawImage(qrEl,QR_X,QR_Y,QR_SIZE,QR_SIZE);}catch(_){}
+    ctx.imageSmoothingEnabled=true;
+  }
+  document.body.removeChild(tmpDiv);
+
+  // Logo centrado
+  await new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const LOGO_R=28;
+      ctx.save();
+      ctx.beginPath();ctx.arc(W/2,QR_Y+QR_SIZE/2,LOGO_R+3,0,Math.PI*2);
+      ctx.fillStyle='#fff';ctx.fill();
+      ctx.beginPath();ctx.arc(W/2,QR_Y+QR_SIZE/2,LOGO_R,0,Math.PI*2);ctx.clip();
+      ctx.drawImage(img,W/2-LOGO_R,QR_Y+QR_SIZE/2-LOGO_R,LOGO_R*2,LOGO_R*2);
+      ctx.restore();res();
+    };
+    img.onerror=()=>res();
+    img.src=LOGO_SRC;
+  });
+
+  // Banner oscuro
+  const BANNER_Y=QR_Y+QR_SIZE+14;
+  const BANNER_H=H-BANNER_Y;
+  ctx.fillStyle='#0f1220';ctx.fillRect(0,BANNER_Y,W,BANNER_H);
+  const g=ctx.createLinearGradient(0,0,W,0);
+  g.addColorStop(0,'#FFA500');g.addColorStop(1,'#FFD700');
+  ctx.fillStyle=g;ctx.fillRect(0,BANNER_Y,W,3);
+  ctx.textAlign='center';ctx.textBaseline='alphabetic';
+  ctx.fillStyle='#FFD700';ctx.font='bold 10px Arial';
+  ctx.fillText('XXIV CAMPEONATO REGIONAL DEL SUR',W/2,BANNER_Y+17);
+  ctx.fillStyle='#8890b0';ctx.font='9px Arial';
+  ctx.fillText('Eliana Amparo R. Molina del Carpio · MDD 2026',W/2,BANNER_Y+30);
+  ctx.strokeStyle='rgba(255,215,0,.25)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(20,BANNER_Y+38);ctx.lineTo(W-20,BANNER_Y+38);ctx.stroke();
+  ctx.fillStyle='#ffffff';ctx.font='bold 13px Arial';
+  const nm=nombre.length>34?nombre.slice(0,32)+'…':nombre;
+  ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
+  ctx.fillStyle=esPadrino_?'#FFA500':tipo==='Titular'?'#FFD700':'#00E676';
+  ctx.font='bold 11px Arial';
+  ctx.fillText(tipoLabel,W/2,BANNER_Y+71);
+  if(disc&&disc!=='—'){
+    ctx.fillStyle='rgba(180,185,210,0.9)';ctx.font='10px Arial';
+    ctx.fillText(disc.toUpperCase(),W/2,BANNER_Y+88);
+  }
+  return canvas;
+}
+
+
+// ── REGISTRO MODAL (admin) ────────────────────────────────────
+let regAcompCount=0;
+function openRegistroModal(){
+  if(session.rol!=='administrador') return;
+  // Reset
+  ['reg-nombre','reg-celular','reg-codigo','reg-disciplina','reg-comida','reg-bebida','reg-tipo-part','reg-obs']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('reg-tipo').value='Titular';
+  document.getElementById('reg-acompanantes-list').innerHTML='';
+  document.getElementById('reg-msg').style.display='none';
+  regAcompCount=0;
+  updateAcompCount();
+  // Poblar dependencias
+  const sel=document.getElementById('reg-dependencia');
+  sel.innerHTML='<option value="">— Seleccionar —</option>';
+  getDependencias().forEach(dep=>{
+    const opt=document.createElement('option');
+    opt.value=dep;opt.textContent=dep;
+    sel.appendChild(opt);
+  });
+  document.getElementById('reg-modal').style.display='flex';
+}
+function closeRegistroModal(){document.getElementById('reg-modal').style.display='none';}
+
+function updateAcompCount(){
+  const el=document.getElementById('reg-acomp-count');
+  if(el) el.textContent=regAcompCount>0?`(${regAcompCount})`:'';
+}
+
+function addAcompanante(){
+  regAcompCount++;
+  updateAcompCount();
+  const idx=regAcompCount;
+  const div=document.createElement('div');
+  div.id=`acomp-${idx}`;
+  div.style.cssText='background:var(--s2);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:10px;position:relative';
+  div.innerHTML=`
+    <div style="font-family:var(--font-h);font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+      Acompañante ${idx}
+      <button onclick="removeAcomp(${idx})" style="position:absolute;right:10px;top:10px;background:rgba(255,23,68,.15);border:none;color:var(--danger);border-radius:3px;padding:2px 8px;cursor:pointer;font-size:11px">✕ Quitar</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Nombre</label><input id="acomp-nombre-${idx}" type="text" placeholder="Nombre completo"></div>
+      <div class="form-group"><label>Comida</label><input id="acomp-comida-${idx}" type="text" placeholder="Plato"></div>
+      <div class="form-group"><label>Bebida</label><input id="acomp-bebida-${idx}" type="text" placeholder="Bebida"></div>
+    </div>`;
+  document.getElementById('reg-acompanantes-list').appendChild(div);
+}
+
+function removeAcomp(idx){
+  const el=document.getElementById(`acomp-${idx}`);
+  if(el) el.remove();
+  // No decrementamos regAcompCount para evitar colisión de IDs
+}
+
+async function submitRegistro(){
+  const msg=document.getElementById('reg-msg');
+  const nombre=document.getElementById('reg-nombre').value.trim();
+  const celular=document.getElementById('reg-celular').value.trim();
+  const dependencia=document.getElementById('reg-dependencia').value.trim();
+  const codigo=document.getElementById('reg-codigo').value.trim().toUpperCase();
+  const tipo=document.getElementById('reg-tipo').value;
+  const disciplina=document.getElementById('reg-disciplina').value.trim();
+  const comida=document.getElementById('reg-comida').value.trim();
+  const bebida=document.getElementById('reg-bebida').value.trim();
+  const tipoPart=document.getElementById('reg-tipo-part').value.trim();
+  const obs=document.getElementById('reg-obs').value.trim();
+
+  if(!nombre||!celular||!dependencia||!codigo){showMsg(msg,'err','Nombre, celular, dependencia y código son obligatorios');return;}
+
+  // Recoger acompañantes visibles
+  const acompanantes=[];
+  document.querySelectorAll('[id^="acomp-nombre-"]').forEach(el=>{
+    const idx=el.id.replace('acomp-nombre-','');
+    const div=document.getElementById(`acomp-${idx}`);
+    if(div&&document.body.contains(div)){
+      const nom=el.value.trim();
+      const com=document.getElementById(`acomp-comida-${idx}`)?.value.trim()||'';
+      const beb=document.getElementById(`acomp-bebida-${idx}`)?.value.trim()||'';
+      if(nom) acompanantes.push({nombre:nom,comida:com,bebida:beb});
+    }
+  });
+
+  try{
+    const res=await apiFetch('registro',{
+      Tipo:tipo,Nombre:nombre,Dependencia:dependencia,Celular:celular,
+      Padrino:tipo==='Padrino'?'SI':'NO',TipoPersona:'Titular',
+      TipoParticipacion:tipoPart,Disciplina:disciplina,
+      Comida:comida,Bebida:bebida,Observaciones:obs,
+      Registro:codigo,Acompanantes:acompanantes
+    });
+    if(res.result==='ok'){
+      showMsg(msg,'ok',`✓ Registro guardado · QR: ${res.qrId}`);
+      setTimeout(()=>{closeRegistroModal();loadData();},2000);
+    } else { showMsg(msg,'err',res.mensaje||'Error al guardar'); }
+  } catch(ex){ showMsg(msg,'err','Error de conexión'); }
 }
 
 
@@ -1174,7 +1417,12 @@ async function doChangePassword(){
   if(new1.length<6){showMsg(msg,'err','La nueva contraseña debe tener al menos 6 caracteres');return;}
   if(new1!==new2){showMsg(msg,'err','Las contraseñas no coinciden');return;}
   try{
-    const res=await apiFetch('changePassword',{usuario:session.usuario,currentPassword:current,newPassword:new1});
+    // Verificar contraseña actual via login
+    const check=await fetch(`${SCRIPT_URL}?action=login&usuario=${encodeURIComponent(session.usuario)}&password=${encodeURIComponent(current)}`,{redirect:'follow'});
+    const ck=await check.json();
+    if(ck.result!=='ok'){showMsg(msg,'err','Contraseña actual incorrecta');return;}
+    // Actualizar con updateUser
+    const res=await apiFetch('updateUser',{usuario:session.usuario,newPassword:new1});
     if(res.result==='ok'){showMsg(msg,'ok','Contraseña cambiada correctamente');setTimeout(closeChangePass,2000);}
     else{showMsg(msg,'err',res.mensaje||'Error al cambiar contraseña');}
   } catch(ex){showMsg(msg,'err','Error de conexión');}
@@ -1188,7 +1436,8 @@ async function adminChangePassword(){
   if(!user||!newPass){showMsg(msg,'err','Completa usuario y nueva contraseña');return;}
   if(newPass.length<6){showMsg(msg,'err','La contraseña debe tener al menos 6 caracteres');return;}
   try{
-    const res=await apiFetch('adminChangePassword',{targetUser:user,newPassword:newPass});
+    // updateUser acepta newPassword y lo hashea igual que el script
+    const res=await apiFetch('updateUser',{usuario:user,newPassword:newPass});
     if(res.result==='ok'){
       showMsg(msg,'ok',`Contraseña de "${user}" actualizada`);
       document.getElementById('cp-user').value='';document.getElementById('cp-newpass').value='';
@@ -1260,8 +1509,16 @@ async function createUser(){
   if(p.length<6){showMsg(msg,'err','La contraseña debe tener al menos 6 caracteres');return;}
   if(needsDep&&!d){showMsg(msg,'err','Selecciona una dependencia para este rol');return;}
   try{
-    const res=await apiFetch('createUser',{usuario:u,password:p,rol:r,dependencia:d});
+    // El script sólo acepta roles: administrador|delegado|verificadorasistencia|verificadorentrega
+    // Para edecan: creamos primero como delegado, luego actualizamos el rol directamente en la hoja
+    // mediante updateUser que no valida el rol
+    const rolParaScript=(r==='edecan')?'delegado':r;
+    const res=await apiFetch('createUser',{usuario:u,password:p,rol:rolParaScript,dependencia:d});
     if(res.result==='ok'){
+      // Si es edecan, actualizamos el rol con updateUser (que no valida lista de roles)
+      if(r==='edecan'){
+        await apiFetch('updateUser',{usuario:u,rol:'edecan',dependencia:d,activo:true});
+      }
       showMsg(msg,'ok','Usuario creado correctamente');
       document.getElementById('nu-user').value='';document.getElementById('nu-pass').value='';
       document.getElementById('nu-rol').value='';
