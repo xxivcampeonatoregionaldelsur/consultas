@@ -570,7 +570,17 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
   border-radius:6px;padding:16px;text-align:center;
 }
 
-/* ── TOAST OVERRIDE (mejorado via CSS, sin tocar JS) ─────────── */
+/* ── MENSAJERÍA — Slider panels base ────────────────────────── */
+.msg-slider-wrap{position:relative;overflow:hidden;}
+.msg-panel{transition:transform .3s cubic-bezier(.4,0,.2,1);}
+/* Desktop: reset slider styles */
+@media(min-width:769px){
+  .msg-slider-wrap{overflow:visible;display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .msg-panel{min-width:unset!important;width:unset!important;transform:none!important;}
+  .msg-nav-tabs{display:none!important;}
+  .msg-sticky-bar{display:none!important;}
+  #msg-actions-desktop{display:flex!important;}
+}
 /* El toast JS usa id=dash-toast con style inline.
    Añadimos reglas que NO sobreescriben el style inline pero
    refuerzan el elemento cuando existe */
@@ -587,16 +597,21 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
    Sistema de campo: un pulgar, sin scroll, sin error
    ══════════════════════════════════════════════════════════════ */
 @media(max-width:768px){
-  /* Header comprimido */
-  header{padding:0 12px;}
+  /* Header comprimido y STICKY */
+  header{padding:0 12px;position:sticky;top:0;z-index:100;}
   .brand-wrap{gap:8px;padding:5px 0;}
   .brand-logo-img{width:36px;height:36px;}
   .brand strong{font-size:12px;}
   /* En móvil ocultar timestamp para ganar espacio */
   .last-upd{display:none}
 
-  /* Nav: scroll horizontal cómodo */
-  .nav{padding:0 8px;}
+  /* Nav: sticky debajo del header, scroll horizontal cómodo */
+  .nav{
+    padding:0 8px;
+    position:sticky;
+    top:var(--header-h,60px);
+    z-index:90;
+  }
   .nav-tab{padding:10px 14px;font-size:12px;letter-spacing:1px;}
 
   /* Main: menos padding lateral */
@@ -611,9 +626,9 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
   .search{font-size:16px;min-height:52px;} /* 16px evita zoom en iOS */
   select.filter{min-height:52px;}
 
-  /* Botones: zona táctil amplia */
-  .btn{min-height:46px;padding:12px 16px;}
-  .btn-sm{min-height:40px;padding:9px 13px;}
+  /* Botones: zona táctil amplia (mínimo 48px) */
+  .btn{min-height:48px;padding:12px 16px;}
+  .btn-sm{min-height:44px;padding:10px 14px;}
 
   /* Login card */
   .login-card{padding:26px 20px}
@@ -631,6 +646,65 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
 
   /* Pills QR: 2 por fila */
   .qr-pill{min-width:calc(50% - 4px);flex:none;}
+
+  /* ── MENSAJERÍA MOBILE LAYOUT ─────────────────────────────── */
+  /* Panel slider: layout vertical con scroll snap */
+  .msg-slider-wrap{
+    display:flex;
+    overflow:hidden;
+    width:100%;
+    position:relative;
+  }
+  .msg-panel{
+    min-width:100%;
+    width:100%;
+    flex-shrink:0;
+    transition:transform .3s cubic-bezier(.4,0,.2,1);
+  }
+  /* Botones de navegación entre paneles */
+  .msg-nav-tabs{
+    display:flex;
+    background:var(--field);
+    border:1px solid var(--border);
+    border-radius:var(--r);
+    margin-bottom:12px;
+    overflow:hidden;
+  }
+  .msg-nav-tab{
+    flex:1;padding:12px;text-align:center;
+    font-family:var(--font-h);font-size:12px;font-weight:700;
+    letter-spacing:1px;text-transform:uppercase;color:var(--muted);
+    cursor:pointer;border-bottom:3px solid transparent;
+    transition:all var(--t-fast);min-height:48px;
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .msg-nav-tab.active{color:var(--gold);border-bottom-color:var(--gold);background:rgba(255,215,0,.04);}
+
+  /* Sticky send bar en móvil */
+  .msg-sticky-bar{
+    position:sticky;bottom:0;
+    background:var(--s1);
+    border-top:1px solid var(--border2);
+    padding:10px 12px;
+    display:flex;gap:8px;
+    z-index:40;
+    margin:0 -12px; /* compensar padding del main */
+  }
+  .msg-sticky-bar .btn{flex:1;justify-content:center;}
+
+  /* Tabla titulares mobile: columnas colapsadas */
+  .tit-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .tit-tbl-wrap table{min-width:320px;}
+  /* En móvil: ocultar columna Celular y Dependencia por defecto */
+  .tit-col-dep{display:none;}
+  .tit-col-cel{display:none;}
+
+  /* Acciones rápidas: 3 por fila en móvil */
+  .quick-actions{grid-template-columns:repeat(3,1fr);gap:8px;}
+  .qa-btn{padding:12px 8px;}
+  .qa-icon{font-size:20px;}
+  .qa-lbl{font-size:10px;}
+  .qa-sub{display:none;} /* ocultar subtítulo para ahorrar espacio */
 }
 
 @media(max-width:400px){
@@ -639,6 +713,7 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
   .stat-val{font-size:40px}
   header{padding:0 8px}
   main{padding:8px}
+  .quick-actions{grid-template-columns:repeat(2,1fr);}
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -802,6 +877,15 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
 /* Scroll suave en toda la app */
 html{scroll-behavior:smooth}
 
+/* Compensar header+nav sticky en móvil */
+@media(max-width:768px){
+  #app{display:flex;flex-direction:column;}
+  main{
+    /* padding-top se ajusta via JS según altura real de header+nav */
+    scroll-padding-top:110px;
+  }
+}
+
 /* Barra de scroll personalizada (no móvil) */
 @media(hover:hover){
   ::-webkit-scrollbar{width:6px;height:6px}
@@ -863,7 +947,7 @@ html{scroll-behavior:smooth}
   <div class="nav">
     <div class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
     <div class="nav-tab" data-tab="participantes" onclick="switchTab('participantes')">👥 Participantes</div>
-    <div class="nav-tab admin-only" data-tab="deps-dashboard" onclick="switchTab('deps-dashboard');renderDepsDashboard()">🏛️ Por Dependencia</div>
+    <div class="nav-tab admin-only" data-tab="deps-dashboard" onclick="switchTab('deps-dashboard');renderDepsDashboard()" id="tab-deps-dashboard" style="display:none">🏛️ Por Dependencia</div>
     <div class="nav-tab" id="tab-mensajeria" data-tab="mensajeria" onclick="switchTab('mensajeria');renderMensajeria()" style="display:none">💬 Mensajería</div>
     <div class="nav-tab admin-only" data-tab="usuarios" onclick="switchTab('usuarios')" id="tab-usuarios" style="display:none">🔑 Usuarios</div>
   </div>
@@ -1147,6 +1231,18 @@ let currentSearch='', currentFilter='todos';
 let currentQRId='', currentQRUrl='', currentQRNombre='', currentQRTipo='', currentQRPadrino='';
 
 // ── BOOT ───────────────────────────────────────────────────────
+function _updateStickyOffset(){
+  const hdr=document.querySelector('header');
+  const nav=document.querySelector('.nav');
+  if(hdr&&nav){
+    const hdrH=hdr.offsetHeight;
+    const navH=nav.offsetHeight;
+    document.documentElement.style.setProperty('--header-h', hdrH+'px');
+    document.documentElement.style.setProperty('--header-nav-h', (hdrH+navH)+'px');
+    nav.style.top=hdrH+'px';
+  }
+}
+
 window.onload = function(){
   // Set logo everywhere
   document.getElementById('login-logo-img').src = LOGO_SRC;
@@ -1156,6 +1252,8 @@ window.onload = function(){
   if(vl) vl.src=LOGO_SRC;
   if(session && session.token) startApp();
   else document.getElementById('login-screen').style.display='flex';
+  // Calcular offset sticky tras render
+  requestAnimationFrame(()=>{ _updateStickyOffset(); window.addEventListener('resize',_updateStickyOffset); });
 };
 
 // ── AUTH ───────────────────────────────────────────────────────
@@ -1211,6 +1309,10 @@ function startApp(){
   rb.textContent=rm[0];rb.className='role-badge '+rm[1];
   if(session.rol!=='administrador'){
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='none');
+  } else {
+    // En móvil, ocultar "Por Dependencia" del nav (se accede desde Acciones Rápidas)
+    const depTab = document.getElementById('tab-deps-dashboard');
+    if(depTab) depTab.style.display = window.innerWidth < 768 ? 'none' : '';
   }
   if(session.rol==='administrador'||session.rol==='edecan'){
     const tm=document.getElementById('tab-mensajeria');
@@ -1431,6 +1533,11 @@ function renderDashboard(){
         <div class="qa-icon">📷</div>
         <div class="qa-lbl">Abrir scanner</div>
         <div class="qa-sub">Verificar QR</div>
+      </div>
+      <div class="qa-btn" onclick="switchTab('deps-dashboard');renderDepsDashboard()">
+        <div class="qa-icon">🏛️</div>
+        <div class="qa-lbl">Por Dependencia</div>
+        <div class="qa-sub">Resumen y estado</div>
       </div>
     </div>`;
   }
@@ -2849,18 +2956,28 @@ function renderMensajeria(){
 
   document.getElementById('mensajeria-inner').innerHTML=`
   ${dashHtml}
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-    <div>
+  <div id="msg-mobile-nav" class="msg-nav-tabs" style="display:none">
+    <div class="msg-nav-tab active" id="msg-tab-lista" onclick="msgShowPanel('lista')">👥 Titulares <span id="msg-sel-badge" style="display:none;background:var(--gold);color:#000;border-radius:50%;width:18px;height:18px;font-size:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:900">1</span></div>
+    <div class="msg-nav-tab" id="msg-tab-redactar" onclick="msgShowPanel('redactar')">✉️ Redactar</div>
+  </div>
+  <div class="msg-slider-wrap" id="msg-slider-wrap">
+    <div class="msg-panel" id="msg-panel-lista">
       <div class="sec-title" style="margin-bottom:10px">👥 Titulares${isEdecan&&session.dependencia?' — <span style="color:var(--gold)">'+e(session.dependencia)+'</span>':''}</div>
-      <div class="tbl-wrap" style="max-height:440px;overflow-y:auto">
-        <table style="min-width:380px">
-          <thead><tr><th>Nombre</th><th>Dependencia</th><th>Celular</th><th>Contactado</th><th style="text-align:center">Acomp.</th></tr></thead>
+      <div class="tit-tbl-wrap tbl-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
+        <table>
+          <thead><tr>
+            <th>Nombre</th>
+            <th class="tit-col-dep">Dependencia</th>
+            <th class="tit-col-cel">Celular</th>
+            <th>Contactado</th>
+            <th style="text-align:center">Ac.</th>
+          </tr></thead>
           <tbody>${titRows||'<tr><td colspan="5"><div class="empty">Sin titulares</div></td></tr>'}</tbody>
         </table>
       </div>
-      <div style="margin-top:8px;font-size:11px;color:var(--muted)">Selecciona un titular para redactar su mensaje</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted)">Toca un titular para redactar su mensaje</div>
     </div>
-    <div>
+    <div class="msg-panel" id="msg-panel-redactar">
       <div class="sec-title" style="margin-bottom:10px">✉️ Redactar Mensaje</div>
       <div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px">
         <div id="msg-info-box" style="display:none;background:var(--field);border-radius:4px;padding:10px;margin-bottom:12px">
@@ -2874,9 +2991,10 @@ function renderMensajeria(){
         </div>
         <div style="margin-bottom:12px">
           <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:5px">Mensaje (editable)</label>
-          <textarea id="msg-texto" rows="11" style="width:100%;background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;padding:12px;color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;resize:vertical;outline:none;min-height:220px" placeholder="Selecciona un titular para comenzar..."></textarea>
+          <textarea id="msg-texto" rows="9" style="width:100%;background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;padding:12px;color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;resize:vertical;outline:none;min-height:180px" placeholder="Selecciona un titular para comenzar..."></textarea>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <!-- Botones visibles en desktop dentro del panel -->
+        <div id="msg-actions-desktop" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-gold" id="btn-wa" onclick="enviarWA()" disabled style="opacity:.45">📱 WhatsApp</button>
           <button class="btn btn-ghost" id="btn-share" onclick="compartirMsg()" style="display:none">📤 Compartir</button>
           <button class="btn btn-ghost" onclick="copiarMsg()">📋 Copiar</button>
@@ -2888,7 +3006,19 @@ function renderMensajeria(){
         <div id="msg-status" class="msg" style="margin-top:10px"></div>
       </div>
     </div>
+  </div>
+  <!-- Sticky bar solo en móvil -->
+  <div class="msg-sticky-bar" id="msg-sticky-bar" style="display:none">
+    <button class="btn btn-gold" id="btn-wa-sticky" onclick="enviarWA()" disabled style="opacity:.45">📱 WhatsApp</button>
+    <button class="btn btn-ghost" onclick="copiarMsg()">📋 Copiar</button>
+    <label id="msg-contactado-lbl-sticky" style="display:none;font-family:var(--font-h);font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;align-items:center;gap:4px">
+      <input type="checkbox" id="msg-chk-contactado-sticky" onchange="toggleContactadoMsgSticky()" style="accent-color:var(--mint)">
+      Contactado
+    </label>
   </div>`;
+
+  // Inicializar layout mobile
+  _initMsgMobileLayout();
 
   // Re-apply selected state if any
   if(_msgQRID) _resaltarFilaTitular();
@@ -2905,15 +3035,30 @@ function selTitular(qrid,idx){
   if(nomEl) nomEl.textContent=r[C.Nombre]||'—';
   const depEl=document.getElementById('msg-info-dep');
   if(depEl) depEl.textContent=r[C.Dependencia]||'—';
-  const waBtn=document.getElementById('btn-wa');
-  if(waBtn){waBtn.disabled=false;waBtn.style.opacity='1';}
+  // Habilitar botón WA (panel desktop y sticky bar)
+  ['btn-wa','btn-wa-sticky'].forEach(id=>{
+    const waBtn=document.getElementById(id);
+    if(waBtn){waBtn.disabled=false;waBtn.style.opacity='1';}
+  });
   const shareBtn=document.getElementById('btn-share');
   if(shareBtn) shareBtn.style.display=navigator.share?'':'none';
-  const cLbl=document.getElementById('msg-contactado-lbl');
-  if(cLbl) cLbl.style.display='';
-  const chk=document.getElementById('msg-chk-contactado');
-  if(chk) chk.checked=(contactados[qrid]||'PENDIENTE')==='SI';
+  // Mostrar label contactado
+  ['msg-contactado-lbl','msg-contactado-lbl-sticky'].forEach(id=>{
+    const cLbl=document.getElementById(id);
+    if(cLbl) cLbl.style.display='';
+  });
+  // Sync checkbox state
+  const chkVal=(contactados[qrid]||'PENDIENTE')==='SI';
+  ['msg-chk-contactado','msg-chk-contactado-sticky'].forEach(id=>{
+    const chk=document.getElementById(id);
+    if(chk) chk.checked=chkVal;
+  });
   aplicarPlantilla();
+  // En móvil: auto-navegar al panel de redacción tras seleccionar titular
+  if(window.innerWidth < 768){
+    // pequeño delay para que el highlight sea visible antes del slide
+    setTimeout(()=>msgShowPanel('redactar'), 200);
+  }
 }
 
 function _resaltarFilaTitular(idx){
@@ -2929,16 +3074,102 @@ function _resaltarFilaTitular(idx){
   }
 }
 
+// ── MENSAJERÍA MOBILE HELPERS ──────────────────────────────────
+function _initMsgMobileLayout(){
+  const isMobile = window.innerWidth < 768;
+  const mobileNav = document.getElementById('msg-mobile-nav');
+  const stickyBar = document.getElementById('msg-sticky-bar');
+  const sliderWrap = document.getElementById('msg-slider-wrap');
+  const desktopActions = document.getElementById('msg-actions-desktop');
+
+  if(isMobile){
+    if(mobileNav) mobileNav.style.display='flex';
+    if(stickyBar) stickyBar.style.display='flex';
+    // En desktop: mostrar dos paneles lado a lado
+    if(sliderWrap){
+      sliderWrap.style.display='block';
+    }
+    // Ocultar botones de acción dentro del panel en móvil (se usan los de la sticky bar)
+    if(desktopActions) desktopActions.style.display='none';
+    // Mostrar primero la lista
+    msgShowPanel('lista', true);
+  } else {
+    if(mobileNav) mobileNav.style.display='none';
+    if(stickyBar) stickyBar.style.display='none';
+    // Desktop: dos columnas side by side
+    if(sliderWrap){
+      sliderWrap.style.display='grid';
+      sliderWrap.style.gridTemplateColumns='1fr 1fr';
+      sliderWrap.style.gap='16px';
+    }
+    if(desktopActions) desktopActions.style.display='flex';
+    // En desktop: mostrar ambos paneles normalmente
+    ['msg-panel-lista','msg-panel-redactar'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){el.style.transform='';el.style.minWidth='';el.style.width='';}
+    });
+  }
+}
+
+let _msgCurrentPanel='lista';
+function msgShowPanel(panel, skipAnimation){
+  _msgCurrentPanel=panel;
+  const lista=document.getElementById('msg-panel-lista');
+  const redactar=document.getElementById('msg-panel-redactar');
+  const tabLista=document.getElementById('msg-tab-lista');
+  const tabRedactar=document.getElementById('msg-tab-redactar');
+  const sliderWrap=document.getElementById('msg-slider-wrap');
+
+  if(!lista||!redactar) return;
+
+  if(window.innerWidth >= 768){
+    // Desktop: no hacer nada, ambos visibles
+    return;
+  }
+
+  // Mobile slider: mover paneles con transform
+  if(panel==='lista'){
+    lista.style.transform='translateX(0)';
+    redactar.style.transform='translateX(100%)';
+    if(tabLista) tabLista.classList.add('active');
+    if(tabRedactar) tabRedactar.classList.remove('active');
+  } else {
+    lista.style.transform='translateX(-100%)';
+    redactar.style.transform='translateX(-100%)';
+    if(tabLista) tabLista.classList.remove('active');
+    if(tabRedactar) tabRedactar.classList.add('active');
+    // Scroll al top del panel de redacción
+    if(sliderWrap) sliderWrap.scrollTop=0;
+  }
+}
+
+function toggleContactadoMsgSticky(){
+  if(!_msgQRID) return;
+  const chk=document.getElementById('msg-chk-contactado-sticky');
+  const val=chk&&chk.checked?'SI':'PENDIENTE';
+  // Sync el otro checkbox
+  const chk2=document.getElementById('msg-chk-contactado');
+  if(chk2) chk2.checked=chk&&chk.checked;
+  setContactado(_msgQRID,val);
+  renderMensajeria();
+}
+
 function aplicarPlantilla(){
   if(!_msgQRID) return;
   const tipo=document.getElementById('msg-tipo')?.value||'bienvenida';
   const pl=PLANTILLAS_MSG[tipo];
-  if(!pl) return;
+  const ta=document.getElementById('msg-texto');
+  if(!ta) return;
+  // Mensaje libre: dejar vacío (placeholder visible)
+  if(!pl||!pl.tpl){
+    ta.value='';
+    ta.placeholder='Escribe tu mensaje personalizado...';
+    return;
+  }
   const r=allRows.find(x=>x[C.QR_ID]===_msgQRID);
   if(!r) return;
   const cel=r[C.Celular]||'';
   const acomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)):[];
-  // Primer nombre desde el final (apellidos primero)
   const partes=(r[C.Nombre]||'').trim().split(/\s+/);
   const primerNom=partes[partes.length-1]||partes[0]||'';
   const nombre=primerNom.charAt(0).toUpperCase()+primerNom.slice(1).toLowerCase();
@@ -2962,16 +3193,20 @@ function aplicarPlantilla(){
     .replace(/{{PLURAL_QR}}/g,acomps.length>0?'estos QR':'este QR')
     .replace(/{{PLURAL_NECESARIO}}/g,acomps.length>0?'serán necesarios':'será necesario');
 
-  const ta=document.getElementById('msg-texto');
-  if(ta) ta.value=texto;
+  ta.value=texto;
 }
+
+
 
 function toggleContactadoMsg(){
   if(!_msgQRID) return;
   const chk=document.getElementById('msg-chk-contactado');
   const val=chk&&chk.checked?'SI':'PENDIENTE';
+  // Sync sticky checkbox
+  const chkSticky=document.getElementById('msg-chk-contactado-sticky');
+  if(chkSticky) chkSticky.checked=chk&&chk.checked;
   setContactado(_msgQRID,val);
-  renderMensajeria();// re-render para actualizar dashboard
+  renderMensajeria();
 }
 
 function enviarWA(){
@@ -2984,8 +3219,11 @@ function enviarWA(){
   window.open(`https://wa.me/51${cel}?text=${encodeURIComponent(texto)}`,'_blank');
   // Marcar automáticamente como contactado
   setContactado(_msgQRID,'SI');
-  const chk=document.getElementById('msg-chk-contactado');
-  if(chk) chk.checked=true;
+  // Sync ambos checkboxes
+  ['msg-chk-contactado','msg-chk-contactado-sticky'].forEach(id=>{
+    const chk=document.getElementById(id);
+    if(chk) chk.checked=true;
+  });
   showToast('📱 Abriendo WhatsApp · Marcado como contactado ✅');
 }
 
