@@ -1211,8 +1211,8 @@ html{scroll-behavior:smooth}
     <div class="qr-actions">
       <button class="btn btn-gold" id="btn-qr-download" onclick="downloadQRFull(this)" style="justify-content:center;padding:12px">⬇ Descargar imagen completa</button>
       <div style="display:flex;gap:8px">
+        <!-- FIX: btn-qr-share (compartir QR) eliminado completamente -->
         <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="copyQRUrl()">🔗 Copiar enlace</button>
-        <button class="btn btn-ghost btn-sm" id="btn-qr-share" style="flex:1;justify-content:center;display:none" onclick="shareQRFull()">📤 Compartir</button>
       </div>
       <div class="qr-id-chip" id="qr-id-chip"></div>
     </div>
@@ -1787,7 +1787,7 @@ function renderParticipants(s,f){
     <div class="toolbar">
       <input class="search" type="text" placeholder="${searchPlaceholder}" value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
       ${canAddRecord?`<button class="btn btn-gold btn-sm" onclick="openRegistroModal()" style="white-space:nowrap">➕ Registrar</button>`:''}
-      <button class="btn btn-ghost btn-sm" onclick="exportParticipantesExcel()" style="white-space:nowrap">⬇ Excel</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportParticipantesExcel()" style="white-space:nowrap;${/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.innerWidth<768?'display:none':''}">⬇ Excel</button>
       <span style="color:var(--muted);font-size:12px">${total} resultado${total!==1?'s':''}</span>
     </div>
     <div class="tbl-wrap">
@@ -1931,11 +1931,7 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
     if(entregaBox) entregaBox.style.background=hasEntrega?'rgba(0,230,118,.07)':'transparent';
   }
 
-  // Botón compartir: solo admin/edecan en móvil (navigator.share disponible)
-  const canShare=navigator.share&&typeof navigator.share==='function';
-  const rolPuedeCompartir=session.rol==='administrador'||session.rol==='edecan';
-  const shareBtn=document.getElementById('btn-qr-share');
-  if(shareBtn) shareBtn.style.display=(canShare&&rolPuedeCompartir)?'':'none';
+  // FIX: Botón compartir eliminado — no se usa navigator.share en ningún punto
 
   // Background overlay: CROWN for padrino, MEDAL for participant
   const bgImg=document.getElementById('qr-bg-img');
@@ -2720,7 +2716,14 @@ function showToast(msg){
 
 
 // ── EXPORTAR PARTICIPANTES A EXCEL (CSV) ──────────────────────
+// FIX 3: En móvil esta función está bloqueada — solo disponible en desktop
 function exportParticipantesExcel(){
+  // Detectar dispositivo móvil
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.innerWidth<768;
+  if(isMobile){
+    showToast('⚠️ Descarga Excel no disponible en móvil. Usa un computador.');
+    return;
+  }
   // Get current filtered rows from allRows using current filter/search
   let rows=[];
   const isAdmin=session.rol==='administrador';
@@ -2792,7 +2795,13 @@ function exportParticipantesExcel(){
 }
 
 // ── EXPORTAR DEPENDENCIAS A EXCEL (CSV) ───────────────────────
+// FIX 3: En móvil esta función está bloqueada — solo disponible en desktop
 function exportExcel(){
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.innerWidth<768;
+  if(isMobile){
+    showToast('⚠️ Descarga Excel no disponible en móvil. Usa un computador.');
+    return;
+  }
   const count=arr=>arr.reduce((m,v)=>{if(v)m[v]=(m[v]||0)+1;return m},{});
   const deps=count(allRows.map(r=>r[C.Dependencia]).filter(v=>v&&v!=='—'));
   const sorted=Object.entries(deps).sort((a,b)=>b[1]-a[1]);
@@ -2902,6 +2911,211 @@ const PLANTILLAS_MSG={
   libre:{label:'✏️ Mensaje libre',tpl:''}
 };
 
+// ══════════════════════════════════════════════════════════════
+//  FIX 5: EDITOR DE PLANTILLAS — Solo para administrador
+//  Permite crear, editar y eliminar plantillas de mensajes.
+//  Las plantillas se almacenan en memoria en PLANTILLAS_MSG
+//  y se integran con el selector existente de mensajería.
+// ══════════════════════════════════════════════════════════════
+
+// Estado del editor de plantillas
+let _editorPlantillaKey = null; // key de la plantilla en edición (null = nueva)
+
+// Claves de plantillas protegidas que no se pueden eliminar
+const PLANTILLAS_PROTEGIDAS = ['libre'];
+
+// Variables dinámicas disponibles para insertar en plantillas
+const VARS_DISPONIBLES = [
+  '{{NOMBRE}}','{{EDECAN}}','{{DEPENDENCIA}}','{{COMIDA_TITULAR}}',
+  '{{QR_TITULAR}}','{{LISTA_ACOMPANANTES}}','{{PLURAL_QR}}','{{PLURAL_NECESARIO}}'
+];
+
+/**
+ * Renderiza el módulo de editor de plantillas dentro del panel de mensajería.
+ * Solo visible para rol administrador.
+ */
+function renderEditorPlantillas(){
+  const container = document.getElementById('msg-editor-plantillas');
+  if(!container) return;
+
+  const plantKeys = Object.keys(PLANTILLAS_MSG);
+  const listaItems = plantKeys.map(k => {
+    const pl = PLANTILLAS_MSG[k];
+    const esProtegida = PLANTILLAS_PROTEGIDAS.includes(k);
+    return `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:4px;background:var(--field);border:1px solid var(--border);margin-bottom:6px;">
+        <span style="flex:1;font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--text)">${e(pl.label)}</span>
+        <button class="btn btn-ghost btn-sm" onclick="abrirEditorPlantilla('${e(k)}')" style="min-height:36px">✏️ Editar</button>
+        ${!esProtegida ? `<button class="btn btn-danger btn-sm" onclick="eliminarPlantilla('${e(k)}')" style="min-height:36px">🗑</button>` : '<span style="font-size:10px;color:var(--muted);padding:0 8px">Base</span>'}
+      </div>`;
+  }).join('');
+
+  const varsHtml = VARS_DISPONIBLES.map(v =>
+    `<span onclick="insertarVarEnEditor('${v}')" title="Click para insertar" style="cursor:pointer;display:inline-block;padding:3px 8px;border-radius:3px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25);font-family:monospace;font-size:11px;color:var(--gold);margin:2px 2px 2px 0;user-select:none;">${v}</span>`
+  ).join('');
+
+  container.innerHTML = `
+    <div class="card" style="margin-bottom:16px;border-left:3px solid var(--gold);">
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;padding-left:10px;">
+        <span>🗂️ Editor de Plantillas</span>
+        <button class="btn btn-gold btn-sm" onclick="abrirEditorPlantilla(null)" style="min-height:36px">+ Nueva plantilla</button>
+      </div>
+
+      <!-- Lista de plantillas existentes -->
+      <div style="padding:0 10px 10px">
+        <div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Plantillas existentes</div>
+        <div id="msg-editor-lista-plantillas">${listaItems}</div>
+      </div>
+
+      <!-- Formulario de edición (oculto por defecto) -->
+      <div id="msg-editor-form" style="display:none;padding:0 10px 14px;border-top:1px solid var(--border);margin-top:8px;">
+        <div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:12px 0 8px">
+          <span id="msg-editor-form-titulo">✏️ Nueva plantilla</span>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:4px;">Nombre / Etiqueta *</label>
+          <input id="msg-editor-label" type="text" placeholder="ej: 🎁 Mensaje especial"
+            style="width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:10px 12px;color:var(--text);font-family:var(--font-b);font-size:13px;outline:none;min-height:40px;">
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:4px;">Variables disponibles (click para insertar)</label>
+          <div>${varsHtml}</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:4px;">Texto de la plantilla *</label>
+          <textarea id="msg-editor-tpl" rows="8"
+            style="width:100%;background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;padding:12px;color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.55;resize:vertical;outline:none;min-height:160px;"
+            placeholder="Escribe el texto de la plantilla. Usa las variables de arriba para datos dinámicos."></textarea>
+        </div>
+        <div id="msg-editor-msg" class="msg" style="margin-bottom:8px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-gold" onclick="guardarPlantilla()" style="min-height:44px;">💾 Guardar plantilla</button>
+          <button class="btn btn-ghost" onclick="cerrarEditorPlantilla()" style="min-height:44px;">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/** Abre el formulario de edición para una plantilla existente o nueva */
+function abrirEditorPlantilla(key){
+  _editorPlantillaKey = key;
+  const form = document.getElementById('msg-editor-form');
+  const titulo = document.getElementById('msg-editor-form-titulo');
+  const labelEl = document.getElementById('msg-editor-label');
+  const tplEl = document.getElementById('msg-editor-tpl');
+  const msgEl = document.getElementById('msg-editor-msg');
+  if(!form) return;
+
+  if(key && PLANTILLAS_MSG[key]){
+    // Editar existente
+    const pl = PLANTILLAS_MSG[key];
+    if(titulo) titulo.textContent = `✏️ Editando: ${pl.label}`;
+    if(labelEl) labelEl.value = pl.label;
+    if(tplEl) tplEl.value = pl.tpl;
+  } else {
+    // Nueva plantilla
+    if(titulo) titulo.textContent = '✏️ Nueva plantilla';
+    if(labelEl) labelEl.value = '';
+    if(tplEl) tplEl.value = '';
+  }
+  if(msgEl) msgEl.style.display='none';
+  form.style.display = 'block';
+  // Scroll al formulario
+  form.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+/** Cierra el formulario del editor sin guardar */
+function cerrarEditorPlantilla(){
+  const form = document.getElementById('msg-editor-form');
+  if(form) form.style.display = 'none';
+  _editorPlantillaKey = null;
+}
+
+/** Guarda la plantilla en edición o crea una nueva */
+function guardarPlantilla(){
+  const labelEl = document.getElementById('msg-editor-label');
+  const tplEl = document.getElementById('msg-editor-tpl');
+  const msgEl = document.getElementById('msg-editor-msg');
+
+  const label = (labelEl?.value||'').trim();
+  const tpl = (tplEl?.value||'').trim();
+
+  if(!label){
+    if(msgEl){msgEl.className='msg err';msgEl.textContent='El nombre de la plantilla no puede estar vacío.';msgEl.style.display='block';}
+    return;
+  }
+
+  // Generar key única si es nueva plantilla
+  let key = _editorPlantillaKey;
+  if(!key){
+    // Crear key a partir del label: lowercase, sin tildes, sin espacios
+    key = label.toLowerCase()
+      .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
+      .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n')
+      .replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')
+      .slice(0, 30) || 'plantilla_'+Date.now();
+    // Garantizar unicidad
+    if(PLANTILLAS_MSG[key]) key += '_'+Date.now();
+  }
+
+  // Guardar en PLANTILLAS_MSG (memoria)
+  PLANTILLAS_MSG[key] = {label, tpl};
+
+  if(msgEl){msgEl.className='msg ok';msgEl.textContent='✓ Plantilla guardada correctamente.';msgEl.style.display='block';}
+  setTimeout(()=>{
+    cerrarEditorPlantilla();
+    // Actualizar lista de plantillas y selector de mensajería
+    renderEditorPlantillas();
+    _actualizarSelectorPlantillas();
+  }, 900);
+}
+
+/** Elimina una plantilla (no protegidas) */
+function eliminarPlantilla(key){
+  if(PLANTILLAS_PROTEGIDAS.includes(key)){
+    showToast('⚠️ Esta plantilla no puede eliminarse.');
+    return;
+  }
+  if(!PLANTILLAS_MSG[key]) return;
+  const nombre = PLANTILLAS_MSG[key].label;
+  if(!confirm(`¿Eliminar la plantilla "${nombre}"?\n\nEsta acción no puede deshacerse.`)) return;
+  delete PLANTILLAS_MSG[key];
+  // Si el selector activo tenía esta plantilla, resetear a libre
+  const sel = document.getElementById('msg-tipo');
+  if(sel && sel.value === key) sel.value = 'libre';
+  renderEditorPlantillas();
+  _actualizarSelectorPlantillas();
+  showToast('🗑 Plantilla eliminada');
+}
+
+/** Inserta una variable en el textarea del editor en la posición del cursor */
+function insertarVarEnEditor(varName){
+  const ta = document.getElementById('msg-editor-tpl');
+  if(!ta) return;
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const before = ta.value.slice(0, start);
+  const after = ta.value.slice(end);
+  ta.value = before + varName + after;
+  // Reposicionar cursor después de la variable insertada
+  const newPos = start + varName.length;
+  ta.selectionStart = ta.selectionEnd = newPos;
+  ta.focus();
+}
+
+/** Actualiza el <select> del selector de plantillas de mensajería con los datos actuales */
+function _actualizarSelectorPlantillas(){
+  const sel = document.getElementById('msg-tipo');
+  if(!sel) return;
+  const currentVal = sel.value;
+  sel.innerHTML = Object.entries(PLANTILLAS_MSG).map(([k,v]) =>
+    `<option value="${k}"${k===currentVal?' selected':''}>${e(v.label)}</option>`
+  ).join('');
+  // Re-aplicar plantilla si hay titular seleccionado
+  aplicarPlantilla();
+}
+
+// ── Estado de titular seleccionado en mensajería ──────────────
 let _msgQRID='';
 
 function renderMensajeria(){
@@ -2953,7 +3167,8 @@ function renderMensajeria(){
     const nacomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).length:0;
     const c=contactados[r[C.QR_ID]||'']||'PENDIENTE';
     const cCol=c==='SI'?'var(--mint)':c==='NO'?'var(--err)':'var(--warn)';
-    return `<tr id="mrow-${i}" onclick="selTitular('${e(r[C.QR_ID]||'')}',${i})" style="cursor:pointer">
+    // FIX 4: data-qrid permite selección fiable sin depender del índice numérico
+    return `<tr id="mrow-${i}" data-qrid="${e(r[C.QR_ID]||'')}" onclick="selTitular('${e(r[C.QR_ID]||'')}',${i})" style="cursor:pointer">
       <td><span class="pname" style="font-size:13px">${e(r[C.Nombre]||'—')}</span></td>
       <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
       <td style="font-size:12px">${e(cel||'—')}</td>
@@ -3041,8 +3256,8 @@ function renderMensajeria(){
 
       <!-- Acciones desktop (dentro del panel) -->
       <div id="msg-actions-inline" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px;">
+        <!-- FIX: btn-share (navigator.share) eliminado completamente -->
         <button class="btn btn-gold" id="btn-wa" onclick="enviarWA()" disabled style="opacity:.45;">📱 WhatsApp</button>
-        <button class="btn btn-ghost" id="btn-share" onclick="compartirMsg()" style="display:none;">📤 Compartir</button>
         <button class="btn btn-ghost" onclick="copiarMsg()">📋 Copiar</button>
         <label id="msg-contactado-lbl" style="display:none;margin-left:auto;font-family:var(--font-h);font-size:11px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px;">
           <input type="checkbox" id="msg-chk-contactado" onchange="toggleContactadoMsg()" style="accent-color:var(--mint);width:16px;height:16px;">
@@ -3061,7 +3276,10 @@ function renderMensajeria(){
       <input type="checkbox" id="msg-chk-contactado-sticky" onchange="toggleContactadoMsgSticky()" style="accent-color:var(--mint);width:16px;height:16px;">
       Contactado
     </label>
-  </div>`;
+  </div>
+
+  <!-- FIX 5: Contenedor del Editor de Plantillas — solo visible para administrador -->
+  ${isAdmin ? '<div id="msg-editor-plantillas" style="margin-top:20px"></div>' : ''}`;
 
   // Inicializar layout
   _initMsgLayout();
@@ -3071,6 +3289,11 @@ function renderMensajeria(){
     _resaltarFilaTitular();
     _actualizarInfoTitular(_msgQRID);
     aplicarPlantilla();
+  }
+
+  // FIX 5: Renderizar el editor de plantillas si es administrador
+  if(isAdmin){
+    renderEditorPlantillas();
   }
 }
 
@@ -3112,9 +3335,7 @@ function _actualizarInfoTitular(qrid){
     if(btn){ btn.disabled = !habilitado; btn.style.opacity = habilitado ? '1' : '.45'; }
   });
 
-  // Botón compartir
-  const shareBtn = document.getElementById('btn-share');
-  if(shareBtn) shareBtn.style.display = (habilitado && navigator.share) ? '' : 'none';
+  // FIX: Botón compartir eliminado — se omite la referencia a btn-share
 
   // Mostrar labels contactado
   const chkVal = (contactados[qrid]||'PENDIENTE') === 'SI';
@@ -3257,16 +3478,22 @@ function aplicarPlantilla(){
 
 
 
+// FIX 4: _resaltarFilaTitular ahora usa data-qrid en lugar de índice numérico.
+// El bug original: el índice 'idx' podía no corresponder al mrow correcto si
+// la lista estaba filtrada. Ahora buscamos por data-qrid directamente.
 function _resaltarFilaTitular(idx){
-  document.querySelectorAll('[id^="mrow-"]').forEach(r=>r.style.background='');
-  if(idx!==undefined){
-    const row=document.getElementById('mrow-'+idx);
-    if(row) row.style.background='rgba(255,215,0,.08)';
-  } else {
-    // buscar por qrid
-    const titulares=allRows.filter(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r));
-    const i=titulares.findIndex(r=>r[C.QR_ID]===_msgQRID);
-    if(i>=0){const row=document.getElementById('mrow-'+i);if(row) row.style.background='rgba(255,215,0,.08)';}
+  // Limpiar selección previa en TODAS las filas
+  document.querySelectorAll('[id^="mrow-"]').forEach(r=>{
+    r.style.background='';
+    r.removeAttribute('data-sel');
+  });
+  // Resaltar por qrid (fuente de verdad) en lugar de por índice
+  if(_msgQRID){
+    const row=document.querySelector(`[id^="mrow-"][data-qrid="${CSS.escape(_msgQRID)}"]`);
+    if(row){
+      row.style.background='rgba(255,215,0,.08)';
+      row.setAttribute('data-sel','1');
+    }
   }
 }
 
@@ -3281,6 +3508,9 @@ function toggleContactadoMsg(){
   renderMensajeria();
 }
 
+// ── ENVIAR WHATSAPP — compatible Android e iOS (CORREGIDO) ──────
+// En móvil se usa location.href para forzar apertura de la app nativa.
+// En desktop se usa window.open para no abandonar la pestaña.
 function enviarWA(){
   if(!_msgQRID) return;
   const r=allRows.find(x=>x[C.QR_ID]===_msgQRID);
@@ -3288,7 +3518,16 @@ function enviarWA(){
   const cel=(r[C.Celular]||'').replace(/\D/g,'');
   if(!cel||cel.length<9){showMsg(document.getElementById('msg-status'),'err','Sin celular registrado para este titular');return;}
   const texto=document.getElementById('msg-texto')?.value||'';
-  window.open(`https://wa.me/51${cel}?text=${encodeURIComponent(texto)}`,'_blank');
+  // encodeURIComponent garantiza encoding correcto para caracteres especiales (ñ, emojis, etc.)
+  const waUrl=`https://wa.me/51${cel}?text=${encodeURIComponent(texto)}`;
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(isMobile){
+    // En móvil: location.href abre la app de WhatsApp directamente (Android e iOS)
+    window.location.href=waUrl;
+  } else {
+    // En desktop: abrir en pestaña nueva sin abandonar la app
+    window.open(waUrl,'_blank','noopener,noreferrer');
+  }
   // Marcar automáticamente como contactado
   setContactado(_msgQRID,'SI');
   // Sync ambos checkboxes
@@ -3299,11 +3538,7 @@ function enviarWA(){
   showToast('📱 Abriendo WhatsApp · Marcado como contactado ✅');
 }
 
-async function compartirMsg(){
-  if(!navigator.share) return;
-  const texto=document.getElementById('msg-texto')?.value||'';
-  try{await navigator.share({text:texto});}catch(_){}
-}
+// compartirMsg ELIMINADO — se suprimió el uso de navigator.share en toda la app.
 
 function copiarMsg(){
   const texto=document.getElementById('msg-texto')?.value||'';
