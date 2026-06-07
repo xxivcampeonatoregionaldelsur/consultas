@@ -251,15 +251,15 @@ main{flex:1;padding:20px}
 }
 .bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .bar-lbl{
-  width:130px;font-family:var(--font-h);font-size:12px;font-weight:600;
+  width:150px;font-family:var(--font-h);font-size:12px;font-weight:600;
   letter-spacing:.5px;text-transform:uppercase;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;
+  white-space:normal;word-break:break-word;flex-shrink:0;line-height:1.2;
 }
-.bar-track{flex:1;height:20px;background:var(--field);border-radius:2px;overflow:hidden}
+.bar-track{flex:1;height:26px;background:var(--field);border-radius:2px;overflow:hidden}
 .bar-fill{
   height:100%;border-radius:2px;display:flex;align-items:center;
-  padding:0 8px;font-family:var(--font-h);font-size:11px;
-  font-weight:800;color:#000;min-width:28px;
+  padding:0 10px;font-family:var(--font-h);font-size:13px;
+  font-weight:900;color:#fff;min-width:32px;
   transition:width .5s cubic-bezier(.4,0,.2,1);letter-spacing:.5px;
 }
 .bf-gold{background:linear-gradient(90deg,var(--gold2),var(--gold))}
@@ -856,7 +856,6 @@ html{scroll-behavior:smooth}
         <span id="user-display"></span>
         <span class="role-badge" id="role-badge"></span>
       </div>
-      <button id="btn-refresh" onclick="loadData()">↺ Actualizar</button>
       <button class="btn-logout" onclick="logout()">Salir</button>
     </div>
   </header>
@@ -865,7 +864,7 @@ html{scroll-behavior:smooth}
     <div class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
     <div class="nav-tab" data-tab="participantes" onclick="switchTab('participantes')">👥 Participantes</div>
     <div class="nav-tab admin-only" data-tab="deps-dashboard" onclick="switchTab('deps-dashboard');renderDepsDashboard()">🏛️ Por Dependencia</div>
-    <div class="nav-tab admin-only" data-tab="usuarios" onclick="switchTab('usuarios')">🔑 Usuarios</div>
+    <div class="nav-tab admin-only" data-tab="usuarios" onclick="switchTab('usuarios')" id="tab-usuarios" style="display:none">🔑 Usuarios</div>
   </div>
 
   <main>
@@ -943,7 +942,7 @@ html{scroll-behavior:smooth}
       <div class="reg-row-pub">
         <div class="reg-field-pub">
           <label class="reg-label-pub">Código Registro (4 caracteres) *</label>
-          <input type="text" id="reg-codigo" class="reg-input-pub" placeholder="ej: AK76"
+          <input type="text" id="reg-codigo" class="reg-input-pub" placeholder="ej: A123"
             oninput="this.value=this.value.replace(/[^a-zA-Z0-9]/g,'').slice(0,4).toUpperCase()" maxlength="4">
         </div>
         <div class="reg-field-pub">
@@ -1115,7 +1114,7 @@ html{scroll-behavior:smooth}
 
 <script>
 // ── CONFIG ─────────────────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQkaPXCIuk3xs81wS8ytGR7cW5uieqLZ3cibe1pk91zujctWzRnWx5WYyrHVGz5y5JEA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwK5mW6aXCIxxU_DZWAh23sCm2QkLKvwudFJTDi_6rvb8kBYn-tCAs4B89rdc7nMxI1WA/exec';
 const SCANNER_URL = 'https://xxivcampeonatoregionaldelsur.github.io/scanner/';
 
 const C = {FechaHora:0,Tipo:1,Nombre:2,Dependencia:3,Celular:4,Padrino:5,TipoPersona:6,TipoParticipacion:7,Disciplina:8,Comida:9,Bebida:10,Observaciones:11,Registro:12,QR_ID:13};
@@ -1199,17 +1198,18 @@ function startApp(){
   if(session.rol!=='administrador'){
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='none');
   }
-  // Mostrar botón de cambiar contraseña para TODOS los usuarios
-  addChangePassBtn();
+  // Solo usuarios no-admin ven el botón de cambiar contraseña propio
+  if(session.rol!=='administrador') addChangePassBtn();
   loadData();
 }
 
 function addChangePassBtn(){
-  const hr=document.getElementById('btn-refresh').parentNode;
+  const hr=document.querySelector('.header-right');
+  if(!hr) return;
   const btn=document.createElement('button');
-  btn.className='btn btn-ghost';btn.style.fontSize='12px';btn.style.padding='8px 12px';
+  btn.className='btn-logout';btn.style.fontSize='12px';btn.style.padding='8px 12px';
   btn.textContent='🔒 Contraseña';btn.onclick=openChangePass;
-  hr.insertBefore(btn,document.getElementById('btn-refresh'));
+  hr.insertBefore(btn,hr.querySelector('.btn-logout'));
 }
 
 function logout(){
@@ -1244,8 +1244,6 @@ function normalizeCheckins(raw){
 
 // ── DATA LOADING ───────────────────────────────────────────────
 async function loadData(){
-  const btn=document.getElementById('btn-refresh');
-  btn.disabled=true;btn.textContent='...';
   try{
     const r=await fetch(`${SCRIPT_URL}?action=getData&token=${session.token}&t=${Date.now()}`,{redirect:'follow'});
     const d=await r.json();
@@ -1255,9 +1253,9 @@ async function loadData(){
     if(session.rol==='administrador') loadUsers();
     document.querySelectorAll('.last-upd').forEach(el=>el.textContent='⏱ '+new Date().toLocaleTimeString('es-PE'));
   } catch(e){
-    document.getElementById('dash-inner').innerHTML=`<div class="msg err" style="display:block">Error cargando datos. Verifica el script.</div>`;
+    const di=document.getElementById('dash-inner');
+    if(di) di.innerHTML=`<div class="msg err" style="display:block">Error cargando datos. Verifica el script.</div>`;
   }
-  btn.disabled=false;btn.textContent='↺ Actualizar';
 }
 
 // ── ÚLTIMA OPERACIÓN (global, actualizada tras checkin) ────────
@@ -1291,13 +1289,12 @@ function renderDashboard(){
   const sorted=m=>Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const comidas=count(allRows.map(r=>r[C.Comida]).filter(v=>v&&v!=='—'));
   const bebidas=count(allRows.map(r=>r[C.Bebida]).filter(v=>v&&v!=='—'));
-  const tipos=count(allRows.map(r=>r[C.TipoParticipacion]).filter(v=>v&&v!=='—'));
   const maxC=Math.max(...Object.values(comidas),1),maxB=Math.max(...Object.values(bebidas),1),
-        maxT=Math.max(...Object.values(tipos),1),maxD=Math.max(...Object.values(discMap),1);
-  const bars=(data,cls,max)=>sorted(data).map(([k,v])=>`
+        maxD=Math.max(...Object.values(discMap),1);
+  const bars=(data,cls,max,valColor)=>sorted(data).map(([k,v])=>`
     <div class="bar-row">
       <div class="bar-lbl" title="${e(k)}">${e(k)}</div>
-      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.round(v/max*100)}%">${v}</div></div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.round(v/max*100)}%"><span style="color:#fff;font-weight:900;font-size:13px">${v}</span></div></div>
     </div>`).join('')||'<div style="color:var(--muted);font-size:12px">Sin datos</div>';
 
   // ── Determinar última operación desde checkins ────────────────
@@ -1373,17 +1370,15 @@ function renderDashboard(){
     ${lastOpHtml}
     <div class="alerts-section">
       <div class="flow-title">Estado del evento en tiempo real</div>
-      <div class="flow-grid" style="grid-template-columns:1fr 20px 1fr 20px 1fr;align-items:center;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
         <div class="flow-step ${sinIngreso>0?'pending':'active'}">
           <div class="flow-step-num" style="color:#fff">${sinIngreso}</div>
           <div class="flow-step-lbl">Sin ingreso</div>
         </div>
-        <div class="flow-arrow">→</div>
         <div class="flow-step ${conIngresoSinEntrega>0?'pending':'active'}">
           <div class="flow-step-num" style="color:#fff">${conIngresoSinEntrega}</div>
           <div class="flow-step-lbl">Ingresaron</div>
         </div>
-        <div class="flow-arrow">→</div>
         <div class="flow-step active">
           <div class="flow-step-num" style="color:#fff">${completados}</div>
           <div class="flow-step-lbl">Completos</div>
@@ -1403,7 +1398,7 @@ function renderDashboard(){
         <div class="qa-lbl">Buscar participante</div>
         <div class="qa-sub">Por nombre o registro</div>
       </div>
-      <div class="qa-btn" onclick="switchTab('usuarios')">
+      <div class="qa-btn" onclick="document.getElementById('tab-usuarios').style.display='';switchTab('usuarios')">
         <div class="qa-icon">🔑</div>
         <div class="qa-lbl">Gestionar usuarios</div>
         <div class="qa-sub">Crear / modificar</div>
@@ -1413,7 +1408,7 @@ function renderDashboard(){
         <div class="qa-lbl">Por dependencia</div>
         <div class="qa-sub">Ver desglose</div>
       </div>
-      <div class="qa-btn" onclick="loadData()">
+      <div class="qa-btn" onclick="loadData();showToast('↺ Actualizando...')">
         <div class="qa-icon">↺</div>
         <div class="qa-lbl">Actualizar datos</div>
         <div class="qa-sub">Sincronizar sheet</div>
@@ -1443,7 +1438,6 @@ function renderDashboard(){
     <div class="charts">
       <div class="card"><div class="card-title">🍽️ Platos solicitados</div>${bars(comidas,'bf-gold',maxC)}</div>
       <div class="card"><div class="card-title">🥤 Bebidas solicitadas</div>${bars(bebidas,'bf-coral',maxB)}</div>
-      <div class="card"><div class="card-title">🎟️ Tipo de participación</div>${bars(tipos,'bf-mint',maxT)}</div>
       <div class="card"><div class="card-title">🎨 Disciplinas</div>${bars(discMap,'bf-lav',maxD)}</div>
     </div>`;
 }
@@ -1457,43 +1451,73 @@ function renderDepsDashboard(){
   const total=allRows.length;
   const max=Math.max(...Object.values(deps),1);
   const colors=['bf-gold','bf-coral','bf-mint','bf-lav','bf-purple'];
-
-  // Corrección: padrino se detecta por la columna Tipo === 'Padrino', igual que esPadrinoRow()
   const padrinosByDep=count(allRows.filter(r=>esPadrinoRow(r)).map(r=>r[C.Dependencia]).filter(v=>v&&v!=='—'));
+
+  // Compute per-dep: ingresos, entregas, comidas breakdown
+  const ingByDep={},entByDep={},comByDep={};
+  allRows.forEach(r=>{
+    const dep=r[C.Dependencia]||'—';
+    const qid=r[C.QR_ID]||'';
+    const com=r[C.Comida]||'—';
+    if(!ingByDep[dep]) ingByDep[dep]=0;
+    if(!entByDep[dep]) entByDep[dep]=0;
+    if(!comByDep[dep]) comByDep[dep]={};
+    if(checkins[qid]&&checkins[qid].ingreso) ingByDep[dep]++;
+    if(checkins[qid]&&checkins[qid].entrega) entByDep[dep]++;
+    if(com&&com!=='—') comByDep[dep][com]=(comByDep[dep][com]||0)+1;
+  });
 
   const rows=sorted.map(([dep,cnt],i)=>{
     const pct=Math.round(cnt/total*100);
     const padCount=padrinosByDep[dep]||0;
+    const ing=ingByDep[dep]||0;
+    const ent=entByDep[dep]||0;
+    const pendIng=cnt-ing;
+    const pendEnt=ing-ent;
+    const coms=comByDep[dep]||{};
+    const comStr=Object.entries(coms).map(([k,v])=>`<span style="font-size:10px;background:rgba(255,215,0,.1);color:var(--gold);padding:2px 6px;border-radius:3px;white-space:nowrap">${e(k)}: ${v}</span>`).join(' ');
     return `
     <tr>
       <td><strong style="font-family:var(--font-h);font-size:14px;text-transform:uppercase">${e(dep)}</strong></td>
-      <td style="text-align:center"><span style="font-family:var(--font-h);font-size:20px;font-weight:900;color:var(--gold)">${cnt}</span></td>
-      <td style="text-align:center;color:var(--muted)">${padCount}</td>
-      <td style="min-width:200px">
+      <td style="text-align:center"><span style="font-family:var(--font-h);font-size:18px;font-weight:900;color:#fff">${cnt}</span></td>
+      <td style="text-align:center">
+        <span style="font-family:var(--font-h);font-size:14px;font-weight:800;color:var(--ok)">${ing}</span>
+        <span style="color:var(--muted);font-size:11px"> / ${pendIng} pend.</span>
+      </td>
+      <td style="text-align:center">
+        <span style="font-family:var(--font-h);font-size:14px;font-weight:800;color:var(--gold)">${ent}</span>
+        <span style="color:var(--muted);font-size:11px"> / ${pendEnt} pend.</span>
+      </td>
+      <td style="min-width:160px">
         <div class="bar-track" style="height:18px">
           <div class="bar-fill ${colors[i%colors.length]}" style="width:${Math.round(cnt/max*100)}%">${pct}%</div>
         </div>
       </td>
+      <td style="font-size:11px">${comStr||'<span style="color:var(--muted)">—</span>'}</td>
     </tr>`;
   }).join('');
 
+  const totalIng=Object.values(ingByDep).reduce((a,b)=>a+b,0);
+  const totalEnt=Object.values(entByDep).reduce((a,b)=>a+b,0);
+
   document.getElementById('deps-inner').innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px">
-      <div class="sec-title" style="flex:1;margin:0">Registrados por Dependencia</div>
-      <span style="color:var(--muted);font-size:12px">${sorted.length} dependencias · ${total} total</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div class="sec-title" style="flex:1;margin:0">Por Dependencia — Estado de Comidas</div>
+      <button class="btn btn-gold btn-sm" onclick="exportExcel()" style="white-space:nowrap">⬇ Exportar Excel</button>
     </div>
-    <div class="stats" style="margin-bottom:20px">
+    <div class="stats" style="margin-bottom:16px">
       <div class="stat g"><div class="stat-lbl">Dependencias</div><div class="stat-val">${sorted.length}</div><div class="stat-icon">🏛️</div></div>
-      <div class="stat c"><div class="stat-lbl">Con Padrino</div><div class="stat-val">${Object.values(padrinosByDep).reduce((a,b)=>a+b,0)}</div><div class="stat-icon">👑</div></div>
-      <div class="stat m"><div class="stat-lbl">Total</div><div class="stat-val">${total}</div><div class="stat-icon">👥</div></div>
+      <div class="stat l"><div class="stat-lbl">Ingresos</div><div class="stat-val">${totalIng}</div><div class="stat-icon">🎫</div></div>
+      <div class="stat m"><div class="stat-lbl">Entregas</div><div class="stat-val">${totalEnt}</div><div class="stat-icon">🍽️</div></div>
+      <div class="stat c"><div class="stat-lbl">Pendientes</div><div class="stat-val">${total-totalEnt}</div><div class="stat-icon">⏳</div></div>
     </div>
     <div class="deps-card">
       <div class="tbl-wrap">
-        <table style="min-width:500px">
+        <table style="min-width:700px">
           <thead><tr>
-            <th>Dependencia</th><th style="text-align:center">Registrados</th><th style="text-align:center">Con Padrino</th><th>Proporción</th>
+            <th>Dependencia</th><th style="text-align:center">Total</th><th style="text-align:center">Ingresos</th><th style="text-align:center">Entregas</th><th>Proporción</th><th>Comidas</th>
           </tr></thead>
-          <tbody>${rows||'<tr><td colspan="4"><div class="empty">Sin datos</div></td></tr>'}</tbody>
+          <tbody>${rows||'<tr><td colspan="6"><div class="empty">Sin datos</div></td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
@@ -1606,7 +1630,7 @@ function renderParticipants(s,f){
 
   const searchPlaceholder=isAdmin
     ?'🔍 Buscar por nombre, tipo, dependencia, registro...'
-    :'🔍 Ingresa 4 dígitos del registro (ej: AK76)...';
+    :'🔍 Ingresa 4 dígitos del registro (ej: A123)...';
 
   const headerHtml=`
     <div class="prog-wrap">
@@ -1622,7 +1646,7 @@ function renderParticipants(s,f){
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Registro</th><th>Comida</th><th>Bebida</th>
+          <th>Reg.</th><th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
           <th>Ingreso</th><th>Entrega</th><th>Acciones</th>
         </tr></thead>
         <tbody id="part-tbody"></tbody>
@@ -1648,13 +1672,13 @@ function renderParticipants(s,f){
       const tr=document.createElement('tr');
       if(hasI&&hasE) tr.className='attended';
       tr.innerHTML=`
+        <td><span style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--text);letter-spacing:.5px">${e(r[C.Registro]||'—')}</span></td>
         <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${esPadrinoRow(r)?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">Padrino</span>':''}</td>
         <td><span class="bdg ${tipoInfo.cls}">${e(tipoInfo.label)}</span></td>
         <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
         <td style="font-size:13px">${e(disc)}</td>
-        <td><code style="font-family:monospace;font-size:12px;color:var(--gold);background:rgba(255,215,0,.08);padding:2px 7px;border-radius:3px">${e(r[C.Registro]||'—')}</code></td>
-        <td style="font-size:12px">${e(r[C.Comida]||'—')}</td>
-        <td style="font-size:12px">${e(r[C.Bebida]||'—')}</td>
+        <td style="font-size:13px;color:var(--text)">${e(r[C.Comida]||'—')}</td>
+        <td style="font-size:13px;color:var(--text)">${e(r[C.Bebida]||'—')}</td>
         <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
         <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
         <td style="white-space:nowrap">
