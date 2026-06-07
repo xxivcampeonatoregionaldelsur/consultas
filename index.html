@@ -228,10 +228,10 @@ main{flex:1;padding:20px}
   line-height:1;letter-spacing:-2px;
 }
 .stat-icon{position:absolute;bottom:8px;right:12px;font-size:26px;opacity:.13;}
-.stat.g .stat-val{color:var(--gold)}
-.stat.c .stat-val{color:#ff4466}
-.stat.m .stat-val{color:var(--mint)}
-.stat.l .stat-val{color:#60aaff}
+.stat.g .stat-val{color:#fff}
+.stat.c .stat-val{color:#fff}
+.stat.m .stat-val{color:#fff}
+.stat.l .stat-val{color:#fff}
 
 /* ── CHARTS / CARDS ──────────────────────────────────────────── */
 .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
@@ -642,6 +642,145 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
 }
 
 /* ══════════════════════════════════════════════════════════════
+   ADMIN DASHBOARD EXCLUSIVO — flujo + alertas + acciones rápidas
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── ÚLTIMA OPERACIÓN ──────────────────────────────────────── */
+.last-op-card{
+  background:linear-gradient(135deg,var(--s1) 0%,var(--s2) 100%);
+  border:1px solid var(--border2);border-left:4px solid var(--gold);
+  border-radius:var(--r);padding:14px 18px;margin-bottom:18px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.last-op-pulse{
+  width:10px;height:10px;border-radius:50%;background:var(--gold);
+  flex-shrink:0;animation:pulse-gold 1.6s ease-in-out infinite;
+}
+@keyframes pulse-gold{
+  0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,.6);opacity:1;}
+  50%{box-shadow:0 0 0 6px rgba(255,215,0,0);opacity:.7;}
+}
+.last-op-info{flex:1;min-width:0;}
+.last-op-lbl{font-family:var(--font-h);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
+.last-op-name{font-family:var(--font-h);font-size:15px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.last-op-detail{font-family:var(--font-h);font-size:11px;color:var(--muted);margin-top:1px;}
+.last-op-time{font-family:var(--font-h);font-size:10px;color:var(--gold);font-weight:700;letter-spacing:.5px;white-space:nowrap;}
+
+/* ── ALERTAS FIJAS ─────────────────────────────────────────── */
+.alerts-section{margin-bottom:18px;}
+.alert-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:11px 15px;border-radius:5px;margin-bottom:8px;
+  border:1px solid transparent;
+}
+.alert-warn{background:rgba(255,165,0,.1);border-color:rgba(255,165,0,.3);}
+.alert-info{background:rgba(0,102,204,.1);border-color:rgba(0,102,204,.3);}
+.alert-danger{background:rgba(255,23,68,.1);border-color:rgba(255,23,68,.3);}
+.alert-ok{background:rgba(0,230,118,.08);border-color:rgba(0,230,118,.25);}
+.alert-icon{font-size:18px;flex-shrink:0;line-height:1.2;}
+.alert-body{flex:1;}
+.alert-title{font-family:var(--font-h);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
+.alert-warn .alert-title{color:var(--warn);}
+.alert-info .alert-title{color:#60a5fa;}
+.alert-danger .alert-title{color:var(--err);}
+.alert-ok .alert-title{color:var(--ok);}
+.alert-text{font-size:12px;color:var(--muted);line-height:1.45;}
+
+/* ── ACCIONES RÁPIDAS ──────────────────────────────────────── */
+.quick-actions{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+  gap:10px;margin-bottom:20px;
+}
+.qa-btn{
+  background:var(--s2);border:1px solid var(--border2);border-radius:var(--r);
+  padding:14px 12px;text-align:center;cursor:pointer;
+  transition:all var(--t-med);display:flex;flex-direction:column;
+  align-items:center;gap:6px;
+}
+.qa-btn:hover{border-color:var(--gold);background:rgba(255,215,0,.06);transform:translateY(-1px);}
+.qa-btn:active{transform:translateY(0);}
+.qa-icon{font-size:22px;}
+.qa-lbl{font-family:var(--font-h);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text);line-height:1.2;}
+.qa-sub{font-family:var(--font-h);font-size:9px;color:var(--muted);letter-spacing:.5px;}
+
+/* ── ESTADOS VISUALES FUERTES ────────────────────────────── */
+.flow-section{margin-bottom:20px;}
+.flow-title{font-family:var(--font-h);font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;}
+.flow-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.flow-step{
+  background:var(--s1);border:1px solid var(--border);border-radius:5px;
+  padding:12px 10px;text-align:center;position:relative;
+}
+.flow-step.active{border-color:rgba(0,230,118,.5);background:rgba(0,230,118,.05);}
+.flow-step.pending{border-color:rgba(255,165,0,.4);background:rgba(255,165,0,.05);}
+.flow-step-num{font-family:var(--font-h);font-size:28px;font-weight:900;color:#fff;line-height:1;}
+.flow-step-lbl{font-family:var(--font-h);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-top:3px;}
+.flow-step.active .flow-step-lbl{color:var(--ok);}
+.flow-step.pending .flow-step-lbl{color:var(--warn);}
+.flow-arrow{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:18px;}
+@media(max-width:500px){.flow-grid{grid-template-columns:1fr;}.flow-arrow{display:none;}}
+
+/* ── REGISTRO MODAL ESTILO WEB PRINCIPAL ─────────────────── */
+.reg-row-pub{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+@media(max-width:500px){.reg-row-pub{grid-template-columns:1fr;}}
+.reg-field-pub{display:flex;flex-direction:column;}
+.reg-label-pub{font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:5px;}
+.reg-input-pub{
+  width:100%;background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;
+  padding:11px 14px;color:var(--text);font-family:var(--font-b);font-size:14px;
+  outline:none;transition:border-color var(--t-fast);min-height:44px;
+}
+.reg-input-pub:focus{border-color:var(--gold);background:#0c1020;}
+.reg-input-pub::placeholder{color:var(--muted);}
+.reg-input-pub.error{border-color:var(--err)!important;background:var(--err-bg);}
+.reg-field-err-pub{font-size:11px;color:var(--err);margin-top:4px;font-weight:600;}
+.disc-chips-wrap{
+  display:flex;flex-wrap:wrap;gap:7px;padding:12px;
+  background:rgba(0,0,0,.2);border:1.5px solid var(--border2);
+  border-radius:4px;
+}
+.disc-chip-label{
+  display:flex;align-items:center;gap:6px;padding:7px 12px;
+  border:1.5px solid var(--border2);border-radius:6px;cursor:pointer;
+  font-family:var(--font-b);font-size:13px;color:var(--text);
+  background:var(--s2);transition:all var(--t-fast);
+}
+.disc-chip-label:hover{border-color:var(--gold);}
+.disc-chip-label.sel{
+  border-color:var(--gold);background:rgba(255,215,0,.15);color:var(--gold);
+}
+.disc-chip-label input[type=checkbox]{accent-color:var(--gold);}
+.disc-group-title{
+  width:100%;font-family:var(--font-h);font-size:9px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;color:var(--gold);
+  padding:3px 0;border-bottom:1px solid rgba(255,215,0,.2);margin-bottom:2px;
+}
+
+/* Número de inscritos por disciplina (blanco sobre barras de color) */
+.bar-fill{color:#fff!important;}
+
+/* ── VERIFICADOR → redirect screen ────────────────────────── */
+#verif-redirect-screen{
+  position:fixed;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:999;
+  background:var(--bg);text-align:center;padding:40px;
+}
+.verif-logo{width:80px;height:80px;border-radius:50%;border:3px solid var(--gold);margin:0 auto 20px;}
+.verif-title{font-family:var(--font-h);font-size:28px;font-weight:900;color:var(--gold);margin-bottom:8px;text-transform:uppercase;letter-spacing:2px;}
+.verif-sub{font-family:var(--font-h);font-size:13px;color:var(--muted);letter-spacing:1px;margin-bottom:32px;}
+.verif-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  background:linear-gradient(135deg,var(--gold2),var(--gold));
+  color:#000;border:none;border-radius:6px;padding:18px 40px;
+  font-family:var(--font-h);font-size:18px;font-weight:900;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  text-decoration:none;box-shadow:0 8px 30px rgba(255,215,0,.3);
+  transition:all var(--t-med);
+}
+.verif-btn:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(255,215,0,.4);}
+.verif-badge{margin-top:20px;font-family:var(--font-h);font-size:11px;color:var(--muted);letter-spacing:1px;}
+
+/* ══════════════════════════════════════════════════════════════
    MICRO-INTERACCIONES CSS — Rendimiento perceptual
    Sin JS, solo CSS. Reducen latencia percibida.
    ══════════════════════════════════════════════════════════════ */
@@ -686,6 +825,18 @@ html{scroll-behavior:smooth}
     <button class="btn-login" onclick="doLogin()" id="login-btn">⚡ Ingresar</button>
     <div class="login-error" id="login-err"></div>
   </div>
+</div>
+
+<!-- VERIFICADOR REDIRECT -->
+<div id="verif-redirect-screen" style="display:none">
+  <img id="verif-logo-img" class="verif-logo" src="" alt="Logo">
+  <div class="verif-title">Verificador</div>
+  <div class="verif-sub" id="verif-role-sub">XXIV Campeonato Regional del Sur</div>
+  <a id="verif-main-btn" href="https://xxivcampeonatoregionaldelsur.github.io/scanner/" class="verif-btn" target="_self">
+    📱 Abrir Escáner QR
+  </a>
+  <div class="verif-badge" id="verif-usuario-badge">—</div>
+  <button class="btn-logout" style="margin-top:28px;min-height:40px;padding:10px 20px;" onclick="logout()">Cerrar sesión</button>
 </div>
 
 <!-- APP -->
@@ -777,48 +928,113 @@ html{scroll-behavior:smooth}
   </main>
 </div>
 
-<!-- REGISTRO MODAL (admin only) -->
+<!-- REGISTRO MODAL (admin only) — estilo web principal con validaciones -->
 <div id="reg-modal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeRegistroModal()">
-  <div class="modal" style="max-width:580px">
+  <div class="modal" style="max-width:620px">
     <button class="modal-close" onclick="closeRegistroModal()">✕</button>
     <div class="qr-header">
-      <h2 style="font-size:18px">➕ Nuevo Registro</h2>
-      <div class="qr-dep">Complete los datos del participante</div>
+      <h2 style="font-size:18px">➕ Nuevo Registro de Participante</h2>
+      <div class="qr-dep">Complete todos los campos obligatorios (*)</div>
     </div>
     <div style="padding:20px">
       <div id="reg-msg" class="msg"></div>
-      <!-- Datos principales -->
-      <div class="sec-title" style="font-size:12px;margin-bottom:10px">Datos del Titular</div>
-      <div class="form-grid">
-        <div class="form-group"><label>Nombre completo *</label><input id="reg-nombre" type="text" placeholder="Apellidos y nombres"></div>
-        <div class="form-group"><label>Celular *</label><input id="reg-celular" type="text" placeholder="Número de celular"></div>
-        <div class="form-group">
-          <label>Dependencia *</label>
-          <select id="reg-dependencia">
+
+      <!-- Fila 1: Registro + Tipo -->
+      <div class="reg-row-pub">
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Código Registro (4 caracteres) *</label>
+          <input type="text" id="reg-codigo" class="reg-input-pub" placeholder="ej: AK76"
+            oninput="this.value=this.value.replace(/[^a-zA-Z0-9]/g,'').slice(0,4).toUpperCase()" maxlength="4">
+        </div>
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Tipo de asistente *</label>
+          <select id="reg-tipo" class="reg-input-pub" onchange="regModalOnTipoChange()">
+            <option value="">— Seleccionar —</option>
+            <option value="Titular">🏅 Participante / Titular</option>
+            <option value="Padrino">👑 Padrino</option>
+            <option value="Invitado">👥 Acompañante / Invitado</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Fila 2: Nombre + Dependencia -->
+      <div class="reg-row-pub">
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Nombres y Apellidos *</label>
+          <input type="text" id="reg-nombre" class="reg-input-pub" placeholder="Apellidos y nombres completos">
+        </div>
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Dependencia *</label>
+          <select id="reg-dependencia" class="reg-input-pub">
             <option value="">— Seleccionar —</option>
           </select>
         </div>
-        <div class="form-group"><label>Registro (código 4 dígitos) *</label><input id="reg-codigo" type="text" placeholder="ej: AK76" maxlength="10"></div>
-        <div class="form-group">
-          <label>Tipo *</label>
-          <select id="reg-tipo">
-            <option value="Titular">Titular</option>
-            <option value="Padrino">Padrino</option>
-            <option value="Invitado">Acompañante/Invitado</option>
+      </div>
+
+      <!-- Fila 3: Celular -->
+      <div class="reg-row-pub">
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Celular * <span style="font-size:9px;font-weight:400;color:var(--muted)">(9 dígitos, empieza con 9)</span></label>
+          <input type="tel" id="reg-celular" class="reg-input-pub" placeholder="9XX XXX XXX"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,9)" maxlength="9">
+        </div>
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Tipo de participación</label>
+          <input type="text" id="reg-tipo-part" class="reg-input-pub" placeholder="ej: Competidor, Delegado...">
+        </div>
+      </div>
+
+      <!-- Bloque disciplinas (solo para Titular/Padrino) -->
+      <div id="reg-bloque-disciplinas" style="display:none;margin-bottom:14px">
+        <label class="reg-label-pub" style="margin-bottom:8px;display:block">Disciplinas en las que participa <span style="font-weight:400;color:var(--muted);font-size:9px">(puede marcar varias)</span></label>
+        <div class="disc-chips-wrap" id="reg-disc-chips-wrap"></div>
+        <div id="reg-disc-sel" style="margin-top:6px;font-family:var(--font-h);font-size:11px;color:var(--gold);font-weight:700;min-height:16px;"></div>
+      </div>
+
+      <!-- Comida + Bebida -->
+      <div class="reg-row-pub">
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Comida *</label>
+          <select id="reg-comida" class="reg-input-pub">
+            <option value="">— Seleccionar —</option>
+            <option value="Chuleta de chancho con arroz y ensalada">🥩 Chuleta de chancho con arroz y ensalada</option>
+            <option value="Pollo a la parrilla con arroz y ensalada">🍗 Pollo a la parrilla con arroz y ensalada</option>
+            <option value="Carne a la parrilla con arroz y ensalada">🔥 Carne a la parrilla con arroz y ensalada</option>
           </select>
         </div>
-        <div class="form-group"><label>Disciplina</label><input id="reg-disciplina" type="text" placeholder="ej: Fútbol, Danza..."></div>
-        <div class="form-group"><label>Comida</label><input id="reg-comida" type="text" placeholder="Plato principal"></div>
-        <div class="form-group"><label>Bebida</label><input id="reg-bebida" type="text" placeholder="Tipo de bebida"></div>
-        <div class="form-group"><label>Tipo de participación</label><input id="reg-tipo-part" type="text" placeholder="ej: Competidor, Delegado..."></div>
-        <div class="form-group"><label>Observaciones</label><input id="reg-obs" type="text" placeholder="Notas adicionales"></div>
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Bebida *</label>
+          <select id="reg-bebida" class="reg-input-pub">
+            <option value="">— Seleccionar —</option>
+            <option value="Copoazú">🧃 Copoazú</option>
+            <option value="Refresco de jamaica">🧃 Refresco de jamaica</option>
+            <option value="Coca Cola">🥤 Coca Cola</option>
+            <option value="Inka Kola">🥤 Inka Kola</option>
+          </select>
+        </div>
       </div>
+
       <!-- Acompañantes -->
-      <div class="sec-title" style="font-size:12px;margin-bottom:10px;margin-top:4px">Acompañantes <span id="reg-acomp-count" style="color:var(--gold);font-size:11px"></span></div>
-      <div id="reg-acompanantes-list"></div>
-      <button class="btn btn-ghost btn-sm" onclick="addAcompanante()" style="margin-bottom:14px">+ Agregar acompañante</button>
+      <div style="margin-bottom:14px">
+        <div class="reg-row-pub" style="margin-bottom:6px">
+          <div class="reg-field-pub">
+            <label class="reg-label-pub">Cantidad de acompañantes <span style="font-weight:400;color:var(--muted);font-size:9px">(máx 3)</span></label>
+            <input type="number" id="reg-cant-acomp" class="reg-input-pub" min="0" max="3" value="0"
+              oninput="regModalAcompChange()">
+          </div>
+          <div class="reg-field-pub"></div>
+        </div>
+        <div id="reg-acompanantes-list"></div>
+      </div>
+
+      <!-- Observaciones -->
+      <div style="margin-bottom:18px">
+        <label class="reg-label-pub">Observaciones (opcional)</label>
+        <textarea id="reg-obs" class="reg-input-pub" rows="2" placeholder="Alergias, restricciones u otros comentarios..." style="resize:vertical"></textarea>
+      </div>
+
       <!-- Acciones -->
-      <div style="display:flex;gap:10px;margin-top:4px">
+      <div style="display:flex;gap:10px">
         <button class="btn btn-gold" style="flex:1;justify-content:center" onclick="submitRegistro()">✓ Guardar Registro</button>
         <button class="btn btn-ghost" onclick="closeRegistroModal()">Cancelar</button>
       </div>
@@ -923,6 +1139,8 @@ window.onload = function(){
   document.getElementById('login-logo-img').src = LOGO_SRC;
   document.getElementById('header-logo-img').src = LOGO_SRC;
   document.getElementById('qr-logo-center').src = LOGO_SRC;
+  const vl=document.getElementById('verif-logo-img');
+  if(vl) vl.src=LOGO_SRC;
   if(session && session.token) startApp();
   else document.getElementById('login-screen').style.display='flex';
 };
@@ -949,6 +1167,26 @@ async function doLogin(){
 
 function startApp(){
   document.getElementById('login-screen').style.display='none';
+
+  // ── VERIFICADORES: solo van al scanner, no a la app ───────────
+  if(session.rol==='verificadorasistencia'||session.rol==='verificadorentrega'){
+    const vs=document.getElementById('verif-redirect-screen');
+    const vi=document.getElementById('verif-logo-img');
+    if(vi) vi.src=LOGO_SRC;
+    const rolLbl=session.rol==='verificadorasistencia'?'Verificador de Asistencia':'Verificador de Entrega';
+    const sub=document.getElementById('verif-role-sub');
+    if(sub) sub.textContent=rolLbl+' · XXIV Campeonato Regional del Sur';
+    const badge=document.getElementById('verif-usuario-badge');
+    if(badge) badge.textContent='👤 '+session.usuario;
+    const btn=document.getElementById('verif-main-btn');
+    if(btn){
+      btn.href='https://xxivcampeonatoregionaldelsur.github.io/scanner/';
+      btn.textContent='📱 Abrir Escáner QR';
+    }
+    if(vs) vs.style.display='flex';
+    return;
+  }
+
   const app=document.getElementById('app');
   app.style.display='flex';
   document.getElementById('user-display').textContent=session.usuario;
@@ -978,6 +1216,8 @@ function logout(){
   localStorage.removeItem('ev_session');
   session=null;allRows=[];checkins={};
   document.getElementById('app').style.display='none';
+  const vs=document.getElementById('verif-redirect-screen');
+  if(vs) vs.style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('l-pass').value='';
 }
@@ -1020,8 +1260,12 @@ async function loadData(){
   btn.disabled=false;btn.textContent='↺ Actualizar';
 }
 
+// ── ÚLTIMA OPERACIÓN (global, actualizada tras checkin) ────────
+let lastOperation = null; // {nombre, tipo, accion, hora}
+
 // ── DASHBOARD ──────────────────────────────────────────────────
 function renderDashboard(){
+  const isAdmin = session.rol === 'administrador';
   // Titulares: TipoPersona=Titular y Tipo != Padrino e Tipo != Invitado
   const titulares=allRows.filter(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r));
   // Acompañantes: Tipo = "Invitado"
@@ -1030,26 +1274,166 @@ function renderDashboard(){
   const padrinos=allRows.filter(r=>esPadrinoRow(r));
   const countIngresos=Object.values(checkins).filter(c=>c.ingreso).length;
   const countEntregas=Object.values(checkins).filter(c=>c.entrega).length;
+  const total=allRows.length;
+
+  // Disciplinas: split por coma para contar individualmente
+  const discMap={};
+  allRows.forEach(r=>{
+    const rawDisc=r[C.Disciplina]||'';
+    if(!rawDisc||rawDisc==='—') return;
+    rawDisc.split(',').forEach(d=>{
+      const dd=d.trim();
+      if(dd) discMap[dd]=(discMap[dd]||0)+1;
+    });
+  });
+
   const count=arr=>arr.reduce((m,v)=>{if(v)m[v]=(m[v]||0)+1;return m},{});
   const sorted=m=>Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const comidas=count(allRows.map(r=>r[C.Comida]).filter(v=>v&&v!=='—'));
   const bebidas=count(allRows.map(r=>r[C.Bebida]).filter(v=>v&&v!=='—'));
   const tipos=count(allRows.map(r=>r[C.TipoParticipacion]).filter(v=>v&&v!=='—'));
-  const discs=count(allRows.map(r=>r[C.Disciplina]).filter(v=>v&&v!=='—'));
   const maxC=Math.max(...Object.values(comidas),1),maxB=Math.max(...Object.values(bebidas),1),
-        maxT=Math.max(...Object.values(tipos),1),maxD=Math.max(...Object.values(discs),1);
+        maxT=Math.max(...Object.values(tipos),1),maxD=Math.max(...Object.values(discMap),1);
   const bars=(data,cls,max)=>sorted(data).map(([k,v])=>`
     <div class="bar-row">
       <div class="bar-lbl" title="${e(k)}">${e(k)}</div>
       <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.round(v/max*100)}%">${v}</div></div>
     </div>`).join('')||'<div style="color:var(--muted);font-size:12px">Sin datos</div>';
+
+  // ── Determinar última operación desde checkins ────────────────
+  let lastOpHtml='';
+  if(isAdmin){
+    // Buscar el checkin más reciente
+    let latestOp=null, latestTime=0;
+    Object.entries(checkins).forEach(([qrid,ck])=>{
+      const row=allRows.find(r=>r[C.QR_ID]===qrid);
+      const nom=row?row[C.Nombre]:'Participante';
+      if(ck.ingreso){
+        // Parse time from ingreso string
+        const t=new Date().getTime(); // fallback
+        if(!latestOp||true){// just show last captured
+          if(ck.ingreso&&(!latestOp||ck.ingreso>latestOp.hora)){
+            latestOp={nombre:nom,tipo:'INGRESO',hora:ck.ingreso,color:'var(--mint)',icon:'🎫'};
+          }
+        }
+      }
+      if(ck.entrega){
+        if(!latestOp||ck.entrega>latestOp.hora){
+          latestOp={nombre:nom,tipo:'ENTREGA',hora:ck.entrega,color:'var(--gold)',icon:'🍽️'};
+        }
+      }
+    });
+
+    // Usar lastOperation global si más reciente
+    const op=lastOperation||latestOp;
+    lastOpHtml=`<div class="last-op-card">
+      <div class="last-op-pulse"></div>
+      <div class="last-op-info">
+        <div class="last-op-lbl">Última operación registrada</div>
+        <div class="last-op-name">${op?e(op.nombre):'—'}</div>
+        <div class="last-op-detail">${op?`<span style="color:${op.color};font-weight:700">${op.icon} ${op.tipo}</span> registrado`:'Sin operaciones aún'}</div>
+      </div>
+      <div class="last-op-time">${op?e(formatHora(op.hora)||op.hora):'—'}</div>
+    </div>`;
+
+    // ── ALERTAS FIJAS ──────────────────────────────────────────────
+    const pendientes=total-countIngresos;
+    const pct=total>0?Math.round(countIngresos/total*100):0;
+    const alertas=[];
+    if(pendientes>0){
+      alertas.push({type:'warn',icon:'⏳',title:'Ingresos pendientes',text:`${pendientes} participante${pendientes!==1?'s':''} aún no han ingresado (${100-pct}% pendiente)`});
+    }
+    if(countEntregas<countIngresos){
+      const sinEntrega=countIngresos-countEntregas;
+      alertas.push({type:'info',icon:'🍽️',title:'Entregas pendientes',text:`${sinEntrega} participante${sinEntrega!==1?'s':''} ingresaron pero no han recibido su comida`});
+    }
+    if(pct>=80&&countEntregas>=countIngresos*0.8){
+      alertas.push({type:'ok',icon:'✅',title:'Operación en buen estado',text:`${pct}% de ingresos procesados · ${Math.round(countEntregas/Math.max(total,1)*100)}% de entregas completadas`});
+    }
+    if(total===0){
+      alertas.push({type:'danger',icon:'🚨',title:'Sin datos cargados',text:'No hay participantes registrados. Verifica la conexión con el servidor.'});
+    }
+
+    // ── ACCIONES RÁPIDAS ──────────────────────────────────────────
+    const alertasHtml=alertas.map(a=>`
+      <div class="alert-item alert-${a.type}">
+        <div class="alert-icon">${a.icon}</div>
+        <div class="alert-body">
+          <div class="alert-title">${a.title}</div>
+          <div class="alert-text">${a.text}</div>
+        </div>
+      </div>`).join('');
+
+    // ── FLUJO DE ESTADOS ──────────────────────────────────────────
+    const sinIngreso=total-countIngresos;
+    const conIngresoSinEntrega=countIngresos-countEntregas;
+    const completados=countEntregas;
+
+    lastOpHtml = `
+    ${lastOpHtml}
+    <div class="alerts-section">
+      <div class="flow-title">Estado del evento en tiempo real</div>
+      <div class="flow-grid" style="grid-template-columns:1fr 20px 1fr 20px 1fr;align-items:center;margin-bottom:14px;">
+        <div class="flow-step ${sinIngreso>0?'pending':'active'}">
+          <div class="flow-step-num" style="color:#fff">${sinIngreso}</div>
+          <div class="flow-step-lbl">Sin ingreso</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step ${conIngresoSinEntrega>0?'pending':'active'}">
+          <div class="flow-step-num" style="color:#fff">${conIngresoSinEntrega}</div>
+          <div class="flow-step-lbl">Ingresaron</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step active">
+          <div class="flow-step-num" style="color:#fff">${completados}</div>
+          <div class="flow-step-lbl">Completos</div>
+        </div>
+      </div>
+      ${alertasHtml||''}
+    </div>
+    <div class="sec-title" style="font-size:11px;margin-bottom:10px">⚡ Acciones rápidas</div>
+    <div class="quick-actions" style="margin-bottom:20px">
+      <div class="qa-btn" onclick="openRegistroModal()">
+        <div class="qa-icon">➕</div>
+        <div class="qa-lbl">Nuevo registro</div>
+        <div class="qa-sub">Participante / acomp.</div>
+      </div>
+      <div class="qa-btn" onclick="switchTab('participantes');setTimeout(()=>document.querySelector('.search')?.focus(),200)">
+        <div class="qa-icon">🔍</div>
+        <div class="qa-lbl">Buscar participante</div>
+        <div class="qa-sub">Por nombre o registro</div>
+      </div>
+      <div class="qa-btn" onclick="switchTab('usuarios')">
+        <div class="qa-icon">🔑</div>
+        <div class="qa-lbl">Gestionar usuarios</div>
+        <div class="qa-sub">Crear / modificar</div>
+      </div>
+      <div class="qa-btn" onclick="switchTab('deps-dashboard');renderDepsDashboard()">
+        <div class="qa-icon">🏛️</div>
+        <div class="qa-lbl">Por dependencia</div>
+        <div class="qa-sub">Ver desglose</div>
+      </div>
+      <div class="qa-btn" onclick="loadData()">
+        <div class="qa-icon">↺</div>
+        <div class="qa-lbl">Actualizar datos</div>
+        <div class="qa-sub">Sincronizar sheet</div>
+      </div>
+      <div class="qa-btn" onclick="window.open('${SCANNER_URL}','_blank')">
+        <div class="qa-icon">📷</div>
+        <div class="qa-lbl">Abrir scanner</div>
+        <div class="qa-sub">Verificar QR</div>
+      </div>
+    </div>`;
+  }
+
   document.getElementById('dash-inner').innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
       <div class="sec-title" style="flex:1;margin:0">Resumen del evento</div>
       <span class="last-upd"></span>
     </div>
+    ${lastOpHtml}
     <div class="stats">
-      <div class="stat g"><div class="stat-lbl">Total Registrados</div><div class="stat-val">${allRows.length}</div><div class="stat-icon">🏟️</div></div>
+      <div class="stat g"><div class="stat-lbl">Total Registrados</div><div class="stat-val">${total}</div><div class="stat-icon">🏟️</div></div>
       <div class="stat c"><div class="stat-lbl">Titulares</div><div class="stat-val">${titulares.length}</div><div class="stat-icon">🥇</div></div>
       <div class="stat m"><div class="stat-lbl">Acompañantes</div><div class="stat-val">${acomps.length}</div><div class="stat-icon">👥</div></div>
       <div class="stat g"><div class="stat-lbl">Padrinos</div><div class="stat-val">${padrinos.length}</div><div class="stat-icon">👑</div></div>
@@ -1060,7 +1444,7 @@ function renderDashboard(){
       <div class="card"><div class="card-title">🍽️ Platos solicitados</div>${bars(comidas,'bf-gold',maxC)}</div>
       <div class="card"><div class="card-title">🥤 Bebidas solicitadas</div>${bars(bebidas,'bf-coral',maxB)}</div>
       <div class="card"><div class="card-title">🎟️ Tipo de participación</div>${bars(tipos,'bf-mint',maxT)}</div>
-      <div class="card"><div class="card-title">🎨 Disciplinas</div>${bars(discs,'bf-lav',maxD)}</div>
+      <div class="card"><div class="card-title">🎨 Disciplinas</div>${bars(discMap,'bf-lav',maxD)}</div>
     </div>`;
 }
 
@@ -1238,7 +1622,7 @@ function renderParticipants(s,f){
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
+          <th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Registro</th><th>Comida</th><th>Bebida</th>
           <th>Ingreso</th><th>Entrega</th><th>Acciones</th>
         </tr></thead>
         <tbody id="part-tbody"></tbody>
@@ -1252,7 +1636,7 @@ function renderParticipants(s,f){
 
   if(!rows.length){
     const tr=document.createElement('tr');
-    tr.innerHTML='<td colspan="9"><div class="empty">Sin resultados</div></td>';
+    tr.innerHTML='<td colspan="10"><div class="empty">Sin resultados</div></td>';
     frag.appendChild(tr);
   } else {
     rows.forEach(r=>{
@@ -1268,6 +1652,7 @@ function renderParticipants(s,f){
         <td><span class="bdg ${tipoInfo.cls}">${e(tipoInfo.label)}</span></td>
         <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
         <td style="font-size:13px">${e(disc)}</td>
+        <td><code style="font-family:monospace;font-size:12px;color:var(--gold);background:rgba(255,215,0,.08);padding:2px 7px;border-radius:3px">${e(r[C.Registro]||'—')}</code></td>
         <td style="font-size:12px">${e(r[C.Comida]||'—')}</td>
         <td style="font-size:12px">${e(r[C.Bebida]||'—')}</td>
         <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
@@ -1754,100 +2139,223 @@ async function buildQRCanvasForRow(row){
 }
 
 
-// ── REGISTRO MODAL (admin) ────────────────────────────────────
-let regAcompCount=0;
-function openRegistroModal(){
-  if(session.rol!=='administrador') return;
-  // Reset
-  ['reg-nombre','reg-celular','reg-codigo','reg-disciplina','reg-comida','reg-bebida','reg-tipo-part','reg-obs']
-    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('reg-tipo').value='Titular';
-  document.getElementById('reg-acompanantes-list').innerHTML='';
-  document.getElementById('reg-msg').style.display='none';
-  regAcompCount=0;
-  updateAcompCount();
-  // Poblar dependencias
+// ── REGISTRO MODAL (admin) ── estilo web principal ────────────
+const DISC_INDIVIDUAL_M = ['Ajedrez','Cubilete','100 metros','Futbolín','Maratón','Tenis de mesa'];
+const DISC_GRUPAL_M     = ['Baloncesto','Danza','Fútbol','Sapo','Vóley mixto'];
+const DISC_BARRA_M      = ['Participante de barra'];
+const DISC_ICONOS_M     = {
+  'Ajedrez':'♟️','Cubilete':'🎲','100 metros':'💨','Futbolín':'🕹️',
+  'Maratón':'🏃','Tenis de mesa':'🏓','Baloncesto':'🏀','Danza':'💃',
+  'Fútbol':'⚽','Sapo':'🐸','Vóley mixto':'🏐','Participante de barra':'📣'
+};
+
+let regModalAcompCount=0;
+
+function regModalPoblarDisciplinas(){
+  const wrap=document.getElementById('reg-disc-chips-wrap');
+  if(!wrap) return;
+  function makeGroup(lista,titulo){
+    const header=`<div class="disc-group-title">${titulo}</div>`;
+    const chips=lista.map(d=>`
+      <label class="disc-chip-label" id="disc-chip-label-${d.replace(/\s/g,'-')}">
+        <input type="checkbox" class="reg-disc-modal" value="${d}" onchange="regModalDiscChange(this)">
+        <span>${DISC_ICONOS_M[d]||'🏅'} ${d}</span>
+      </label>`).join('');
+    return header+chips;
+  }
+  wrap.innerHTML=
+    makeGroup(DISC_GRUPAL_M,'🏅 Disciplinas Grupales')+
+    makeGroup(DISC_INDIVIDUAL_M,'🎯 Disciplinas Individuales')+
+    makeGroup(DISC_BARRA_M,'📣 Barra');
+}
+
+function regModalDiscChange(el){
+  const all=document.querySelectorAll('.reg-disc-modal');
+  if(el.value==='Invitado'&&el.checked) all.forEach(c=>{if(c!==el)c.checked=false;});
+  if(el.value!=='Invitado'&&el.checked) all.forEach(c=>{if(c.value==='Invitado')c.checked=false;});
+  // visual
+  all.forEach(c=>{
+    const lbl=c.closest('.disc-chip-label');
+    if(lbl){
+      lbl.classList.toggle('sel',c.checked);
+    }
+  });
+  const sel=document.getElementById('reg-disc-sel');
+  const checked=Array.from(document.querySelectorAll('.reg-disc-modal:checked')).map(c=>c.value);
+  if(sel) sel.textContent=checked.length?'✅ '+checked.join(', '):'';
+}
+
+function regModalOnTipoChange(){
+  const tipo=document.getElementById('reg-tipo').value;
+  const bloq=document.getElementById('reg-bloque-disciplinas');
+  if(bloq) bloq.style.display=(tipo==='Titular'||tipo==='Padrino')?'':'none';
+  // Poblar dependencias dinámico
   const sel=document.getElementById('reg-dependencia');
+  const curr=sel.value;
   sel.innerHTML='<option value="">— Seleccionar —</option>';
   getDependencias().forEach(dep=>{
     const opt=document.createElement('option');
     opt.value=dep;opt.textContent=dep;
+    if(dep===curr)opt.selected=true;
     sel.appendChild(opt);
+  });
+}
+
+function regModalAcompChange(){
+  const inputEl=document.getElementById('reg-cant-acomp');
+  const rawVal=Math.min(3,Math.max(0,parseInt(inputEl.value)||0));
+  inputEl.value=rawVal;
+  regModalAcompCount=rawVal;
+  const wrap=document.getElementById('reg-acompanantes-list');
+  wrap.innerHTML='';
+  for(let i=1;i<=rawVal;i++){
+    const div=document.createElement('div');
+    div.style.cssText='background:var(--s2);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:10px;';
+    div.innerHTML=`
+      <div style="font-family:var(--font-h);font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Acompañante ${i}</div>
+      <div class="reg-row-pub">
+        <div class="reg-field-pub"><label class="reg-label-pub">Nombre</label><input id="acomp-nombre-${i}" type="text" class="reg-input-pub" placeholder="Nombre completo"></div>
+        <div class="reg-field-pub"><label class="reg-label-pub">Comida</label>
+          <select id="acomp-comida-${i}" class="reg-input-pub">
+            <option value="">— Seleccionar —</option>
+            <option value="Chuleta de chancho con arroz y ensalada">🥩 Chuleta de chancho</option>
+            <option value="Pollo a la parrilla con arroz y ensalada">🍗 Pollo a la parrilla</option>
+            <option value="Carne a la parrilla con arroz y ensalada">🔥 Carne a la parrilla</option>
+          </select>
+        </div>
+        <div class="reg-field-pub"><label class="reg-label-pub">Bebida</label>
+          <select id="acomp-bebida-${i}" class="reg-input-pub">
+            <option value="">— Seleccionar —</option>
+            <option value="Copoazú">🧃 Copoazú</option>
+            <option value="Refresco de jamaica">🧃 Refresco de jamaica</option>
+            <option value="Coca Cola">🥤 Coca Cola</option>
+            <option value="Inka Kola">🥤 Inka Kola</option>
+          </select>
+        </div>
+      </div>`;
+    wrap.appendChild(div);
+  }
+}
+
+function openRegistroModal(){
+  if(session.rol!=='administrador') return;
+  // Reset
+  ['reg-nombre','reg-celular','reg-codigo','reg-tipo-part','reg-obs']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const tipoSel=document.getElementById('reg-tipo');
+  if(tipoSel) tipoSel.value='';
+  const comSel=document.getElementById('reg-comida');
+  if(comSel) comSel.value='';
+  const bebSel=document.getElementById('reg-bebida');
+  if(bebSel) bebSel.value='';
+  const cantSel=document.getElementById('reg-cant-acomp');
+  if(cantSel) cantSel.value=0;
+  document.getElementById('reg-acompanantes-list').innerHTML='';
+  const bloq=document.getElementById('reg-bloque-disciplinas');
+  if(bloq) bloq.style.display='none';
+  const sel=document.getElementById('reg-disc-sel');
+  if(sel) sel.textContent='';
+  document.getElementById('reg-msg').style.display='none';
+  regModalPoblarDisciplinas();
+  // Poblar dependencias
+  const depSel=document.getElementById('reg-dependencia');
+  depSel.innerHTML='<option value="">— Seleccionar —</option>';
+  getDependencias().forEach(dep=>{
+    const opt=document.createElement('option');
+    opt.value=dep;opt.textContent=dep;
+    depSel.appendChild(opt);
   });
   document.getElementById('reg-modal').style.display='flex';
 }
 function closeRegistroModal(){document.getElementById('reg-modal').style.display='none';}
 
-function updateAcompCount(){
-  const el=document.getElementById('reg-acomp-count');
-  if(el) el.textContent=regAcompCount>0?`(${regAcompCount})`:'';
+// Limpia errores visuales del modal
+function regLimpiarErrores(){
+  document.querySelectorAll('#reg-modal .reg-input-pub').forEach(el=>el.classList.remove('error'));
+  document.querySelectorAll('#reg-modal .reg-field-err-pub').forEach(el=>el.remove());
 }
-
-function addAcompanante(){
-  regAcompCount++;
-  updateAcompCount();
-  const idx=regAcompCount;
-  const div=document.createElement('div');
-  div.id=`acomp-${idx}`;
-  div.style.cssText='background:var(--s2);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:10px;position:relative';
-  div.innerHTML=`
-    <div style="font-family:var(--font-h);font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
-      Acompañante ${idx}
-      <button onclick="removeAcomp(${idx})" style="position:absolute;right:10px;top:10px;background:rgba(255,23,68,.15);border:none;color:var(--danger);border-radius:3px;padding:2px 8px;cursor:pointer;font-size:11px">✕ Quitar</button>
-    </div>
-    <div class="form-grid">
-      <div class="form-group"><label>Nombre</label><input id="acomp-nombre-${idx}" type="text" placeholder="Nombre completo"></div>
-      <div class="form-group"><label>Comida</label><input id="acomp-comida-${idx}" type="text" placeholder="Plato"></div>
-      <div class="form-group"><label>Bebida</label><input id="acomp-bebida-${idx}" type="text" placeholder="Bebida"></div>
-    </div>`;
-  document.getElementById('reg-acompanantes-list').appendChild(div);
-}
-
-function removeAcomp(idx){
-  const el=document.getElementById(`acomp-${idx}`);
-  if(el) el.remove();
-  // No decrementamos regAcompCount para evitar colisión de IDs
+function regMostrarErrorCampo(id,msg){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.classList.add('error');
+  const par=el.closest('.reg-field-pub')||el.parentElement;
+  if(par&&!par.querySelector('.reg-field-err-pub')){
+    const sp=document.createElement('span');
+    sp.className='reg-field-err-pub';sp.textContent=msg;
+    par.appendChild(sp);
+  }
 }
 
 async function submitRegistro(){
   const msg=document.getElementById('reg-msg');
-  const nombre=document.getElementById('reg-nombre').value.trim();
-  const celular=document.getElementById('reg-celular').value.trim();
-  const dependencia=document.getElementById('reg-dependencia').value.trim();
-  const codigo=document.getElementById('reg-codigo').value.trim().toUpperCase();
-  const tipo=document.getElementById('reg-tipo').value;
-  const disciplina=document.getElementById('reg-disciplina').value.trim();
-  const comida=document.getElementById('reg-comida').value.trim();
-  const bebida=document.getElementById('reg-bebida').value.trim();
-  const tipoPart=document.getElementById('reg-tipo-part').value.trim();
-  const obs=document.getElementById('reg-obs').value.trim();
+  regLimpiarErrores();
+  let ok=true;
 
-  if(!nombre||!celular||!dependencia||!codigo){showMsg(msg,'err','Nombre, celular, dependencia y código son obligatorios');return;}
+  const nombre=(document.getElementById('reg-nombre')?.value||'').trim();
+  const celular=(document.getElementById('reg-celular')?.value||'').trim();
+  const dependencia=(document.getElementById('reg-dependencia')?.value||'').trim();
+  const codigo=(document.getElementById('reg-codigo')?.value||'').trim().toUpperCase();
+  const tipo=document.getElementById('reg-tipo')?.value||'';
+  const tipoPart=(document.getElementById('reg-tipo-part')?.value||'').trim();
+  const comida=(document.getElementById('reg-comida')?.value||'').trim();
+  const bebida=(document.getElementById('reg-bebida')?.value||'').trim();
+  const obs=(document.getElementById('reg-obs')?.value||'').trim();
 
-  // Recoger acompañantes visibles
-  const acompanantes=[];
-  document.querySelectorAll('[id^="acomp-nombre-"]').forEach(el=>{
-    const idx=el.id.replace('acomp-nombre-','');
-    const div=document.getElementById(`acomp-${idx}`);
-    if(div&&document.body.contains(div)){
-      const nom=el.value.trim();
-      const com=document.getElementById(`acomp-comida-${idx}`)?.value.trim()||'';
-      const beb=document.getElementById(`acomp-bebida-${idx}`)?.value.trim()||'';
-      if(nom) acompanantes.push({nombre:nom,comida:com,bebida:beb});
+  // Validaciones campo a campo
+  if(!codigo){regMostrarErrorCampo('reg-codigo','Código de registro obligatorio.');ok=false;}
+  else if(!/^[A-Z0-9]{4}$/.test(codigo)){regMostrarErrorCampo('reg-codigo','Debe tener exactamente 4 caracteres alfanuméricos.');ok=false;}
+
+  if(!tipo){regMostrarErrorCampo('reg-tipo','Selecciona el tipo de asistente.');ok=false;}
+  if(!nombre){regMostrarErrorCampo('reg-nombre','El nombre es obligatorio.');ok=false;}
+  if(!dependencia){regMostrarErrorCampo('reg-dependencia','Selecciona la dependencia.');ok=false;}
+
+  if(!celular){regMostrarErrorCampo('reg-celular','El celular es obligatorio.');ok=false;}
+  else if(!/^\d{9}$/.test(celular)){regMostrarErrorCampo('reg-celular','Debe tener 9 dígitos.');ok=false;}
+  else if(!celular.startsWith('9')){regMostrarErrorCampo('reg-celular','El celular debe empezar con 9.');ok=false;}
+
+  if(!comida){regMostrarErrorCampo('reg-comida','Selecciona la comida.');ok=false;}
+  if(!bebida){regMostrarErrorCampo('reg-bebida','Selecciona la bebida.');ok=false;}
+
+  // Disciplinas (solo para Titular y Padrino)
+  let disciplina='';
+  if(tipo==='Titular'||tipo==='Padrino'){
+    const checked=Array.from(document.querySelectorAll('.reg-disc-modal:checked')).map(c=>c.value);
+    disciplina=checked.join(', ');
+    if(!disciplina){
+      const wrap=document.getElementById('reg-disc-chips-wrap');
+      if(wrap) wrap.style.border='1.5px solid var(--err)';
+      showMsg(msg,'err','Selecciona al menos una disciplina.');
+      ok=false;
     }
-  });
+  }
+
+  if(!ok){showMsg(msg,'err','Corrige los errores antes de guardar.');return;}
+
+  // Recoger acompañantes
+  const acompanantes=[];
+  const cantAcomp=parseInt(document.getElementById('reg-cant-acomp')?.value)||0;
+  for(let i=1;i<=cantAcomp;i++){
+    const nom=(document.getElementById(`acomp-nombre-${i}`)?.value||'').trim();
+    const com=(document.getElementById(`acomp-comida-${i}`)?.value||'').trim();
+    const beb=(document.getElementById(`acomp-bebida-${i}`)?.value||'').trim();
+    if(nom) acompanantes.push({nombre:nom,comida:com,bebida:beb});
+  }
+
+  // Mapear tipo al servidor
+  const tipoServidor=tipo==='Titular'?'Titular':tipo==='Padrino'?'Padrino':'Invitado';
+  const tipoPersona=tipo==='Invitado'?'Acompañante':'Titular';
 
   try{
     const res=await apiFetch('registro',{
-      Tipo:tipo,Nombre:nombre,Dependencia:dependencia,Celular:celular,
-      Padrino:tipo==='Padrino'?'SI':'NO',TipoPersona:'Titular',
+      Tipo:tipoServidor,Nombre:nombre,Dependencia:dependencia,Celular:celular,
+      Padrino:tipo==='Padrino'?'SI':'NO',TipoPersona:tipoPersona,
       TipoParticipacion:tipoPart,Disciplina:disciplina,
       Comida:comida,Bebida:bebida,Observaciones:obs,
       Registro:codigo,Acompanantes:acompanantes
     });
     if(res.result==='ok'){
-      showMsg(msg,'ok',`✓ Registro guardado · QR: ${res.qrId}`);
-      setTimeout(()=>{closeRegistroModal();loadData();},2000);
+      showMsg(msg,'ok',`✓ Registro guardado · QR: ${res.qrId||'OK'}`);
+      setTimeout(()=>{closeRegistroModal();loadData();},2200);
     } else { showMsg(msg,'err',res.mensaje||'Error al guardar'); }
   } catch(ex){ showMsg(msg,'err','Error de conexión'); }
 }
