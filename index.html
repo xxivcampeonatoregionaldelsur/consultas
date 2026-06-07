@@ -1287,6 +1287,8 @@ async function doLogin(){
 
 function startApp(){
   document.getElementById('login-screen').style.display='none';
+  // FIX: Cargar contactados de localStorage al iniciar
+  _loadContactados();
 
   // ── VERIFICADORES: solo van al scanner, no a la app ───────────
   if(session.rol==='verificadorasistencia'||session.rol==='verificadorentrega'){
@@ -1377,13 +1379,60 @@ async function loadData(){
     const r=await fetch(`${SCRIPT_URL}?action=getData&token=${session.token}&t=${Date.now()}`,{redirect:'follow'});
     const d=await r.json();
     if(d.result==='error'&&d.mensaje&&d.mensaje.includes('expirad')){logout();return;}
-    if(d.rows){allRows=d.rows.map(normalizeRow);checkins=normalizeCheckins(d.checkins||{});}
+    if(d.rows){
+      allRows=d.rows.map(normalizeRow);
+      checkins=normalizeCheckins(d.checkins||{});
+      // FIX 3: Cargar contactados desde el servidor (columnas Contactado/FechaContacto del Sheet)
+      // Fusionamos con localStorage: el servidor tiene prioridad para el estado real
+      if(d.contactados){
+        _mergeContactadosFromServer(d.contactados);
+      }
+    }
     renderDashboard();renderParticipants();
     if(session.rol==='administrador') loadUsers();
     document.querySelectorAll('.last-upd').forEach(el=>el.textContent='⏱ '+new Date().toLocaleTimeString('es-PE'));
   } catch(e){
     const di=document.getElementById('dash-inner');
     if(di) di.innerHTML=`<div class="msg err" style="display:block">Error cargando datos. Verifica el script.</div>`;
+  }
+  // FIX 1: Cargar plantillas desde Sheets si es admin
+  if(session.rol==='administrador'){
+    loadPlantillasFromSheets();
+  }
+}
+
+// FIX 3: Fusionar contactados del servidor con los del localStorage
+// El servidor (Sheets) es fuente de verdad para estados 'SI'
+function _mergeContactadosFromServer(serverContactados){
+  // serverContactados = { qrid: {estado:'SI'|'NO'|'', fecha:'...'} }
+  Object.keys(serverContactados).forEach(qrid=>{
+    const srv=serverContactados[qrid];
+    const srvEstado=srv.estado||'';
+    // Si el servidor tiene un valor explícito, lo usamos
+    if(srvEstado==='SI'||srvEstado==='NO'){
+      contactados[qrid]=srvEstado;
+    } else if(!contactados[qrid]){
+      // Si no hay valor local y el servidor tampoco, queda en PENDIENTE
+      contactados[qrid]='PENDIENTE';
+    }
+  });
+  _saveContactados();
+}
+
+// FIX 1: Cargar plantillas guardadas en Google Sheets
+async function loadPlantillasFromSheets(){
+  try{
+    const r=await fetch(`${SCRIPT_URL}?action=getPlantillas&token=${session.token}`,{redirect:'follow'});
+    const d=await r.json();
+    if(d.result==='ok'&&d.plantillas&&d.plantillas.length>0){
+      d.plantillas.forEach(pl=>{
+        // Solo cargar si la key no es una plantilla base protegida ya cargada en código
+        // Las plantillas del Sheet SOBREESCRIBEN las del código si tienen la misma key
+        PLANTILLAS_MSG[pl.key]={label:pl.label,tpl:pl.tpl};
+      });
+    }
+  } catch(ex){
+    console.warn('No se pudieron cargar plantillas del servidor:',ex);
   }
 }
 
@@ -1793,11 +1842,20 @@ function renderParticipants(s,f){
     <div class="tbl-wrap">
       <table>
         <thead><tr>
+          <th style="width:34px;text-align:center"><input type="checkbox" id="chk-all-part" title="Seleccionar todos" onchange="toggleSeleccionTodos(this.checked)" style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer"></th>
           <th>Reg.</th><th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
           <th>Ingreso</th><th>Entrega</th><th>Contactado</th><th>Acciones</th>
         </tr></thead>
         <tbody id="part-tbody"></tbody>
       </table>
+    </div>
+    <!-- FIX 2: Barra de acciones para selección múltiple -->
+    <div id="part-sel-bar" style="display:none;background:var(--s2);border:1px solid var(--gold);border-radius:4px;padding:10px 14px;margin-top:8px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span id="part-sel-count" style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--gold)">0 seleccionados</span>
+      <button class="btn btn-gold btn-sm" onclick="enviarWASeleccionados()" style="white-space:nowrap">📱 WhatsApp a seleccionados</button>
+      <button class="btn btn-ghost btn-sm" onclick="marcarContactadosSeleccionados('SI')" style="white-space:nowrap">✅ Marcar contactados</button>
+      <button class="btn btn-ghost btn-sm" onclick="marcarContactadosSeleccionados('PENDIENTE')" style="white-space:nowrap">⏳ Limpiar estado</button>
+      <button class="btn btn-ghost btn-sm" onclick="limpiarSeleccion()" style="margin-left:auto">✕ Limpiar selección</button>
     </div>`;
 
   document.getElementById('part-inner').innerHTML=headerHtml;
@@ -1807,7 +1865,7 @@ function renderParticipants(s,f){
 
   if(!rows.length){
     const tr=document.createElement('tr');
-    tr.innerHTML='<td colspan="10"><div class="empty">Sin resultados</div></td>';
+    tr.innerHTML='<td colspan="12"><div class="empty">Sin resultados</div></td>';
     frag.appendChild(tr);
   } else {
     rows.forEach(r=>{
@@ -1821,9 +1879,18 @@ function renderParticipants(s,f){
       const canDelete=isAdmin||(isEdecan&&(!session.dependencia||dep===session.dependencia));
       const contactado=contactados[qid]||'PENDIENTE';
       const cColor=contactado==='SI'?'var(--mint)':contactado==='NO'?'var(--err)':'var(--warn)';
+      const sel=_seleccionados.has(qid);
       const tr=document.createElement('tr');
+      tr.setAttribute('data-qrid',qid);
       if(hasI&&hasE) tr.className='attended';
+      if(sel) tr.style.background='rgba(255,215,0,.07)';
       tr.innerHTML=`
+        <!-- FIX 2: Checkbox de selección por fila -->
+        <td style="text-align:center;padding:6px 8px">
+          <input type="checkbox" class="chk-part-row" data-qrid="${e(qid)}"
+            ${sel?'checked':''} onchange="onRowCheckChange(this)"
+            style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer">
+        </td>
         <td><span style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--text);letter-spacing:.5px">${e(r[C.Registro]||'—')}</span></td>
         <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${esPadrinoRow(r)?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">Padrino</span>':''}</td>
         <td><span class="bdg ${tipoInfo.cls}">${e(tipoInfo.label)}</span></td>
@@ -1834,7 +1901,9 @@ function renderParticipants(s,f){
         <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
         <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
         <td>
-          <select style="background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:4px 6px;color:${cColor};font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;min-height:32px"
+          <!-- FIX 3: data-qrid para actualización sin re-render; onchange ahora llama a saveContactadoServer -->
+          <select data-qrid="${e(qid)}"
+            style="background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:4px 6px;color:${cColor};font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;min-height:32px"
             onchange="setContactado('${e(qid)}',this.value)">
             <option value="PENDIENTE"${contactado==='PENDIENTE'?' selected':''}>⏳ Pend.</option>
             <option value="SI"${contactado==='SI'?' selected':''}>✅ Sí</option>
@@ -2834,9 +2903,10 @@ function exportExcel(){
 
 
 // ══════════════════════════════════════════════════════════════
-//  CONTACTADO — estado local (sin cambios al script)
+//  CONTACTADO — estado persistido en localStorage Y en Google Sheets
 // ══════════════════════════════════════════════════════════════
 let contactados = {}; // {qrid: 'SI'|'NO'|'PENDIENTE'} — persistido en localStorage
+let _seleccionados = new Set(); // FIX 2: QR IDs seleccionados en tabla
 
 function _loadContactados(){
   try{const d=localStorage.getItem('ev_contactados');if(d) contactados=JSON.parse(d);}catch(_){}
@@ -2844,15 +2914,147 @@ function _loadContactados(){
 function _saveContactados(){
   try{localStorage.setItem('ev_contactados',JSON.stringify(contactados));}catch(_){}
 }
+
+// FIX 3: setContactado guarda en localStorage inmediatamente Y en Sheets de forma asíncrona
 function setContactado(qrid,valor){
   contactados[qrid]=valor;
   _saveContactados();
-  // Actualizar color del select sin re-renderizar toda la tabla
+  // Actualizar color del select en DOM sin re-renderizar toda la tabla
   const selEl=document.querySelector(`select[data-qrid="${CSS.escape(qrid)}"]`);
   if(selEl){
     const cColor=valor==='SI'?'var(--mint)':valor==='NO'?'var(--err)':'var(--warn)';
     selEl.style.color=cColor;
   }
+  // Persistir en Google Sheets en segundo plano (no bloquea UI)
+  saveContactadoServer(qrid, valor);
+}
+
+// FIX 3: Enviar estado de contactado al servidor (Sheets)
+async function saveContactadoServer(qrid, estado){
+  if(!session||!session.token) return;
+  try{
+    const body=new URLSearchParams({data:JSON.stringify({
+      action:'saveContactado',
+      token:session.token,
+      qrid:qrid,
+      estado:estado==='PENDIENTE'?'':estado
+    })});
+    await fetch(SCRIPT_URL,{method:'POST',redirect:'follow',body});
+    // No mostramos toast para no interrumpir el flujo del usuario
+  } catch(ex){
+    console.warn('Error guardando contactado en Sheets:',ex);
+  }
+}
+
+// FIX 2: Toggle selección individual de fila
+function onRowCheckChange(chk){
+  const qrid=chk.getAttribute('data-qrid');
+  if(!qrid) return;
+  if(chk.checked) _seleccionados.add(qrid);
+  else _seleccionados.delete(qrid);
+  _actualizarBarraSeleccion();
+  // Resaltar fila
+  const tr=chk.closest('tr');
+  if(tr) tr.style.background=chk.checked?'rgba(255,215,0,.07)':'';
+}
+
+// FIX 2: Toggle selección de todos
+function toggleSeleccionTodos(checked){
+  document.querySelectorAll('.chk-part-row').forEach(chk=>{
+    chk.checked=checked;
+    const qrid=chk.getAttribute('data-qrid');
+    if(qrid){
+      if(checked) _seleccionados.add(qrid);
+      else _seleccionados.delete(qrid);
+    }
+    const tr=chk.closest('tr');
+    if(tr) tr.style.background=checked?'rgba(255,215,0,.07)':'';
+  });
+  _actualizarBarraSeleccion();
+}
+
+// FIX 2: Actualizar barra de acciones con conteo de seleccionados
+function _actualizarBarraSeleccion(){
+  const bar=document.getElementById('part-sel-bar');
+  const cnt=document.getElementById('part-sel-count');
+  if(!bar) return;
+  const n=_seleccionados.size;
+  if(n>0){
+    bar.style.display='flex';
+    if(cnt) cnt.textContent=n+' seleccionado'+(n!==1?'s':'');
+  } else {
+    bar.style.display='none';
+  }
+}
+
+// FIX 2: Limpiar selección
+function limpiarSeleccion(){
+  _seleccionados.clear();
+  document.querySelectorAll('.chk-part-row').forEach(chk=>{
+    chk.checked=false;
+    const tr=chk.closest('tr');
+    if(tr) tr.style.background='';
+  });
+  const all=document.getElementById('chk-all-part');
+  if(all) all.checked=false;
+  _actualizarBarraSeleccion();
+}
+
+// FIX 2: Marcar como contactados los seleccionados en masa
+function marcarContactadosSeleccionados(valor){
+  if(_seleccionados.size===0){showToast('⚠️ Ningún contacto seleccionado');return;}
+  _seleccionados.forEach(qrid=>{
+    setContactado(qrid,valor);
+  });
+  const n=_seleccionados.size;
+  showToast(`✅ ${n} contacto${n!==1?'s':''} marcados como "${valor}"`);
+  limpiarSeleccion();
+  renderParticipants();
+}
+
+// FIX 2: Abrir WhatsApp para todos los seleccionados en secuencia
+// (abre cada uno en una nueva ventana con 800ms de espacio entre sí)
+async function enviarWASeleccionados(){
+  if(_seleccionados.size===0){showToast('⚠️ Ningún contacto seleccionado');return;}
+  const qrids=Array.from(_seleccionados);
+  const tipo=document.getElementById('msg-tipo')?.value||'bienvenida';
+  const pl=PLANTILLAS_MSG[tipo];
+
+  let enviados=0;
+  for(const qrid of qrids){
+    const r=allRows.find(x=>x[C.QR_ID]===qrid);
+    if(!r) continue;
+    const cel=(r[C.Celular]||'').replace(/\D/g,'');
+    if(!cel||cel.length<9) continue;
+
+    // Generar mensaje con plantilla si existe
+    let texto='';
+    if(pl&&pl.tpl){
+      const partes=(r[C.Nombre]||'').trim().split(/\s+/);
+      const primerNom=partes[partes.length-1]||partes[0]||'';
+      const nombre=primerNom.charAt(0).toUpperCase()+primerNom.slice(1).toLowerCase();
+      const qrUrl=`${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
+      texto=pl.tpl
+        .replace(/{{NOMBRE}}/g,nombre)
+        .replace(/{{EDECAN}}/g,session.usuario||'tu edecán')
+        .replace(/{{DEPENDENCIA}}/g,session.dependencia||r[C.Dependencia]||'—')
+        .replace(/{{COMIDA_TITULAR}}/g,r[C.Comida]||'—')
+        .replace(/{{QR_TITULAR}}/g,qrUrl)
+        .replace(/{{LISTA_ACOMPANANTES}}/g,'')
+        .replace(/{{PLURAL_QR}}/g,'este QR')
+        .replace(/{{PLURAL_NECESARIO}}/g,'será necesario');
+    }
+
+    const waUrl=`https://wa.me/51${cel}${texto?'?text='+encodeURIComponent(texto):''}`;
+    window.open(waUrl,'_blank','noopener,noreferrer');
+    setContactado(qrid,'SI');
+    enviados++;
+    // Pausa para evitar que el navegador bloquee múltiples aperturas
+    if(enviados<qrids.length) await new Promise(res=>setTimeout(res,900));
+  }
+  showToast(`📱 ${enviados} WhatsApp${enviados!==1?'s':''} abiertos · Marcados como contactados`);
+  limpiarSeleccion();
+  renderParticipants();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3032,7 +3234,7 @@ function cerrarEditorPlantilla(){
 }
 
 /** Guarda la plantilla en edición o crea una nueva */
-function guardarPlantilla(){
+async function guardarPlantilla(){
   const labelEl = document.getElementById('msg-editor-label');
   const tplEl = document.getElementById('msg-editor-tpl');
   const msgEl = document.getElementById('msg-editor-msg');
@@ -3048,30 +3250,47 @@ function guardarPlantilla(){
   // Generar key única si es nueva plantilla
   let key = _editorPlantillaKey;
   if(!key){
-    // Crear key a partir del label: lowercase, sin tildes, sin espacios
     key = label.toLowerCase()
       .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
       .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n')
       .replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')
       .slice(0, 30) || 'plantilla_'+Date.now();
-    // Garantizar unicidad
     if(PLANTILLAS_MSG[key]) key += '_'+Date.now();
   }
 
-  // Guardar en PLANTILLAS_MSG (memoria)
+  // Guardar en memoria inmediatamente
   PLANTILLAS_MSG[key] = {label, tpl};
 
-  if(msgEl){msgEl.className='msg ok';msgEl.textContent='✓ Plantilla guardada correctamente.';msgEl.style.display='block';}
+  if(msgEl){msgEl.className='msg ok';msgEl.textContent='⏳ Guardando en Google Sheets...';msgEl.style.display='block';}
+
+  // FIX 1: Persistir en Google Sheets de forma asíncrona
+  try{
+    const body=new URLSearchParams({data:JSON.stringify({
+      action:'savePlantilla',
+      token:session.token,
+      key,label,tpl
+    })});
+    const res=await fetch(SCRIPT_URL,{method:'POST',redirect:'follow',body});
+    const d=await res.json();
+    if(d.result==='ok'){
+      if(msgEl){msgEl.textContent='✓ Plantilla guardada en Google Sheets.';msgEl.style.display='block';}
+    } else {
+      // Guardado en memoria OK pero falló Sheets — no es crítico
+      if(msgEl){msgEl.className='msg ok';msgEl.textContent='✓ Guardada localmente (Sheets: '+( d.mensaje||'error')+')';msgEl.style.display='block';}
+    }
+  } catch(ex){
+    if(msgEl){msgEl.className='msg ok';msgEl.textContent='✓ Guardada localmente (sin conexión al servidor)';msgEl.style.display='block';}
+  }
+
   setTimeout(()=>{
     cerrarEditorPlantilla();
-    // Actualizar lista de plantillas y selector de mensajería
     renderEditorPlantillas();
     _actualizarSelectorPlantillas();
-  }, 900);
+  }, 1100);
 }
 
 /** Elimina una plantilla (no protegidas) */
-function eliminarPlantilla(key){
+async function eliminarPlantilla(key){
   if(PLANTILLAS_PROTEGIDAS.includes(key)){
     showToast('⚠️ Esta plantilla no puede eliminarse.');
     return;
@@ -3086,6 +3305,11 @@ function eliminarPlantilla(key){
   renderEditorPlantillas();
   _actualizarSelectorPlantillas();
   showToast('🗑 Plantilla eliminada');
+  // FIX 1: Eliminar del servidor en segundo plano
+  try{
+    const body=new URLSearchParams({data:JSON.stringify({action:'deletePlantilla',token:session.token,key})});
+    await fetch(SCRIPT_URL,{method:'POST',redirect:'follow',body});
+  } catch(ex){ console.warn('Error eliminando plantilla del servidor:',ex); }
 }
 
 /** Inserta una variable en el textarea del editor en la posición del cursor */
@@ -3508,18 +3732,33 @@ function toggleContactadoMsg(){
   renderMensajeria();
 }
 
-// ── ENVIAR WHATSAPP — compatible Android e iOS (CORREGIDO) ──────
-// En móvil se usa location.href para forzar apertura de la app nativa.
-// En desktop se usa window.open para no abandonar la pestaña.
+// ── ENVIAR WHATSAPP — compatible Android e iOS ──────────────────
+// FIX 4: Formatea el número correctamente con código de país Perú (+51)
+// Valida que el número tenga 9 dígitos y empiece con 9
+// Marca como contactado en MEMORIA y en SHEETS simultáneamente
 function enviarWA(){
   if(!_msgQRID) return;
   const r=allRows.find(x=>x[C.QR_ID]===_msgQRID);
   if(!r){showMsg(document.getElementById('msg-status'),'err','Titular no encontrado');return;}
-  const cel=(r[C.Celular]||'').replace(/\D/g,'');
-  if(!cel||cel.length<9){showMsg(document.getElementById('msg-status'),'err','Sin celular registrado para este titular');return;}
+
+  // FIX 4: Formateo correcto del número de teléfono
+  const celRaw=(r[C.Celular]||'').replace(/\D/g,'');
+  // Eliminar código de país si ya viene incluido (51 = Perú)
+  let cel=celRaw;
+  if(cel.startsWith('51')&&cel.length===11) cel=cel.slice(2);
+  if(!cel||cel.length!==9){
+    showMsg(document.getElementById('msg-status'),'err',`Número inválido: "${r[C.Celular]||'vacío'}" · Debe tener 9 dígitos`);
+    return;
+  }
+  if(!cel.startsWith('9')){
+    showMsg(document.getElementById('msg-status'),'err','El número debe empezar con 9 (celular peruano)');
+    return;
+  }
+
   const texto=document.getElementById('msg-texto')?.value||'';
-  // encodeURIComponent garantiza encoding correcto para caracteres especiales (ñ, emojis, etc.)
-  const waUrl=`https://wa.me/51${cel}?text=${encodeURIComponent(texto)}`;
+  // FIX 4: Código de país Perú 51, siempre antepuesto
+  const waUrl=`https://wa.me/51${cel}${texto?'?text='+encodeURIComponent(texto):''}`;
+
   const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(isMobile){
     // En móvil: location.href abre la app de WhatsApp directamente (Android e iOS)
@@ -3528,14 +3767,15 @@ function enviarWA(){
     // En desktop: abrir en pestaña nueva sin abandonar la app
     window.open(waUrl,'_blank','noopener,noreferrer');
   }
-  // Marcar automáticamente como contactado
+
+  // FIX 3+4: Marcar automáticamente como contactado en MEMORIA y SHEETS
   setContactado(_msgQRID,'SI');
   // Sync ambos checkboxes
   ['msg-chk-contactado','msg-chk-contactado-sticky'].forEach(id=>{
     const chk=document.getElementById(id);
     if(chk) chk.checked=true;
   });
-  showToast('📱 Abriendo WhatsApp · Marcado como contactado ✅');
+  showToast(`📱 WhatsApp +51${cel} · Marcado contactado ✅`);
 }
 
 // compartirMsg ELIMINADO — se suprimió el uso de navigator.share en toda la app.
