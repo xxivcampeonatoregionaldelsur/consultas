@@ -864,6 +864,7 @@ html{scroll-behavior:smooth}
     <div class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
     <div class="nav-tab" data-tab="participantes" onclick="switchTab('participantes')">👥 Participantes</div>
     <div class="nav-tab admin-only" data-tab="deps-dashboard" onclick="switchTab('deps-dashboard');renderDepsDashboard()">🏛️ Por Dependencia</div>
+    <div class="nav-tab" id="tab-mensajeria" data-tab="mensajeria" onclick="switchTab('mensajeria');renderMensajeria()" style="display:none">💬 Mensajería</div>
     <div class="nav-tab admin-only" data-tab="usuarios" onclick="switchTab('usuarios')" id="tab-usuarios" style="display:none">🔑 Usuarios</div>
   </div>
 
@@ -881,6 +882,11 @@ html{scroll-behavior:smooth}
     <!-- DASHBOARD POR DEPENDENCIA (admin only) -->
     <div class="tab-pane" id="pane-deps-dashboard">
       <div id="deps-inner"><div class="loader"><div class="spinner"></div><span>Cargando...</span></div></div>
+    </div>
+
+    <!-- MENSAJERÍA (admin + edecan) -->
+    <div class="tab-pane" id="pane-mensajeria">
+      <div id="mensajeria-inner"><div class="loader"><div class="spinner"></div><span>Cargando...</span></div></div>
     </div>
 
     <!-- USUARIOS (admin only) -->
@@ -922,6 +928,17 @@ html{scroll-behavior:smooth}
       </div>
 
       <div class="sec-title" style="margin-top:8px">Usuarios registrados</div>
+      <div class="toolbar" style="margin-bottom:8px">
+        <input class="search" id="users-search" type="text" placeholder="🔍 Buscar por nombre o dependencia..." oninput="filterUsersTable()">
+        <select class="filter" id="users-rol-filter" onchange="filterUsersTable()">
+          <option value="">— Todos los roles —</option>
+          <option value="administrador">Administrador</option>
+          <option value="edecan">Edecán</option>
+          <option value="delegado">Delegado</option>
+          <option value="verificadorasistencia">Ver. Asistencia</option>
+          <option value="verificadorentrega">Ver. Entrega</option>
+        </select>
+      </div>
       <div class="tbl-wrap" id="users-table"><div class="loader"><div class="spinner"></div></div></div>
     </div>
   </main>
@@ -1194,6 +1211,10 @@ function startApp(){
   rb.textContent=rm[0];rb.className='role-badge '+rm[1];
   if(session.rol!=='administrador'){
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='none');
+  }
+  if(session.rol==='administrador'||session.rol==='edecan'){
+    const tm=document.getElementById('tab-mensajeria');
+    if(tm) tm.style.display='';
   }
   // Solo usuarios no-admin ven el botón de cambiar contraseña propio
   if(session.rol!=='administrador') addChangePassBtn();
@@ -1640,6 +1661,7 @@ function renderParticipants(s,f){
     ?'🔍 Buscar por nombre, tipo, dependencia, registro...'
     :'🔍 Ingresa 4 dígitos del registro (ej: A123)...';
 
+  const canAddRecord=isAdmin||(session.rol==='edecan');
   const headerHtml=`
     <div class="prog-wrap">
       <div class="prog-lbl">Ingresos: <strong>${withIngreso}/${total}</strong></div>
@@ -1648,7 +1670,7 @@ function renderParticipants(s,f){
     </div>
     <div class="toolbar">
       <input class="search" type="text" placeholder="${searchPlaceholder}" value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
-      ${isAdmin?`<button class="btn btn-gold btn-sm" onclick="openRegistroModal()" style="white-space:nowrap">➕ Registrar</button>`:''}
+      ${canAddRecord?`<button class="btn btn-gold btn-sm" onclick="openRegistroModal()" style="white-space:nowrap">➕ Registrar</button>`:''}
       <button class="btn btn-ghost btn-sm" onclick="exportParticipantesExcel()" style="white-space:nowrap">⬇ Excel</button>
       <span style="color:var(--muted);font-size:12px">${total} resultado${total!==1?'s':''}</span>
     </div>
@@ -1656,7 +1678,7 @@ function renderParticipants(s,f){
       <table>
         <thead><tr>
           <th>Reg.</th><th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
-          <th>Ingreso</th><th>Entrega</th><th>Acciones</th>
+          <th>Ingreso</th><th>Entrega</th><th>Contactado</th><th>Acciones</th>
         </tr></thead>
         <tbody id="part-tbody"></tbody>
       </table>
@@ -1678,21 +1700,34 @@ function renderParticipants(s,f){
       const isPadrino=esPadrinoRow(r);
       const tipoInfo=getTipoDisplay(r);
       const disc=r[C.Disciplina]||'—';
+      const dep=r[C.Dependencia]||'';
+      const isEdecan=session.rol==='edecan';
+      const canDelete=isAdmin||(isEdecan&&(!session.dependencia||dep===session.dependencia));
+      const contactado=contactados[qid]||'PENDIENTE';
+      const cColor=contactado==='SI'?'var(--mint)':contactado==='NO'?'var(--err)':'var(--warn)';
       const tr=document.createElement('tr');
       if(hasI&&hasE) tr.className='attended';
       tr.innerHTML=`
         <td><span style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--text);letter-spacing:.5px">${e(r[C.Registro]||'—')}</span></td>
         <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${esPadrinoRow(r)?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">Padrino</span>':''}</td>
         <td><span class="bdg ${tipoInfo.cls}">${e(tipoInfo.label)}</span></td>
-        <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
+        <td style="color:var(--muted);font-size:12px">${e(dep||'—')}</td>
         <td style="font-size:13px">${e(disc)}</td>
         <td style="font-size:13px;color:var(--text)">${e(r[C.Comida]||'—')}</td>
         <td style="font-size:13px;color:var(--text)">${e(r[C.Bebida]||'—')}</td>
         <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
         <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
+        <td>
+          <select style="background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:4px 6px;color:${cColor};font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;min-height:32px"
+            onchange="setContactado('${e(qid)}',this.value)">
+            <option value="PENDIENTE"${contactado==='PENDIENTE'?' selected':''}>⏳ Pend.</option>
+            <option value="SI"${contactado==='SI'?' selected':''}>✅ Sí</option>
+            <option value="NO"${contactado==='NO'?' selected':''}>❌ No</option>
+          </select>
+        </td>
         <td style="white-space:nowrap">
           ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(r[C.TipoPersona]||'')}','${e(r[C.Dependencia]||'')}','${e(r[C.Tipo]||'')}','${e(r[C.Disciplina]||'')}')">🔲 QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
-          ${isAdmin?`<button class="btn btn-danger btn-sm" onclick="deleteRegistro('${e(qid)}','${e(r[C.Nombre]||'')}')">🗑</button>`:''}
+          ${canDelete?`<button class="btn btn-danger btn-sm" onclick="deleteRegistro('${e(qid)}','${e(r[C.Nombre]||'')}','${e(dep)}')">🗑</button>`:''}
         </td>`;
       frag.appendChild(tr);
     });
@@ -1703,14 +1738,20 @@ function formatHora(str){
   if(!str) return '';const parts=String(str).split(' ');return parts[1]||parts[0]||'';
 }
 
-// ── DELETE REGISTRO (admin only) ───────────────────────────────
-async function deleteRegistro(qrid, nombre){
+// ── DELETE REGISTRO ────────────────────────────────────────────
+async function deleteRegistro(qrid, nombre, dep){
+  const isAdmin=session.rol==='administrador';
+  const isEdecan=session.rol==='edecan';
+  if(!isAdmin&&!isEdecan){alert('Sin permisos para eliminar.');return;}
+  if(isEdecan&&session.dependencia&&dep!==session.dependencia){
+    alert('Solo puedes eliminar registros de tu dependencia asignada.');return;
+  }
   if(!qrid){alert('Sin QR ID para eliminar');return;}
-  if(!confirm(`¿Eliminar el registro de "${nombre}" (QR: ${qrid})?\n\nEsta acción no se puede deshacer.`)) return;
+  if(!confirm(`¿Eliminar el registro de "${nombre}"?\n\nEsto eliminará también a sus acompañantes.\nEsta acción no se puede deshacer.`)) return;
   try{
     const res=await apiFetch('deleteRegistro',{qrid});
     if(res.result==='ok'){
-      showToast('🗑 Registro eliminado');
+      showToast(`🗑 Eliminado (${res.filas} fila${res.filas!==1?'s':''} borradas)`);
       await loadData();
     } else { alert(res.mensaje||'Error al eliminar'); }
   } catch(ex){ alert('Error de conexión'); }
@@ -2271,7 +2312,9 @@ function regModalAcompChange(){
 }
 
 function openRegistroModal(){
-  if(session.rol!=='administrador') return;
+  const isAdmin=session.rol==='administrador';
+  const isEdecan=session.rol==='edecan';
+  if(!isAdmin&&!isEdecan) return;
   // Reset
   ['reg-nombre','reg-celular','reg-codigo','reg-obs']
     .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -2292,12 +2335,19 @@ function openRegistroModal(){
   regModalPoblarDisciplinas();
   // Poblar dependencias
   const depSel=document.getElementById('reg-dependencia');
-  depSel.innerHTML='<option value="">— Seleccionar —</option>';
-  getDependencias().forEach(dep=>{
-    const opt=document.createElement('option');
-    opt.value=dep;opt.textContent=dep;
-    depSel.appendChild(opt);
-  });
+  if(isEdecan&&session.dependencia){
+    depSel.innerHTML=`<option value="${e(session.dependencia)}">${e(session.dependencia)}</option>`;
+    depSel.value=session.dependencia;
+    depSel.disabled=true;
+  } else {
+    depSel.disabled=false;
+    depSel.innerHTML='<option value="">— Seleccionar —</option>';
+    getDependencias().forEach(dep=>{
+      const opt=document.createElement('option');
+      opt.value=dep;opt.textContent=dep;
+      depSel.appendChild(opt);
+    });
+  }
   document.getElementById('reg-modal').style.display='flex';
 }
 function closeRegistroModal(){document.getElementById('reg-modal').style.display='none';}
@@ -2451,23 +2501,11 @@ async function loadUsers(){
     const r=await fetch(`${SCRIPT_URL}?action=getUsers&token=${session.token}`,{redirect:'follow'});
     const d=await r.json();
     if(!d.users){document.getElementById('users-table').innerHTML='<div class="empty">Error cargando usuarios</div>';return;}
-    const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega'};
-    const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega'};
-    const rows=d.users.map(u=>`
-      <tr>
-        <td><strong>${e(u.usuario)}</strong></td>
-        <td><span class="bdg role-badge ${rmap[u.rol]||''}">${rlbl[u.rol]||u.rol}</span></td>
-        <td style="color:var(--muted);font-size:12px">${e(u.dependencia||'—')}</td>
-        <td><span class="bdg ${u.activo==='SI'?'bdg-chk':'bdg-no'}">${u.activo==='SI'?'Activo':'Inactivo'}</span></td>
-        <td style="color:var(--muted);font-size:11px">${e(u.fecha||'')}</td>
-        <td>
-          <button class="btn btn-ghost btn-sm" onclick="toggleUser('${e(u.usuario)}','${u.activo==='SI'?'NO':'SI'}')">${u.activo==='SI'?'Desactivar':'Activar'}</button>
-          ${u.usuario!=='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteUser('${e(u.usuario)}')">Eliminar</button>`:''}
-        </td>
-      </tr>`).join('');
+    _allUsersData=d.users;
     document.getElementById('users-table').innerHTML=`
       <table><thead><tr><th>Usuario</th><th>Rol</th><th>Dependencia</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="6"><div class="empty">Sin usuarios</div></td></tr>'}</tbody></table>`;
+      <tbody id="users-tbody"></tbody></table>`;
+    renderUsersRows(_allUsersData);
   } catch(ex){document.getElementById('users-table').innerHTML='<div class="empty">Error de conexión</div>';}
 }
 
@@ -2667,6 +2705,299 @@ function exportExcel(){
   a.style.display='none';document.body.appendChild(a);a.click();
   document.body.removeChild(a);URL.revokeObjectURL(url);
   showToast('✓ Excel de dependencias descargado');
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  CONTACTADO — estado local (sin cambios al script)
+// ══════════════════════════════════════════════════════════════
+let contactados = {}; // {qrid: 'SI'|'NO'|'PENDIENTE'} — persistido en localStorage
+
+function _loadContactados(){
+  try{const d=localStorage.getItem('ev_contactados');if(d) contactados=JSON.parse(d);}catch(_){}
+}
+function _saveContactados(){
+  try{localStorage.setItem('ev_contactados',JSON.stringify(contactados));}catch(_){}
+}
+function setContactado(qrid,valor){
+  contactados[qrid]=valor;
+  _saveContactados();
+  // Actualizar color del select sin re-renderizar toda la tabla
+  const selEl=document.querySelector(`select[data-qrid="${CSS.escape(qrid)}"]`);
+  if(selEl){
+    const cColor=valor==='SI'?'var(--mint)':valor==='NO'?'var(--err)':'var(--warn)';
+    selEl.style.color=cColor;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  USUARIOS — filtro por rol y búsqueda
+// ══════════════════════════════════════════════════════════════
+let _allUsersData=[];
+
+function filterUsersTable(){
+  const search=(document.getElementById('users-search')?.value||'').toLowerCase().trim();
+  const rol=document.getElementById('users-rol-filter')?.value||'';
+  const filtered=_allUsersData.filter(u=>{
+    const matchS=!search||(u.usuario||'').toLowerCase().includes(search)||(u.dependencia||'').toLowerCase().includes(search);
+    const matchR=!rol||u.rol===rol;
+    return matchS&&matchR;
+  });
+  renderUsersRows(filtered);
+}
+
+function renderUsersRows(users){
+  const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega'};
+  const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega'};
+  const rows=users.map(u=>`
+    <tr>
+      <td><strong>${e(u.usuario)}</strong></td>
+      <td><span class="bdg role-badge ${rmap[u.rol]||''}">${rlbl[u.rol]||u.rol}</span></td>
+      <td style="color:var(--muted);font-size:12px">${e(u.dependencia||'—')}</td>
+      <td><span class="bdg ${u.activo==='SI'?'bdg-chk':'bdg-no'}">${u.activo==='SI'?'Activo':'Inactivo'}</span></td>
+      <td style="color:var(--muted);font-size:11px">${e(u.fecha||'')}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="toggleUser('${e(u.usuario)}','${u.activo==='SI'?'NO':'SI'}')">${u.activo==='SI'?'Desactivar':'Activar'}</button>
+        ${u.usuario!=='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteUser('${e(u.usuario)}')">Eliminar</button>`:''}
+      </td>
+    </tr>`).join('');
+  const tb=document.getElementById('users-tbody');
+  if(tb) tb.innerHTML=rows||'<tr><td colspan="6"><div class="empty">Sin usuarios</div></td></tr>';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MENSAJERÍA
+// ══════════════════════════════════════════════════════════════
+const PLANTILLAS_MSG={
+  bienvenida:{label:'🎉 Bienvenida con QR',
+    tpl:`Hola {{NOMBRE}} 😊\nMi nombre es {{EDECAN}}, edecán de la dependencia {{DEPENDENCIA}}, y estaré acompañándote durante el evento.\n\nTe comparto el detalle de tu registro para el evento del 28.06.2026:\n\n👤 Participante titular:\n📍 Plato elegido: {{COMIDA_TITULAR}}\n🎫 QR de acceso titular: {{QR_TITULAR}}\n\n{{LISTA_ACOMPANANTES}}Por favor, conserva {{PLURAL_QR}} ya que {{PLURAL_NECESARIO}} para tu ingreso.\n\nSi tienes alguna consulta, cambio o necesitas apoyo con algún detalle, puedes escribirme. 🙌`},
+  confirmacion:{label:'✅ Confirmación de asistencia',
+    tpl:`Hola {{NOMBRE}} 😊\nTe escribo de parte de la dependencia {{DEPENDENCIA}} para confirmar tu asistencia al evento del 28.06.2026.\n\n¿Confirmas tu participación? Respóndeme con un ✅ para tenerlo registrado.\n\nCualquier cambio o consulta puedes escribirme directamente. ¡Nos vemos pronto! 🎉`},
+  recordatorio:{label:'⏰ Recordatorio previo al evento',
+    tpl:`Hola {{NOMBRE}} 👋\nTe recuerdo que el evento es el próximo 28.06.2026. Datos importantes:\n\n📍 Dependencia: {{DEPENDENCIA}}\n🍽️ Plato registrado: {{COMIDA_TITULAR}}\n🎫 Recuerda llevar tu QR de acceso.\n\nAnte cualquier duda estoy disponible. ¡Te esperamos! 🙌`},
+  cambio_horario:{label:'🕐 Cambio de horario / agenda',
+    tpl:`Hola {{NOMBRE}} 📢\nTe informo que ha habido un cambio en el cronograma del evento del 28.06.2026.\n\n[Detalla aquí el cambio]\n\nDisculpa los inconvenientes. Escríbeme ante cualquier consulta.\nSaludos, {{EDECAN}} — {{DEPENDENCIA}}`},
+  invitacion:{label:'🎭 Invitación a evento especial',
+    tpl:`Hola {{NOMBRE}} 🌟\nEn nombre de la dependencia {{DEPENDENCIA}} tenemos el agrado de invitarte a un evento especial dentro del XXIV Campeonato Regional del Sur.\n\n[Detalla aquí el evento: obra de teatro, cena especial, etc.]\n\nConfírmame tu asistencia. ¡Será una velada especial! 🎉`},
+  agenda:{label:'📋 Información de agenda',
+    tpl:`Hola {{NOMBRE}} 📋\nTe compartimos la agenda del evento del 28.06.2026:\n\n[Pega aquí la agenda]\n\nTu dependencia: {{DEPENDENCIA}}\nCualquier consulta estoy a tu disposición. — {{EDECAN}}`},
+  seguimiento:{label:'📞 Seguimiento',
+    tpl:`Hola {{NOMBRE}} 🙋\nTe escribo para hacer seguimiento de tu registro para el evento del 28.06.2026.\n\n¿Todo listo de tu parte? ¿Tienes alguna duda?\n\nQuedo atento/a. Saludos, {{EDECAN}} — {{DEPENDENCIA}}`},
+  libre:{label:'✏️ Mensaje libre',tpl:''}
+};
+
+let _msgQRID='';
+
+function renderMensajeria(){
+  const isAdmin=session.rol==='administrador';
+  const isEdecan=session.rol==='edecan';
+  if(!isAdmin&&!isEdecan){
+    document.getElementById('mensajeria-inner').innerHTML='<div class="msg err" style="display:block">Sin acceso.</div>';return;
+  }
+  _loadContactados();
+
+  let titulares=allRows.filter(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r));
+  if(isEdecan&&session.dependencia) titulares=titulares.filter(r=>r[C.Dependencia]===session.dependencia);
+
+  // Dashboard contactados por dependencia (admin only)
+  let dashHtml='';
+  if(isAdmin){
+    const depSt={};
+    allRows.filter(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r)).forEach(r=>{
+      const dep=r[C.Dependencia]||'—',qid=r[C.QR_ID]||'',c=contactados[qid]||'PENDIENTE';
+      if(!depSt[dep]) depSt[dep]={SI:0,NO:0,PENDIENTE:0,tot:0};
+      depSt[dep][c]++;depSt[dep].tot++;
+    });
+    const depBars=Object.entries(depSt).sort((a,b)=>b[1].tot-a[1].tot).map(([dep,s])=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+        <span style="font-family:var(--font-h);font-size:11px;font-weight:700;text-transform:uppercase;min-width:140px;color:var(--text);word-break:break-word">${e(dep)}</span>
+        <span style="font-size:11px;color:var(--mint);font-weight:700;min-width:32px">✅${s.SI}</span>
+        <span style="font-size:11px;color:var(--err);font-weight:700;min-width:32px">❌${s.NO}</span>
+        <span style="font-size:11px;color:var(--warn);font-weight:700;min-width:36px">⏳${s.PENDIENTE}</span>
+        <div style="flex:1;height:8px;background:var(--field);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${s.tot>0?Math.round(s.SI/s.tot*100):0}%;background:var(--mint);border-radius:4px"></div>
+        </div>
+        <span style="font-size:10px;color:var(--muted);min-width:28px">${s.tot>0?Math.round(s.SI/s.tot*100):0}%</span>
+      </div>`).join('');
+    dashHtml=`<div class="card" style="margin-bottom:18px">
+      <div class="card-title">📊 Estado de Contacto por Dependencia</div>
+      <div style="padding:0 10px">
+        <div style="display:flex;gap:16px;margin-bottom:10px;font-family:var(--font-h);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px">
+          <span style="color:var(--mint)">✅ Contactado</span>
+          <span style="color:var(--err)">❌ No contactado</span>
+          <span style="color:var(--warn)">⏳ Pendiente</span>
+        </div>
+        ${depBars||'<div style="color:var(--muted);font-size:12px">Sin datos</div>'}
+      </div>
+    </div>`;
+  }
+
+  const plantOpts=Object.entries(PLANTILLAS_MSG).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  const titRows=titulares.map((r,i)=>{
+    const cel=r[C.Celular]||'';
+    const nacomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).length:0;
+    const c=contactados[r[C.QR_ID]||'']||'PENDIENTE';
+    const cCol=c==='SI'?'var(--mint)':c==='NO'?'var(--err)':'var(--warn)';
+    return `<tr id="mrow-${i}" onclick="selTitular('${e(r[C.QR_ID]||'')}',${i})" style="cursor:pointer">
+      <td><span class="pname" style="font-size:13px">${e(r[C.Nombre]||'—')}</span></td>
+      <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
+      <td style="font-size:12px">${e(cel||'—')}</td>
+      <td><span style="font-family:var(--font-h);font-size:11px;font-weight:700;color:${cCol}">${c==='SI'?'✅ Sí':c==='NO'?'❌ No':'⏳ Pend.'}</span></td>
+      <td style="text-align:center"><span class="bdg bdg-a">${nacomps}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('mensajeria-inner').innerHTML=`
+  ${dashHtml}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">👥 Titulares${isEdecan&&session.dependencia?' — <span style="color:var(--gold)">'+e(session.dependencia)+'</span>':''}</div>
+      <div class="tbl-wrap" style="max-height:440px;overflow-y:auto">
+        <table style="min-width:380px">
+          <thead><tr><th>Nombre</th><th>Dependencia</th><th>Celular</th><th>Contactado</th><th style="text-align:center">Acomp.</th></tr></thead>
+          <tbody>${titRows||'<tr><td colspan="5"><div class="empty">Sin titulares</div></td></tr>'}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted)">Selecciona un titular para redactar su mensaje</div>
+    </div>
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">✉️ Redactar Mensaje</div>
+      <div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px">
+        <div id="msg-info-box" style="display:none;background:var(--field);border-radius:4px;padding:10px;margin-bottom:12px">
+          <div style="font-family:var(--font-h);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px">Titular seleccionado</div>
+          <div id="msg-info-nombre" style="font-family:var(--font-h);font-size:15px;font-weight:800;color:var(--text)">—</div>
+          <div id="msg-info-dep" style="font-size:11px;color:var(--muted)">—</div>
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:5px">Tipo de mensaje</label>
+          <select class="filter" id="msg-tipo" style="width:100%" onchange="aplicarPlantilla()">${plantOpts}</select>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:5px">Mensaje (editable)</label>
+          <textarea id="msg-texto" rows="11" style="width:100%;background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;padding:12px;color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;resize:vertical;outline:none;min-height:220px" placeholder="Selecciona un titular para comenzar..."></textarea>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-gold" id="btn-wa" onclick="enviarWA()" disabled style="opacity:.45">📱 WhatsApp</button>
+          <button class="btn btn-ghost" id="btn-share" onclick="compartirMsg()" style="display:none">📤 Compartir</button>
+          <button class="btn btn-ghost" onclick="copiarMsg()">📋 Copiar</button>
+          <label id="msg-contactado-lbl" style="display:none;margin-left:auto;font-family:var(--font-h);font-size:11px;color:var(--muted);cursor:pointer">
+            <input type="checkbox" id="msg-chk-contactado" onchange="toggleContactadoMsg()" style="margin-right:4px;accent-color:var(--mint)">
+            Marcar como contactado
+          </label>
+        </div>
+        <div id="msg-status" class="msg" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>`;
+
+  // Re-apply selected state if any
+  if(_msgQRID) _resaltarFilaTitular();
+}
+
+function selTitular(qrid,idx){
+  _msgQRID=qrid;
+  _resaltarFilaTitular(idx);
+  const r=allRows.find(x=>x[C.QR_ID]===qrid);
+  if(!r) return;
+  const box=document.getElementById('msg-info-box');
+  if(box) box.style.display='';
+  const nomEl=document.getElementById('msg-info-nombre');
+  if(nomEl) nomEl.textContent=r[C.Nombre]||'—';
+  const depEl=document.getElementById('msg-info-dep');
+  if(depEl) depEl.textContent=r[C.Dependencia]||'—';
+  const waBtn=document.getElementById('btn-wa');
+  if(waBtn){waBtn.disabled=false;waBtn.style.opacity='1';}
+  const shareBtn=document.getElementById('btn-share');
+  if(shareBtn) shareBtn.style.display=navigator.share?'':'none';
+  const cLbl=document.getElementById('msg-contactado-lbl');
+  if(cLbl) cLbl.style.display='';
+  const chk=document.getElementById('msg-chk-contactado');
+  if(chk) chk.checked=(contactados[qrid]||'PENDIENTE')==='SI';
+  aplicarPlantilla();
+}
+
+function _resaltarFilaTitular(idx){
+  document.querySelectorAll('[id^="mrow-"]').forEach(r=>r.style.background='');
+  if(idx!==undefined){
+    const row=document.getElementById('mrow-'+idx);
+    if(row) row.style.background='rgba(255,215,0,.08)';
+  } else {
+    // buscar por qrid
+    const titulares=allRows.filter(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r));
+    const i=titulares.findIndex(r=>r[C.QR_ID]===_msgQRID);
+    if(i>=0){const row=document.getElementById('mrow-'+i);if(row) row.style.background='rgba(255,215,0,.08)';}
+  }
+}
+
+function aplicarPlantilla(){
+  if(!_msgQRID) return;
+  const tipo=document.getElementById('msg-tipo')?.value||'bienvenida';
+  const pl=PLANTILLAS_MSG[tipo];
+  if(!pl) return;
+  const r=allRows.find(x=>x[C.QR_ID]===_msgQRID);
+  if(!r) return;
+  const cel=r[C.Celular]||'';
+  const acomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)):[];
+  // Primer nombre desde el final (apellidos primero)
+  const partes=(r[C.Nombre]||'').trim().split(/\s+/);
+  const primerNom=partes[partes.length-1]||partes[0]||'';
+  const nombre=primerNom.charAt(0).toUpperCase()+primerNom.slice(1).toLowerCase();
+  const qrUrl=`${SCANNER_URL}?qrid=${encodeURIComponent(_msgQRID)}`;
+
+  let listaAcomp='';
+  if(acomps.length>0){
+    listaAcomp='👥 Acompañantes:\n'+acomps.map((ac,i)=>{
+      const qrAc=`${SCANNER_URL}?qrid=${encodeURIComponent(ac[C.QR_ID]||'')}`;
+      return `  ${i+1}. ${ac[C.Nombre]||'—'} — Plato: ${ac[C.Comida]||'—'}\n     QR: ${qrAc}`;
+    }).join('\n')+'\n\n';
+  }
+
+  const texto=pl.tpl
+    .replace(/{{NOMBRE}}/g,nombre)
+    .replace(/{{EDECAN}}/g,session.usuario||'tu edecán')
+    .replace(/{{DEPENDENCIA}}/g,session.dependencia||r[C.Dependencia]||'—')
+    .replace(/{{COMIDA_TITULAR}}/g,r[C.Comida]||'—')
+    .replace(/{{QR_TITULAR}}/g,qrUrl)
+    .replace(/{{LISTA_ACOMPANANTES}}/g,listaAcomp)
+    .replace(/{{PLURAL_QR}}/g,acomps.length>0?'estos QR':'este QR')
+    .replace(/{{PLURAL_NECESARIO}}/g,acomps.length>0?'serán necesarios':'será necesario');
+
+  const ta=document.getElementById('msg-texto');
+  if(ta) ta.value=texto;
+}
+
+function toggleContactadoMsg(){
+  if(!_msgQRID) return;
+  const chk=document.getElementById('msg-chk-contactado');
+  const val=chk&&chk.checked?'SI':'PENDIENTE';
+  setContactado(_msgQRID,val);
+  renderMensajeria();// re-render para actualizar dashboard
+}
+
+function enviarWA(){
+  if(!_msgQRID) return;
+  const r=allRows.find(x=>x[C.QR_ID]===_msgQRID);
+  if(!r){showMsg(document.getElementById('msg-status'),'err','Titular no encontrado');return;}
+  const cel=(r[C.Celular]||'').replace(/\D/g,'');
+  if(!cel||cel.length<9){showMsg(document.getElementById('msg-status'),'err','Sin celular registrado para este titular');return;}
+  const texto=document.getElementById('msg-texto')?.value||'';
+  window.open(`https://wa.me/51${cel}?text=${encodeURIComponent(texto)}`,'_blank');
+  // Marcar automáticamente como contactado
+  setContactado(_msgQRID,'SI');
+  const chk=document.getElementById('msg-chk-contactado');
+  if(chk) chk.checked=true;
+  showToast('📱 Abriendo WhatsApp · Marcado como contactado ✅');
+}
+
+async function compartirMsg(){
+  if(!navigator.share) return;
+  const texto=document.getElementById('msg-texto')?.value||'';
+  try{await navigator.share({text:texto});}catch(_){}
+}
+
+function copiarMsg(){
+  const texto=document.getElementById('msg-texto')?.value||'';
+  navigator.clipboard.writeText(texto).then(()=>showToast('📋 Mensaje copiado')).catch(()=>prompt('Copia:',texto));
 }
 
 function e(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
