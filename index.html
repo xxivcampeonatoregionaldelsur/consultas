@@ -977,10 +977,7 @@ html{scroll-behavior:smooth}
           <input type="tel" id="reg-celular" class="reg-input-pub" placeholder="9XX XXX XXX"
             oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,9)" maxlength="9">
         </div>
-        <div class="reg-field-pub">
-          <label class="reg-label-pub">Tipo de participación</label>
-          <input type="text" id="reg-tipo-part" class="reg-input-pub" placeholder="ej: Competidor, Delegado...">
-        </div>
+        <div class="reg-field-pub"></div>
       </div>
 
       <!-- Bloque disciplinas (solo para Titular/Padrino) -->
@@ -1017,8 +1014,8 @@ html{scroll-behavior:smooth}
       <div style="margin-bottom:14px">
         <div class="reg-row-pub" style="margin-bottom:6px">
           <div class="reg-field-pub">
-            <label class="reg-label-pub">Cantidad de acompañantes <span style="font-weight:400;color:var(--muted);font-size:9px">(máx 3)</span></label>
-            <input type="number" id="reg-cant-acomp" class="reg-input-pub" min="0" max="3" value="0"
+            <label class="reg-label-pub">Cantidad de acompañantes <span style="font-weight:400;color:var(--muted);font-size:9px">(máx 99)</span></label>
+            <input type="number" id="reg-cant-acomp" class="reg-input-pub" min="0" max="99" value="0"
               oninput="regModalAcompChange()">
           </div>
           <div class="reg-field-pub"></div>
@@ -2239,7 +2236,7 @@ function regModalOnTipoChange(){
 
 function regModalAcompChange(){
   const inputEl=document.getElementById('reg-cant-acomp');
-  const rawVal=Math.min(3,Math.max(0,parseInt(inputEl.value)||0));
+  const rawVal=Math.min(99,Math.max(0,parseInt(inputEl.value)||0));
   inputEl.value=rawVal;
   regModalAcompCount=rawVal;
   const wrap=document.getElementById('reg-acompanantes-list');
@@ -2276,7 +2273,7 @@ function regModalAcompChange(){
 function openRegistroModal(){
   if(session.rol!=='administrador') return;
   // Reset
-  ['reg-nombre','reg-celular','reg-codigo','reg-tipo-part','reg-obs']
+  ['reg-nombre','reg-celular','reg-codigo','reg-obs']
     .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const tipoSel=document.getElementById('reg-tipo');
   if(tipoSel) tipoSel.value='';
@@ -2332,7 +2329,7 @@ async function submitRegistro(){
   const dependencia=(document.getElementById('reg-dependencia')?.value||'').trim();
   const codigo=(document.getElementById('reg-codigo')?.value||'').trim().toUpperCase();
   const tipo=document.getElementById('reg-tipo')?.value||'';
-  const tipoPart=(document.getElementById('reg-tipo-part')?.value||'').trim();
+  const tipoPart='';
   const comida=(document.getElementById('reg-comida')?.value||'').trim();
   const bebida=(document.getElementById('reg-bebida')?.value||'').trim();
   const obs=(document.getElementById('reg-obs')?.value||'').trim();
