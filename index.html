@@ -581,6 +581,15 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
   .msg-sticky-bar{display:none!important;}
   #msg-actions-desktop{display:flex!important;}
 }
+
+/* ── MENSAJERÍA MOBILE — panel show/hide simple ─────────────── */
+/* Usamos display block/none para evitar bugs de overflow+transform */
+.msg-view{display:none;}
+.msg-view.active{display:block;}
+@media(min-width:769px){
+  .msg-view{display:block!important;}
+  .msg-view-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+}
 /* El toast JS usa id=dash-toast con style inline.
    Añadimos reglas que NO sobreescriben el style inline pero
    refuerzan el elemento cuando existe */
@@ -2939,7 +2948,6 @@ function renderMensajeria(){
     </div>`;
   }
 
-  const plantOpts=Object.entries(PLANTILLAS_MSG).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
   const titRows=titulares.map((r,i)=>{
     const cel=r[C.Celular]||'';
     const nacomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).length:0;
@@ -2954,112 +2962,300 @@ function renderMensajeria(){
     </tr>`;
   }).join('');
 
-  document.getElementById('mensajeria-inner').innerHTML=`
+  // (layout se inicializa en el nuevo bloque de HTML más abajo)
+
+  // ── Construir HTML del panel de mensajería ────────────────────
+  // Seleccionar "libre" por defecto para que el textarea quede disponible de inmediato
+  const plantOpts = Object.entries(PLANTILLAS_MSG).map(([k,v]) =>
+    `<option value="${k}"${k==='libre'?' selected':''}>${v.label}</option>`
+  ).join('');
+
+  document.getElementById('mensajeria-inner').innerHTML = `
   ${dashHtml}
-  <div id="msg-mobile-nav" class="msg-nav-tabs" style="display:none">
-    <div class="msg-nav-tab active" id="msg-tab-lista" onclick="msgShowPanel('lista')">👥 Titulares <span id="msg-sel-badge" style="display:none;background:var(--gold);color:#000;border-radius:50%;width:18px;height:18px;font-size:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:900">1</span></div>
-    <div class="msg-nav-tab" id="msg-tab-redactar" onclick="msgShowPanel('redactar')">✉️ Redactar</div>
+
+  <!-- Tabs de navegación móvil (ocultos en desktop) -->
+  <div class="msg-nav-tabs" id="msg-mobile-nav">
+    <div class="msg-nav-tab active" id="msg-tab-lista" onclick="msgShowView('lista')">👥 Titulares</div>
+    <div class="msg-nav-tab" id="msg-tab-redactar" onclick="msgShowView('redactar')">✉️ Redactar</div>
   </div>
-  <div class="msg-slider-wrap" id="msg-slider-wrap">
-    <div class="msg-panel" id="msg-panel-lista">
-      <div class="sec-title" style="margin-bottom:10px">👥 Titulares${isEdecan&&session.dependencia?' — <span style="color:var(--gold)">'+e(session.dependencia)+'</span>':''}</div>
-      <div class="tit-tbl-wrap tbl-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
+
+  <!-- Wrapper: en desktop grid 2 col, en móvil apila views -->
+  <div class="msg-view-wrap" id="msg-view-wrap">
+
+    <!-- PANEL LISTA -->
+    <div class="msg-view active" id="msg-view-lista">
+      <div class="sec-title" style="margin-bottom:10px">
+        👥 Titulares${isEdecan&&session.dependencia?' — <span style="color:var(--gold)">'+e(session.dependencia)+'</span>':''}
+      </div>
+      <div class="tit-tbl-wrap tbl-wrap" style="max-height:55vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
         <table>
           <thead><tr>
             <th>Nombre</th>
             <th class="tit-col-dep">Dependencia</th>
             <th class="tit-col-cel">Celular</th>
-            <th>Contactado</th>
+            <th>Estado</th>
             <th style="text-align:center">Ac.</th>
           </tr></thead>
           <tbody>${titRows||'<tr><td colspan="5"><div class="empty">Sin titulares</div></td></tr>'}</tbody>
         </table>
       </div>
-      <div style="margin-top:8px;font-size:11px;color:var(--muted)">Toca un titular para redactar su mensaje</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted)">Toca un titular → se carga su mensaje automáticamente</div>
     </div>
-    <div class="msg-panel" id="msg-panel-redactar">
+
+    <!-- PANEL REDACTAR -->
+    <div class="msg-view" id="msg-view-redactar">
       <div class="sec-title" style="margin-bottom:10px">✉️ Redactar Mensaje</div>
-      <div style="background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px">
-        <div id="msg-info-box" style="display:none;background:var(--field);border-radius:4px;padding:10px;margin-bottom:12px">
-          <div style="font-family:var(--font-h);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px">Titular seleccionado</div>
-          <div id="msg-info-nombre" style="font-family:var(--font-h);font-size:15px;font-weight:800;color:var(--text)">—</div>
-          <div id="msg-info-dep" style="font-size:11px;color:var(--muted)">—</div>
+
+      <!-- Info del titular seleccionado -->
+      <div id="msg-info-box" style="display:none;background:var(--field);border:1px solid var(--border2);border-radius:4px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:var(--font-h);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Titular seleccionado</div>
+          <div id="msg-info-nombre" style="font-family:var(--font-h);font-size:15px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">— Ninguno seleccionado —</div>
+          <div id="msg-info-dep" style="font-size:11px;color:var(--muted);"></div>
         </div>
-        <div style="margin-bottom:10px">
-          <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:5px">Tipo de mensaje</label>
-          <select class="filter" id="msg-tipo" style="width:100%" onchange="aplicarPlantilla()">${plantOpts}</select>
-        </div>
-        <div style="margin-bottom:12px">
-          <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:5px">Mensaje (editable)</label>
-          <textarea id="msg-texto" rows="9" style="width:100%;background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;padding:12px;color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.5;resize:vertical;outline:none;min-height:180px" placeholder="Selecciona un titular para comenzar..."></textarea>
-        </div>
-        <!-- Botones visibles en desktop dentro del panel -->
-        <div id="msg-actions-desktop" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-gold" id="btn-wa" onclick="enviarWA()" disabled style="opacity:.45">📱 WhatsApp</button>
-          <button class="btn btn-ghost" id="btn-share" onclick="compartirMsg()" style="display:none">📤 Compartir</button>
-          <button class="btn btn-ghost" onclick="copiarMsg()">📋 Copiar</button>
-          <label id="msg-contactado-lbl" style="display:none;margin-left:auto;font-family:var(--font-h);font-size:11px;color:var(--muted);cursor:pointer">
-            <input type="checkbox" id="msg-chk-contactado" onchange="toggleContactadoMsg()" style="margin-right:4px;accent-color:var(--mint)">
-            Marcar como contactado
-          </label>
-        </div>
-        <div id="msg-status" class="msg" style="margin-top:10px"></div>
+        <button class="btn btn-ghost btn-sm" onclick="msgShowView('lista')" style="display:none" id="btn-volver-lista">← Lista</button>
       </div>
+
+      <!-- Aviso cuando no hay titular -->
+      <div id="msg-aviso-sin-titular" style="background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.3);border-radius:4px;padding:12px;margin-bottom:12px;font-family:var(--font-h);font-size:12px;color:var(--warn);text-align:center;">
+        ☝️ Selecciona un titular de la lista para cargar su mensaje
+      </div>
+
+      <!-- Selector tipo de mensaje — SIEMPRE VISIBLE -->
+      <div style="margin-bottom:10px;">
+        <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:5px;">Tipo de mensaje</label>
+        <select class="filter" id="msg-tipo" style="width:100%;font-size:15px;" onchange="aplicarPlantilla()">
+          ${plantOpts}
+        </select>
+      </div>
+
+      <!-- Textarea — SIEMPRE VISIBLE y editable -->
+      <div style="margin-bottom:12px;">
+        <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:5px;">Mensaje</label>
+        <textarea id="msg-texto"
+          rows="9"
+          style="width:100%;background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;padding:12px;color:var(--text);font-family:var(--font-b);font-size:14px;line-height:1.55;resize:vertical;outline:none;min-height:200px;"
+          placeholder="Selecciona un titular arriba, luego elige el tipo de mensaje para cargar la plantilla. O escribe directamente aquí."
+        ></textarea>
+      </div>
+
+      <!-- Acciones desktop (dentro del panel) -->
+      <div id="msg-actions-inline" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px;">
+        <button class="btn btn-gold" id="btn-wa" onclick="enviarWA()" disabled style="opacity:.45;">📱 WhatsApp</button>
+        <button class="btn btn-ghost" id="btn-share" onclick="compartirMsg()" style="display:none;">📤 Compartir</button>
+        <button class="btn btn-ghost" onclick="copiarMsg()">📋 Copiar</button>
+        <label id="msg-contactado-lbl" style="display:none;margin-left:auto;font-family:var(--font-h);font-size:11px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="msg-chk-contactado" onchange="toggleContactadoMsg()" style="accent-color:var(--mint);width:16px;height:16px;">
+          Marcar contactado
+        </label>
+      </div>
+      <div id="msg-status" class="msg" style="margin-top:8px;"></div>
     </div>
   </div>
-  <!-- Sticky bar solo en móvil -->
-  <div class="msg-sticky-bar" id="msg-sticky-bar" style="display:none">
-    <button class="btn btn-gold" id="btn-wa-sticky" onclick="enviarWA()" disabled style="opacity:.45">📱 WhatsApp</button>
-    <button class="btn btn-ghost" onclick="copiarMsg()">📋 Copiar</button>
-    <label id="msg-contactado-lbl-sticky" style="display:none;font-family:var(--font-h);font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;align-items:center;gap:4px">
-      <input type="checkbox" id="msg-chk-contactado-sticky" onchange="toggleContactadoMsgSticky()" style="accent-color:var(--mint)">
+
+  <!-- Barra sticky de envío — sólo móvil, siempre al fondo -->
+  <div class="msg-sticky-bar" id="msg-sticky-bar">
+    <button class="btn btn-gold" id="btn-wa-sticky" onclick="enviarWA()" disabled style="opacity:.45;flex:2;">📱 WhatsApp</button>
+    <button class="btn btn-ghost" onclick="copiarMsg()" style="flex:1;">📋 Copiar</button>
+    <label id="msg-contactado-lbl-sticky" style="display:none;font-family:var(--font-h);font-size:11px;color:var(--muted);cursor:pointer;align-items:center;gap:4px;flex-shrink:0;">
+      <input type="checkbox" id="msg-chk-contactado-sticky" onchange="toggleContactadoMsgSticky()" style="accent-color:var(--mint);width:16px;height:16px;">
       Contactado
     </label>
   </div>`;
 
-  // Inicializar layout mobile
-  _initMsgMobileLayout();
+  // Inicializar layout
+  _initMsgLayout();
 
-  // Re-apply selected state if any
-  if(_msgQRID) _resaltarFilaTitular();
-}
-
-function selTitular(qrid,idx){
-  _msgQRID=qrid;
-  _resaltarFilaTitular(idx);
-  const r=allRows.find(x=>x[C.QR_ID]===qrid);
-  if(!r) return;
-  const box=document.getElementById('msg-info-box');
-  if(box) box.style.display='';
-  const nomEl=document.getElementById('msg-info-nombre');
-  if(nomEl) nomEl.textContent=r[C.Nombre]||'—';
-  const depEl=document.getElementById('msg-info-dep');
-  if(depEl) depEl.textContent=r[C.Dependencia]||'—';
-  // Habilitar botón WA (panel desktop y sticky bar)
-  ['btn-wa','btn-wa-sticky'].forEach(id=>{
-    const waBtn=document.getElementById(id);
-    if(waBtn){waBtn.disabled=false;waBtn.style.opacity='1';}
-  });
-  const shareBtn=document.getElementById('btn-share');
-  if(shareBtn) shareBtn.style.display=navigator.share?'':'none';
-  // Mostrar label contactado
-  ['msg-contactado-lbl','msg-contactado-lbl-sticky'].forEach(id=>{
-    const cLbl=document.getElementById(id);
-    if(cLbl) cLbl.style.display='';
-  });
-  // Sync checkbox state
-  const chkVal=(contactados[qrid]||'PENDIENTE')==='SI';
-  ['msg-chk-contactado','msg-chk-contactado-sticky'].forEach(id=>{
-    const chk=document.getElementById(id);
-    if(chk) chk.checked=chkVal;
-  });
-  aplicarPlantilla();
-  // En móvil: auto-navegar al panel de redacción tras seleccionar titular
-  if(window.innerWidth < 768){
-    // pequeño delay para que el highlight sea visible antes del slide
-    setTimeout(()=>msgShowPanel('redactar'), 200);
+  // Re-aplicar estado si había titular seleccionado
+  if(_msgQRID){
+    _resaltarFilaTitular();
+    _actualizarInfoTitular(_msgQRID);
+    aplicarPlantilla();
   }
 }
+
+function selTitular(qrid, idx){
+  _msgQRID = qrid;
+  _resaltarFilaTitular(idx);
+  _actualizarInfoTitular(qrid);
+  aplicarPlantilla();
+  // En móvil: navegar al panel de redacción
+  if(window.innerWidth < 768){
+    setTimeout(()=> msgShowView('redactar'), 120);
+  }
+}
+
+// Actualiza el bloque de info del titular y habilita botones
+function _actualizarInfoTitular(qrid){
+  const r = allRows.find(x => x[C.QR_ID] === qrid);
+
+  // Ocultar aviso "sin titular"
+  const aviso = document.getElementById('msg-aviso-sin-titular');
+  if(aviso) aviso.style.display = r ? 'none' : '';
+
+  // Info box
+  const box = document.getElementById('msg-info-box');
+  const nomEl = document.getElementById('msg-info-nombre');
+  const depEl = document.getElementById('msg-info-dep');
+  const volverBtn = document.getElementById('btn-volver-lista');
+  if(box){
+    box.style.display = r ? 'flex' : 'none';
+  }
+  if(nomEl) nomEl.textContent = r ? (r[C.Nombre]||'—') : '— Ninguno seleccionado —';
+  if(depEl) depEl.textContent = r ? (r[C.Dependencia]||'') : '';
+  if(volverBtn) volverBtn.style.display = (window.innerWidth < 768 && r) ? '' : 'none';
+
+  // Habilitar/deshabilitar botones WA
+  const habilitado = !!r;
+  ['btn-wa','btn-wa-sticky'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(btn){ btn.disabled = !habilitado; btn.style.opacity = habilitado ? '1' : '.45'; }
+  });
+
+  // Botón compartir
+  const shareBtn = document.getElementById('btn-share');
+  if(shareBtn) shareBtn.style.display = (habilitado && navigator.share) ? '' : 'none';
+
+  // Mostrar labels contactado
+  const chkVal = (contactados[qrid]||'PENDIENTE') === 'SI';
+  ['msg-contactado-lbl','msg-contactado-lbl-sticky'].forEach(id => {
+    const lbl = document.getElementById(id);
+    if(lbl) lbl.style.display = habilitado ? 'flex' : 'none';
+  });
+  ['msg-chk-contactado','msg-chk-contactado-sticky'].forEach(id => {
+    const chk = document.getElementById(id);
+    if(chk) chk.checked = chkVal;
+  });
+}
+
+// ── MENSAJERÍA — Inicialización de layout responsive ──────────
+function _initMsgLayout(){
+  const isMobile = window.innerWidth < 768;
+  const mobileNav = document.getElementById('msg-mobile-nav');
+  const stickyBar = document.getElementById('msg-sticky-bar');
+  const actionsInline = document.getElementById('msg-actions-inline');
+
+  if(isMobile){
+    if(mobileNav) mobileNav.style.display = 'flex';
+    if(stickyBar) stickyBar.style.display = 'flex';
+    // En móvil, ocultar botones inline (se usan los de sticky bar)
+    if(actionsInline) actionsInline.style.display = 'none';
+    // Mostrar panel lista primero
+    msgShowView('lista');
+  } else {
+    if(mobileNav) mobileNav.style.display = 'none';
+    if(stickyBar) stickyBar.style.display = 'none';
+    if(actionsInline) actionsInline.style.display = 'flex';
+    // Desktop: ambos paneles visibles
+    ['msg-view-lista','msg-view-redactar'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el){ el.style.display = 'block'; el.classList.add('active'); }
+    });
+  }
+}
+
+// Cambia entre vistas en móvil
+function msgShowView(view){
+  if(window.innerWidth >= 768) return; // Desktop: ambas visibles siempre
+
+  const lista = document.getElementById('msg-view-lista');
+  const redactar = document.getElementById('msg-view-redactar');
+  const tabLista = document.getElementById('msg-tab-lista');
+  const tabRedactar = document.getElementById('msg-tab-redactar');
+
+  if(view === 'lista'){
+    if(lista){ lista.style.display = 'block'; }
+    if(redactar){ redactar.style.display = 'none'; }
+    if(tabLista) tabLista.classList.add('active');
+    if(tabRedactar) tabRedactar.classList.remove('active');
+  } else {
+    if(lista){ lista.style.display = 'none'; }
+    if(redactar){ redactar.style.display = 'block'; }
+    if(tabLista) tabLista.classList.remove('active');
+    if(tabRedactar) tabRedactar.classList.add('active');
+    // Scroll al top de la página para ver el panel de redacción
+    window.scrollTo({top: document.getElementById('pane-mensajeria')?.offsetTop || 0, behavior:'smooth'});
+  }
+}
+
+function toggleContactadoMsgSticky(){
+  if(!_msgQRID) return;
+  const chk = document.getElementById('msg-chk-contactado-sticky');
+  const val = chk && chk.checked ? 'SI' : 'PENDIENTE';
+  const chk2 = document.getElementById('msg-chk-contactado');
+  if(chk2) chk2.checked = chk && chk.checked;
+  setContactado(_msgQRID, val);
+  renderMensajeria();
+}
+
+function aplicarPlantilla(){
+  const ta = document.getElementById('msg-texto');
+  if(!ta) return;
+
+  const tipo = document.getElementById('msg-tipo')?.value || 'libre';
+  const pl = PLANTILLAS_MSG[tipo];
+
+  // Sin titular seleccionado: solo aplicar si es libre (dejarlo vacío)
+  if(!_msgQRID){
+    if(!pl || !pl.tpl){
+      ta.value = '';
+      ta.placeholder = 'Escribe tu mensaje aquí...';
+    } else {
+      // Mostrar plantilla con placeholders sin reemplazar para que el usuario vea la estructura
+      ta.value = pl.tpl
+        .replace(/{{NOMBRE}}/g,'[NOMBRE]')
+        .replace(/{{EDECAN}}/g, session.usuario||'[EDECAN]')
+        .replace(/{{DEPENDENCIA}}/g, session.dependencia||'[DEPENDENCIA]')
+        .replace(/{{COMIDA_TITULAR}}/g,'[COMIDA]')
+        .replace(/{{QR_TITULAR}}/g,'[QR_LINK]')
+        .replace(/{{LISTA_ACOMPANANTES}}/g,'')
+        .replace(/{{PLURAL_QR}}/g,'este QR')
+        .replace(/{{PLURAL_NECESARIO}}/g,'será necesario');
+    }
+    return;
+  }
+
+  // Con titular seleccionado
+  if(!pl || !pl.tpl){
+    // Libre: mantener lo que hay o vaciar si está en blanco
+    if(!ta.value) ta.value = '';
+    ta.placeholder = 'Escribe tu mensaje personalizado...';
+    return;
+  }
+
+  const r = allRows.find(x => x[C.QR_ID] === _msgQRID);
+  if(!r) return;
+
+  const cel = r[C.Celular]||'';
+  const acomps = cel ? allRows.filter(x=>(x[C.Celular]||'')===cel && esAcompananteRow(x)) : [];
+
+  // Extraer primer nombre (apellidos primero → último token es el nombre)
+  const partes = (r[C.Nombre]||'').trim().split(/\s+/);
+  const primerNom = partes[partes.length-1] || partes[0] || '';
+  const nombre = primerNom.charAt(0).toUpperCase() + primerNom.slice(1).toLowerCase();
+
+  const qrUrl = `${SCANNER_URL}?qrid=${encodeURIComponent(_msgQRID)}`;
+
+  let listaAcomp = '';
+  if(acomps.length > 0){
+    listaAcomp = '👥 Acompañantes:\n' + acomps.map((ac,i) => {
+      const qrAc = `${SCANNER_URL}?qrid=${encodeURIComponent(ac[C.QR_ID]||'')}`;
+      return `  ${i+1}. ${ac[C.Nombre]||'—'} — Plato: ${ac[C.Comida]||'—'}\n     QR: ${qrAc}`;
+    }).join('\n') + '\n\n';
+  }
+
+  ta.value = pl.tpl
+    .replace(/{{NOMBRE}}/g, nombre)
+    .replace(/{{EDECAN}}/g, session.usuario||'tu edecán')
+    .replace(/{{DEPENDENCIA}}/g, session.dependencia||r[C.Dependencia]||'—')
+    .replace(/{{COMIDA_TITULAR}}/g, r[C.Comida]||'—')
+    .replace(/{{QR_TITULAR}}/g, qrUrl)
+    .replace(/{{LISTA_ACOMPANANTES}}/g, listaAcomp)
+    .replace(/{{PLURAL_QR}}/g, acomps.length>0 ? 'estos QR' : 'este QR')
+    .replace(/{{PLURAL_NECESARIO}}/g, acomps.length>0 ? 'serán necesarios' : 'será necesario');
+}
+
+
 
 function _resaltarFilaTitular(idx){
   document.querySelectorAll('[id^="mrow-"]').forEach(r=>r.style.background='');
@@ -3073,130 +3269,6 @@ function _resaltarFilaTitular(idx){
     if(i>=0){const row=document.getElementById('mrow-'+i);if(row) row.style.background='rgba(255,215,0,.08)';}
   }
 }
-
-// ── MENSAJERÍA MOBILE HELPERS ──────────────────────────────────
-function _initMsgMobileLayout(){
-  const isMobile = window.innerWidth < 768;
-  const mobileNav = document.getElementById('msg-mobile-nav');
-  const stickyBar = document.getElementById('msg-sticky-bar');
-  const sliderWrap = document.getElementById('msg-slider-wrap');
-  const desktopActions = document.getElementById('msg-actions-desktop');
-
-  if(isMobile){
-    if(mobileNav) mobileNav.style.display='flex';
-    if(stickyBar) stickyBar.style.display='flex';
-    // En desktop: mostrar dos paneles lado a lado
-    if(sliderWrap){
-      sliderWrap.style.display='block';
-    }
-    // Ocultar botones de acción dentro del panel en móvil (se usan los de la sticky bar)
-    if(desktopActions) desktopActions.style.display='none';
-    // Mostrar primero la lista
-    msgShowPanel('lista', true);
-  } else {
-    if(mobileNav) mobileNav.style.display='none';
-    if(stickyBar) stickyBar.style.display='none';
-    // Desktop: dos columnas side by side
-    if(sliderWrap){
-      sliderWrap.style.display='grid';
-      sliderWrap.style.gridTemplateColumns='1fr 1fr';
-      sliderWrap.style.gap='16px';
-    }
-    if(desktopActions) desktopActions.style.display='flex';
-    // En desktop: mostrar ambos paneles normalmente
-    ['msg-panel-lista','msg-panel-redactar'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el){el.style.transform='';el.style.minWidth='';el.style.width='';}
-    });
-  }
-}
-
-let _msgCurrentPanel='lista';
-function msgShowPanel(panel, skipAnimation){
-  _msgCurrentPanel=panel;
-  const lista=document.getElementById('msg-panel-lista');
-  const redactar=document.getElementById('msg-panel-redactar');
-  const tabLista=document.getElementById('msg-tab-lista');
-  const tabRedactar=document.getElementById('msg-tab-redactar');
-  const sliderWrap=document.getElementById('msg-slider-wrap');
-
-  if(!lista||!redactar) return;
-
-  if(window.innerWidth >= 768){
-    // Desktop: no hacer nada, ambos visibles
-    return;
-  }
-
-  // Mobile slider: mover paneles con transform
-  if(panel==='lista'){
-    lista.style.transform='translateX(0)';
-    redactar.style.transform='translateX(100%)';
-    if(tabLista) tabLista.classList.add('active');
-    if(tabRedactar) tabRedactar.classList.remove('active');
-  } else {
-    lista.style.transform='translateX(-100%)';
-    redactar.style.transform='translateX(-100%)';
-    if(tabLista) tabLista.classList.remove('active');
-    if(tabRedactar) tabRedactar.classList.add('active');
-    // Scroll al top del panel de redacción
-    if(sliderWrap) sliderWrap.scrollTop=0;
-  }
-}
-
-function toggleContactadoMsgSticky(){
-  if(!_msgQRID) return;
-  const chk=document.getElementById('msg-chk-contactado-sticky');
-  const val=chk&&chk.checked?'SI':'PENDIENTE';
-  // Sync el otro checkbox
-  const chk2=document.getElementById('msg-chk-contactado');
-  if(chk2) chk2.checked=chk&&chk.checked;
-  setContactado(_msgQRID,val);
-  renderMensajeria();
-}
-
-function aplicarPlantilla(){
-  if(!_msgQRID) return;
-  const tipo=document.getElementById('msg-tipo')?.value||'bienvenida';
-  const pl=PLANTILLAS_MSG[tipo];
-  const ta=document.getElementById('msg-texto');
-  if(!ta) return;
-  // Mensaje libre: dejar vacío (placeholder visible)
-  if(!pl||!pl.tpl){
-    ta.value='';
-    ta.placeholder='Escribe tu mensaje personalizado...';
-    return;
-  }
-  const r=allRows.find(x=>x[C.QR_ID]===_msgQRID);
-  if(!r) return;
-  const cel=r[C.Celular]||'';
-  const acomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)):[];
-  const partes=(r[C.Nombre]||'').trim().split(/\s+/);
-  const primerNom=partes[partes.length-1]||partes[0]||'';
-  const nombre=primerNom.charAt(0).toUpperCase()+primerNom.slice(1).toLowerCase();
-  const qrUrl=`${SCANNER_URL}?qrid=${encodeURIComponent(_msgQRID)}`;
-
-  let listaAcomp='';
-  if(acomps.length>0){
-    listaAcomp='👥 Acompañantes:\n'+acomps.map((ac,i)=>{
-      const qrAc=`${SCANNER_URL}?qrid=${encodeURIComponent(ac[C.QR_ID]||'')}`;
-      return `  ${i+1}. ${ac[C.Nombre]||'—'} — Plato: ${ac[C.Comida]||'—'}\n     QR: ${qrAc}`;
-    }).join('\n')+'\n\n';
-  }
-
-  const texto=pl.tpl
-    .replace(/{{NOMBRE}}/g,nombre)
-    .replace(/{{EDECAN}}/g,session.usuario||'tu edecán')
-    .replace(/{{DEPENDENCIA}}/g,session.dependencia||r[C.Dependencia]||'—')
-    .replace(/{{COMIDA_TITULAR}}/g,r[C.Comida]||'—')
-    .replace(/{{QR_TITULAR}}/g,qrUrl)
-    .replace(/{{LISTA_ACOMPANANTES}}/g,listaAcomp)
-    .replace(/{{PLURAL_QR}}/g,acomps.length>0?'estos QR':'este QR')
-    .replace(/{{PLURAL_NECESARIO}}/g,acomps.length>0?'serán necesarios':'será necesario');
-
-  ta.value=texto;
-}
-
-
 
 function toggleContactadoMsg(){
   if(!_msgQRID) return;
