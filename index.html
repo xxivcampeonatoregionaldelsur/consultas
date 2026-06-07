@@ -1403,11 +1403,7 @@ function renderDashboard(){
         <div class="qa-lbl">Gestionar usuarios</div>
         <div class="qa-sub">Crear / modificar</div>
       </div>
-      <div class="qa-btn" onclick="switchTab('deps-dashboard');renderDepsDashboard()">
-        <div class="qa-icon">🏛️</div>
-        <div class="qa-lbl">Por dependencia</div>
-        <div class="qa-sub">Ver desglose</div>
-      </div>
+
       <div class="qa-btn" onclick="loadData();showToast('↺ Actualizando...')">
         <div class="qa-icon">↺</div>
         <div class="qa-lbl">Actualizar datos</div>
@@ -1475,7 +1471,23 @@ function renderDepsDashboard(){
     const pendIng=cnt-ing;
     const pendEnt=ing-ent;
     const coms=comByDep[dep]||{};
-    const comStr=Object.entries(coms).map(([k,v])=>`<span style="font-size:10px;background:rgba(255,215,0,.1);color:var(--gold);padding:2px 6px;border-radius:3px;white-space:nowrap">${e(k)}: ${v}</span>`).join(' ');
+    // Build food breakdown - each food with a mini progress bar
+    const totalComs=Object.values(coms).reduce((a,b)=>a+b,0);
+    const foodColors=['#FFD700','#00E676','#60a5fa','#FFA500','#a78bfa'];
+    const comHtml=Object.entries(coms).sort((a,b)=>b[1]-a[1]).map(([k,v],fi)=>{
+      const foodPct=totalComs>0?Math.round(v/totalComs*100):0;
+      // Shorten food name: take first meaningful word
+      const shortName=k.replace('con arroz y ensalada','').replace('a la parrilla','').replace('de chancho','').trim();
+      return `<div style="margin-bottom:5px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+          <span style="font-family:var(--font-h);font-size:10px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.3px">${e(shortName)}</span>
+          <span style="font-family:var(--font-h);font-size:11px;font-weight:900;color:${foodColors[fi%foodColors.length]}">${v}</span>
+        </div>
+        <div style="height:6px;background:var(--field);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${foodPct}%;background:${foodColors[fi%foodColors.length]};border-radius:3px;transition:width .4s"></div>
+        </div>
+      </div>`;
+    }).join('');
     return `
     <tr>
       <td><strong style="font-family:var(--font-h);font-size:14px;text-transform:uppercase">${e(dep)}</strong></td>
@@ -1493,7 +1505,7 @@ function renderDepsDashboard(){
           <div class="bar-fill ${colors[i%colors.length]}" style="width:${Math.round(cnt/max*100)}%">${pct}%</div>
         </div>
       </td>
-      <td style="font-size:11px">${comStr||'<span style="color:var(--muted)">—</span>'}</td>
+      <td style="min-width:200px;padding:8px 14px">${comHtml||'<span style="color:var(--muted)">—</span>'}</td>
     </tr>`;
   }).join('');
 
@@ -1503,7 +1515,6 @@ function renderDepsDashboard(){
   document.getElementById('deps-inner').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
       <div class="sec-title" style="flex:1;margin:0">Por Dependencia — Estado de Comidas</div>
-      <button class="btn btn-gold btn-sm" onclick="exportExcel()" style="white-space:nowrap">⬇ Exportar Excel</button>
     </div>
     <div class="stats" style="margin-bottom:16px">
       <div class="stat g"><div class="stat-lbl">Dependencias</div><div class="stat-val">${sorted.length}</div><div class="stat-icon">🏛️</div></div>
@@ -1641,6 +1652,7 @@ function renderParticipants(s,f){
     <div class="toolbar">
       <input class="search" type="text" placeholder="${searchPlaceholder}" value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
       ${isAdmin?`<button class="btn btn-gold btn-sm" onclick="openRegistroModal()" style="white-space:nowrap">➕ Registrar</button>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="exportParticipantesExcel()" style="white-space:nowrap">⬇ Excel</button>
       <span style="color:var(--muted);font-size:12px">${total} resultado${total!==1?'s':''}</span>
     </div>
     <div class="tbl-wrap">
@@ -2413,6 +2425,7 @@ async function doChangePassword(){
     // Usa la nueva acción changeOwnPassword que verifica la contraseña actual en el servidor
     const res=await apiFetch('changeOwnPassword',{currentPassword:current,newPassword:new1});
     if(res.result==='ok'){showMsg(msg,'ok','✓ Contraseña cambiada correctamente');setTimeout(closeChangePass,2000);}
+    else if(res.mensaje&&res.mensaje.includes('Acción desconocida')){showMsg(msg,'err','El servidor no soporta esta acción. Pide al administrador que redespliegue el Google Apps Script actualizado.');}
     else{showMsg(msg,'err',res.mensaje||'Error al cambiar contraseña');}
   } catch(ex){showMsg(msg,'err','Error de conexión');}
 }
@@ -2552,6 +2565,111 @@ function showToast(msg){
     document.body.appendChild(t);}
   t.textContent=msg;t.style.opacity='1';
   clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',2500);
+}
+
+
+// ── EXPORTAR PARTICIPANTES A EXCEL (CSV) ──────────────────────
+function exportParticipantesExcel(){
+  // Get current filtered rows from allRows using current filter/search
+  let rows=[];
+  const isAdmin=session.rol==='administrador';
+  if(currentSearch){
+    const searchLower=currentSearch.toLowerCase();
+    if(isAdmin){
+      rows=allRows.filter(r=>{
+        return (r[C.Registro]||'').toLowerCase().includes(searchLower)||
+               (r[C.Nombre]||'').toLowerCase().includes(searchLower)||
+               (r[C.Tipo]||'').toLowerCase().includes(searchLower)||
+               (r[C.Dependencia]||'').toLowerCase().includes(searchLower)||
+               (r[C.Disciplina]||'').toLowerCase().includes(searchLower)||
+               getTipoDisplay(r).label.toLowerCase().includes(searchLower);
+      });
+    } else {
+      const matched=allRows.filter(r=>(r[C.Registro]||'').toLowerCase().includes(searchLower));
+      const seen=new Set();
+      matched.forEach(r=>{
+        const cel=r[C.Celular]||'';const key=cel||r[C.QR_ID]||'';
+        if(!seen.has(key)){seen.add(key);
+          if(cel){
+            const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
+            if(titular) rows.push(titular);
+            allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>rows.push(x));
+            allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>rows.push(x));
+          } else { rows.push(r); }
+        }
+      });
+    }
+  } else {
+    rows=allRows.filter(r=>{
+      const qid=r[C.QR_ID]||'';
+      const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
+      const isPadrino=esPadrinoRow(r);const isAcomp=esAcompananteRow(r);
+      const isTitular=r[C.TipoPersona]==='Titular'&&!isPadrino&&!isAcomp;
+      return currentFilter==='todos'||
+        (currentFilter==='titulares'&&isTitular)||
+        (currentFilter==='acompanantes'&&isAcomp)||
+        (currentFilter==='padrinos'&&isPadrino)||
+        (currentFilter==='ingreso'&&hasIngreso)||(currentFilter==='entrega'&&hasEntrega)||
+        (currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
+    });
+  }
+  // Build CSV
+  const headers=['Registro','Nombre','Tipo','Dependencia','Celular','Tipo Participacion','Disciplina','Comida','Bebida','Ingreso','Entrega','Observaciones','QR_ID'];
+  const csvRows=[headers.join(',')];
+  rows.forEach(r=>{
+    const qid=r[C.QR_ID]||'';
+    const tipoInfo=getTipoDisplay(r);
+    const ingreso=checkins[qid]&&checkins[qid].ingreso?checkins[qid].ingreso:'';
+    const entrega=checkins[qid]&&checkins[qid].entrega?checkins[qid].entrega:'';
+    const vals=[
+      r[C.Registro]||'',r[C.Nombre]||'',tipoInfo.label,r[C.Dependencia]||'',
+      r[C.Celular]||'',r[C.TipoParticipacion]||'',r[C.Disciplina]||'',
+      r[C.Comida]||'',r[C.Bebida]||'',ingreso,entrega,
+      r[C.Observaciones]||'',qid
+    ].map(v=>`"${String(v).replace(/"/g,'""')}"`);
+    csvRows.push(vals.join(','));
+  });
+  const bom='﻿'; // BOM para UTF-8 en Excel
+  const blob=new Blob([bom+csvRows.join('\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const fecha=new Date().toLocaleDateString('es-PE').replace(/\//g,'-');
+  a.href=url;a.download=`participantes_${fecha}.csv`;
+  a.style.display='none';document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+  showToast('✓ Excel descargado ('+rows.length+' registros)');
+}
+
+// ── EXPORTAR DEPENDENCIAS A EXCEL (CSV) ───────────────────────
+function exportExcel(){
+  const count=arr=>arr.reduce((m,v)=>{if(v)m[v]=(m[v]||0)+1;return m},{});
+  const deps=count(allRows.map(r=>r[C.Dependencia]).filter(v=>v&&v!=='—'));
+  const sorted=Object.entries(deps).sort((a,b)=>b[1]-a[1]);
+  const ingByDep={},entByDep={},comByDep={};
+  allRows.forEach(r=>{
+    const dep=r[C.Dependencia]||'—';const qid=r[C.QR_ID]||'';const com=r[C.Comida]||'—';
+    if(!ingByDep[dep]) ingByDep[dep]=0;if(!entByDep[dep]) entByDep[dep]=0;if(!comByDep[dep]) comByDep[dep]={};
+    if(checkins[qid]&&checkins[qid].ingreso) ingByDep[dep]++;
+    if(checkins[qid]&&checkins[qid].entrega) entByDep[dep]++;
+    if(com&&com!=='—') comByDep[dep][com]=(comByDep[dep][com]||0)+1;
+  });
+  const headers=['Dependencia','Total','Ingresos','Pendientes Ingreso','Entregas','Pendientes Entrega','Platos (detalle)'];
+  const csvRows=[headers.join(',')];
+  sorted.forEach(([dep,cnt])=>{
+    const ing=ingByDep[dep]||0,ent=entByDep[dep]||0;
+    const coms=Object.entries(comByDep[dep]||{}).map(([k,v])=>k+':'+v).join(' | ');
+    const vals=[dep,cnt,ing,cnt-ing,ent,ing-ent,coms].map(v=>`"${String(v).replace(/"/g,'""')}"`);
+    csvRows.push(vals.join(','));
+  });
+  const bom='﻿';
+  const blob=new Blob([bom+csvRows.join('\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const fecha=new Date().toLocaleDateString('es-PE').replace(/\//g,'-');
+  a.href=url;a.download=`dependencias_${fecha}.csv`;
+  a.style.display='none';document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+  showToast('✓ Excel de dependencias descargado');
 }
 
 function e(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
