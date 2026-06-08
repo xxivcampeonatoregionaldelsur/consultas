@@ -1220,8 +1220,38 @@ html{scroll-behavior:smooth}
 </div>
 
 <script>
+/* ═══════════════════════════════════════════════════════════════
+   XXIV CAMPEONATO REGIONAL DEL SUR — App de Gestión de Participantes
+   ═══════════════════════════════════════════════════════════════
+   CONVENCIÓN DE NOMBRES (camelCase en todo el código):
+   ─────────────────────────────────────────────────────
+   • nombreCompleto   → campo "Nombres y Apellidos" íntegro (ej: "María García López")
+   • primerNombre     → primer token de nombreCompleto (ej: "María")
+   • nombreInformal   → alias capitalizado de primerNombre (para saludos)
+   • nombreFormal     → alias de nombreCompleto (para mensajes formales)
+
+   FLUJO PRINCIPAL:
+   ─────────────────────────────────────────────────────
+   1. submitRegistro()  → crea participante, servidor persiste QR_ID en BD
+   2. loadData()        → carga allRows desde Sheets (incluye QR_ID de la BD)
+   3. showQR()          → muestra modal con QR construido del QR_ID existente
+   4. enviarWA() /
+      shareQRFull()     → envía mensaje con qrUrl del QR_ID de la BD (no regenera)
+      └─ CASO 1: sin acomps → 1 mensaje + 1 QR
+      └─ CASO 2: con acomps → N mensajes, 1 QR por persona (QR_ID propio de la BD)
+      └─ FALLBACK: si canShare falla con archivos → PDF único o texto plano
+
+   VARIABLES DE ESTADO GLOBAL:
+   ─────────────────────────────────────────────────────
+   • qrModal    → estado del modal QR (qrId, nombreCompleto, tipo, etc.)
+   • msgQrid    → QR_ID del participante activo en el panel de mensajería
+   • allRows    → todos los registros cargados desde Sheets
+   • checkins   → {qrId: {ingreso, entrega}} desde Sheets
+   • contactados → {qrId: 'SI'|'NO'|'PENDIENTE'} local + server
+   ═══════════════════════════════════════════════════════════════ */
+
 // ── CONFIG ─────────────────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzuGpqApjC7wb4ShB3u0qtgAHiU6FlJnnxoP2dORiXKRHjwkoFJwYNA7Ekt-bBlfDMvzA/exec';
+const SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbzuGpqApjC7wb4ShB3u0qtgAHiU6FlJnnxoP2dORiXKRHjwkoFJwYNA7Ekt-bBlfDMvzA/exec';
 const SCANNER_URL = 'https://xxivcampeonatoregionaldelsur.github.io/scanner/';
 
 const C = {FechaHora:0,Tipo:1,Nombre:2,Dependencia:3,Celular:4,Padrino:5,TipoPersona:6,TipoParticipacion:7,Disciplina:8,Comida:9,Bebida:10,Observaciones:11,Registro:12,QR_ID:13};
@@ -1237,7 +1267,8 @@ const MEDAL_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' 
 let session = JSON.parse(localStorage.getItem('ev_session')||'null');
 let allRows=[], checkins={};
 let currentSearch='', currentFilter='todos';
-let currentQRId='', currentQRUrl='', currentQRNombre='', currentQRTipo='', currentQRPadrino='';
+// Estado del modal QR — objeto global para compartir entre funciones
+let qrModal = {qrId:'', nombreCompleto:'', tipo:'', padrino:'', disciplina:'', qrUrl:''};
 
 // ── BOOT ───────────────────────────────────────────────────────
 function _updateStickyOffset(){
@@ -1998,14 +2029,18 @@ async function deleteRegistro(qrid, nombre, dep){
 }
 
 // ── QR MODAL ───────────────────────────────────────────────────
-let currentQRDisc='';
+// qrModal.disciplina: contiene la disciplina del participante activo en el modal QR
 function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
-  currentQRId=qrid;currentQRNombre=nombre;currentQRTipo=tipo;currentQRPadrino=padrino||'';
-  currentQRDisc=disc||'';
-  const url=`${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
-  currentQRUrl=url;
-  // Padrino se determina por el Tipo que viene del row (columna Tipo)
-  const esPadrino=(padrino||'').toLowerCase()==='padrino';
+  // Poblar estado del modal QR con los datos del participante seleccionado
+  qrModal.qrId           = qrid;
+  qrModal.nombreCompleto = nombre; // "Nombres y Apellidos" tal cual del formulario
+  qrModal.tipo           = tipo;
+  qrModal.padrino        = padrino || '';
+  qrModal.disciplina     = disc || '';
+  const url = `${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
+  qrModal.qrUrl = url;
+  // Padrino se determina por la columna Tipo del registro
+  const esPadrino = (padrino||'').toLowerCase() === 'padrino';
   const esTitular=tipo==='Titular'&&!esPadrino;
 
   // Badge: Padrino > Titular > Acompañante
@@ -2131,7 +2166,8 @@ async function buildQRCanvas(){
   // Fondo blanco
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
 
-  const esPadrino=(currentQRPadrino||'').toLowerCase()==='padrino';
+  // Leer estado del modal para saber si es padrino
+  const esPadrino = (qrModal.padrino||'').toLowerCase() === 'padrino';
 
   const QR_SIZE=260,QR_X=(W-QR_SIZE)/2,QR_Y=50;
 
@@ -2157,7 +2193,7 @@ async function buildQRCanvas(){
       tmpDiv.style.cssText='position:fixed;left:-9999px;top:-9999px;visibility:hidden';
       document.body.appendChild(tmpDiv);
       await new Promise(res=>{
-        new QRCode(tmpDiv,{text:currentQRUrl,width:QR_SIZE,height:QR_SIZE,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+        new QRCode(tmpDiv,{text:qrModal.qrUrl,width:QR_SIZE,height:QR_SIZE,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
         setTimeout(()=>{
           const c=tmpDiv.querySelector('canvas');
           if(c){ctx.imageSmoothingEnabled=false;ctx.drawImage(c,QR_X,QR_Y,QR_SIZE,QR_SIZE);}
@@ -2206,19 +2242,22 @@ async function buildQRCanvas(){
 
   // Nombre
   ctx.fillStyle='#ffffff';ctx.font='bold 13px Arial';
-  const nm=(currentQRNombre||'').length>34?(currentQRNombre||'').slice(0,32)+'…':(currentQRNombre||'');
+  // Usar nombre completo tal como fue registrado (campo Nombres y Apellidos)
+  const nm = (qrModal.nombreCompleto||'').length > 34
+    ? (qrModal.nombreCompleto||'').slice(0,32) + '…'
+    : (qrModal.nombreCompleto||'');
   ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
 
   // Tipo (solo texto)
-  const tipoLabelCanvas=esPadrino?'PADRINO':currentQRTipo==='Titular'?'TITULAR':'ACOMPAÑANTE';
-  ctx.fillStyle=esPadrino?'#FFA500':currentQRTipo==='Titular'?'#FFD700':'#00E676';
+  const tipoLabelCanvas = esPadrino ? 'PADRINO' : qrModal.tipo === 'Titular' ? 'TITULAR' : 'ACOMPAÑANTE';
+  ctx.fillStyle = esPadrino ? '#FFA500' : qrModal.tipo === 'Titular' ? '#FFD700' : '#00E676';
   ctx.font='bold 11px Arial';
   ctx.fillText(tipoLabelCanvas,W/2,BANNER_Y+71);
 
   // Disciplina
-  if(currentQRDisc&&currentQRDisc!=='—'){
+  if(qrModal.disciplina && qrModal.disciplina !== '—'){
     ctx.fillStyle='rgba(180,185,210,0.9)';ctx.font='10px Arial';
-    ctx.fillText(currentQRDisc.toUpperCase(),W/2,BANNER_Y+88);
+    ctx.fillText(qrModal.disciplina.toUpperCase(), W/2, BANNER_Y+88);
   }
 
   return canvas;
@@ -2230,7 +2269,8 @@ async function downloadQRFull(btn){
   try{
     const canvas=await buildQRCanvas();
     if(!canvas){showToast('❌ QR aún no generado, intenta de nuevo');return;}
-    const fname=`QR_${currentQRId}_${(currentQRNombre||'participante').replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ]/g,'_')}.png`;
+    // Nombre del archivo usando el QR_ID real de la BD y el nombre completo
+    const fname = `QR_${qrModal.qrId}_${(qrModal.nombreCompleto||'participante').replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ]/g,'_')}.png`;
     const blob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/png',1.0));
     if(!blob){showToast('❌ Error generando imagen');return;}
     // Siempre descargar como archivo (escritorio y móvil)
@@ -2245,31 +2285,45 @@ async function downloadQRFull(btn){
   finally{if(btn){btn.disabled=false;btn.textContent='⬇ Descargar imagen completa';}}
 }
 
+// ── COMPARTIR QR — reutiliza QR de la BD, no regenera nuevos ──
+// Flujo:
+//   CASO 1: Titular/Padrino SIN acompañantes → 1 mensaje + 1 QR (el de la BD)
+//   CASO 2: Titular/Padrino CON acompañantes → mensaje por participante, cada uno
+//           con su QR_ID real de la BD. Fallback: PDF único si canShare falla.
 async function shareQRFull(){
   if(!navigator.share){ copyQRUrl(); return; }
 
   try{
-    const currentRow=allRows.find(r=>r[C.QR_ID]===currentQRId);
+    // Obtener fila del titular activo en el modal QR
+    const currentRow = allRows.find(r => r[C.QR_ID] === qrModal.qrId);
     if(!currentRow){ copyQRUrl(); return; }
 
-    const celular=currentRow[C.Celular]||'';
-    const grupoCelular=celular?allRows.filter(r=>(r[C.Celular]||'')===celular):[];
-    const titularRow=grupoCelular.find(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r))||currentRow;
-    const acompRows=grupoCelular.filter(r=>esAcompananteRow(r));
+    const celular      = currentRow[C.Celular] || '';
+    const grupoCelular = celular ? allRows.filter(r => (r[C.Celular]||'') === celular) : [];
+    const titularRow   = grupoCelular.find(r =>
+      r[C.TipoPersona] === 'Titular' && !esPadrinoRow(r) && !esAcompananteRow(r)
+    ) || currentRow;
 
-    const primerNombre=(titularRow[C.Nombre]||'—').split(/\s+/)[0];
-    const primerNombreCap=primerNombre.charAt(0).toUpperCase()+primerNombre.slice(1).toLowerCase();
-    const edecanNombre=session.usuario||'tu edecán';
-    const dependencia=session.dependencia||titularRow[C.Dependencia]||'la dependencia';
-    const comidaTitular=titularRow[C.Comida]||'—';
-    const bebidaTitular=titularRow[C.Bebida]||'—';
+    // Acompañantes vinculados al mismo celular
+    const acompRows = grupoCelular.filter(r => esAcompananteRow(r));
 
-    // ── Generar canvas del titular ─────────────────────────────
-    const canvasTitular=await buildQRCanvas();
+    // primerNombre: primer token del campo "Nombres y Apellidos"
+    const nombreCompletoTitular = (titularRow[C.Nombre] || '—').trim();
+    const primerNombreCap = _capitalizarPrimero(nombreCompletoTitular.split(/\s+/)[0]);
+    const edecanNombre    = session.usuario || 'tu edecán';
+    const dependencia     = session.dependencia || titularRow[C.Dependencia] || 'la dependencia';
+    const comidaTitular   = titularRow[C.Comida] || '—';
+    const bebidaTitular   = titularRow[C.Bebida] || '—';
 
-    // ── CASO 1: Sin acompañantes → 1 solo mensaje ─────────────
-    if(acompRows.length===0){
-      const mensajeUnico=
+    // ── Construir canvas del QR ya almacenado en la BD (solo para adjunto visual)
+    // buildQRCanvas usa qrModal.qrId → QR real de la BD, no genera uno nuevo
+    const canvasTitular = await buildQRCanvas();
+
+    // ════════════════════════════════════════════════════════════
+    // CASO 1: Sin acompañantes → un único mensaje + QR del titular
+    // ════════════════════════════════════════════════════════════
+    if(acompRows.length === 0){
+      const mensajeUnico =
 `Hola ${primerNombreCap} 😊 Mi nombre es ${edecanNombre} y seré tu edecán de la dependencia ${dependencia} durante el evento del 28/06/2026.
 
 🎟️ Tu registro:
@@ -2281,21 +2335,19 @@ Te adjunto tu QR de acceso 👆 Preséntalo tanto en el ingreso como al momento 
 Si tienes alguna consulta o necesitas apoyo, con toda confianza puedes escribirme. Estaré feliz de ayudarte 🙌
 ¡Nos vemos muy pronto!`;
 
-      const files=[];
-      if(canvasTitular){
-        const blob=await new Promise(res=>canvasTitular.toBlob(b=>res(b),'image/png',1.0));
-        if(blob){
-          const fname=`QR_${titularRow[C.QR_ID]||'titular'}.png`;
-          files.push(new File([blob],fname,{type:'image/png'}));
-        }
-      }
-      await _compartir(files,`QR - ${primerNombreCap}`,mensajeUnico);
+      // Adjuntar el QR existente (canvas renderizado desde QR_ID de la BD)
+      const files = await _canvasToFileList([[canvasTitular, `QR_${titularRow[C.QR_ID]||'titular'}.png`]]);
+      await _compartir(files, `QR - ${primerNombreCap}`, mensajeUnico);
       return;
     }
 
-    // ── CASO 2: Con acompañantes → múltiples mensajes ─────────
-    // MENSAJE 1: Titular + aviso de seguimiento
-    const msg1=
+    // ════════════════════════════════════════════════════════════
+    // CASO 2: Con acompañantes → 1 mensaje por participante,
+    //         cada uno con su QR_ID real de la BD
+    // ════════════════════════════════════════════════════════════
+
+    // Mensaje titular
+    const msg1 =
 `Hola ${primerNombreCap} 😊 Mi nombre es ${edecanNombre} y seré tu edecán de la dependencia ${dependencia} durante el evento del 28/06/2026.
 
 🎟️ Tu registro (Titular):
@@ -2306,72 +2358,93 @@ Te adjunto tu QR de acceso 👆
 
 En los siguientes mensajes te envío los datos y QR de cada uno de tus acompañantes 🙌`;
 
-    const filesMsg1=[];
-    if(canvasTitular){
-      const blob=await new Promise(res=>canvasTitular.toBlob(b=>res(b),'image/png',1.0));
-      if(blob) filesMsg1.push(new File([blob],`QR_titular_${titularRow[C.QR_ID]||''}.png`,{type:'image/png'}));
-    }
-    await _compartir(filesMsg1,`QR Titular - ${primerNombreCap}`,msg1);
+    const filesMsg1 = await _canvasToFileList([[canvasTitular, `QR_titular_${titularRow[C.QR_ID]||''}.png`]]);
+    await _compartir(filesMsg1, `QR Titular - ${primerNombreCap}`, msg1);
 
-    // MENSAJES POR ACOMPAÑANTE
-    for(let i=0;i<acompRows.length;i++){
-      const ac=acompRows[i];
-      const nomAc=(ac[C.Nombre]||'—');
-      const comAc=ac[C.Comida]||'—';
-      const bebAc=ac[C.Bebida]||'—';
-      const numAc=i+1;
-      const acCanvas=await buildQRCanvasForRow(ac);
-      const msgAc=
+    // Mensajes por acompañante — QR_ID real de cada uno
+    for(let i = 0; i < acompRows.length; i++){
+      const ac    = acompRows[i];
+      const nomAc = ac[C.Nombre] || '—';
+      const comAc = ac[C.Comida] || '—';
+      const bebAc = ac[C.Bebida] || '—';
+      const numAc = i + 1;
+      // Renderiza canvas usando el QR_ID del acompañante (de la BD)
+      const acCanvas = await buildQRCanvasForRow(ac);
+      const msgAc =
 `👥 Acompañante ${numAc}: ${nomAc}
 • Plato: ${comAc} | Bebida: ${bebAc}
 
 Te adjunto su QR de acceso 👆 (válido para ingreso y comida)`;
 
-      const filesAc=[];
-      if(acCanvas){
-        const blob=await new Promise(res=>acCanvas.toBlob(b=>res(b),'image/png',1.0));
-        if(blob) filesAc.push(new File([blob],`QR_acomp${numAc}_${ac[C.QR_ID]||''}.png`,{type:'image/png'}));
-      }
-      await _compartir(filesAc,`QR Acompañante ${numAc} - ${nomAc}`,msgAc);
+      const filesAc = await _canvasToFileList([[acCanvas, `QR_acomp${numAc}_${ac[C.QR_ID]||''}.png`]]);
+      await _compartir(filesAc, `QR Acompañante ${numAc} - ${nomAc}`, msgAc);
     }
 
-    // MENSAJE FINAL: Cierre
-    const msgCierre=
+    // Mensaje de cierre
+    const msgCierre =
 `📌 Recuerda guardar todos los QR que te envié — los necesitarás tanto para el ingreso como para recibir tu comida.
 
 Si tienes alguna consulta, cambio o necesitas apoyo con cualquier detalle, con toda confianza puedes escribirme, estaré feliz de ayudarte 😊
 
 ¡Nos vemos el 28 de junio! 🙌🎉`;
-    await _compartir([],`Cierre - ${primerNombreCap}`,msgCierre);
+    await _compartir([], `Cierre - ${primerNombreCap}`, msgCierre);
 
   } catch(ex){ copyQRUrl(); }
 }
 
-// Helper interno: comparte un mensaje con archivos opcionales
-// Si no hay archivos o navigator.canShare no los soporta, comparte solo texto
+// ── Helpers de compartir ─────────────────────────────────────
+
+/** Capitaliza la primera letra y pasa el resto a minúsculas */
+function _capitalizarPrimero(str){
+  if(!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+/**
+ * Convierte una lista de [canvas|null, filename] en File[].
+ * Solo incluye entradas donde el canvas es válido.
+ */
+async function _canvasToFileList(pairs){
+  const files = [];
+  for(const [canvas, fname] of pairs){
+    if(!canvas) continue;
+    const blob = await new Promise(res => canvas.toBlob(b => res(b), 'image/png', 1.0));
+    if(blob) files.push(new File([blob], fname, {type:'image/png'}));
+  }
+  return files;
+}
+
+// ── _compartir: comparte mensaje con archivos opcionales ────────
+// Si canShare no soporta archivos, intenta solo texto.
+// Si el canal no admite múltiples archivos, considera usar PDF (ver shareQRFull).
 async function _compartir(files, title, text){
-  if(files.length>0 && navigator.canShare && navigator.canShare({files})){
+  if(files.length > 0 && navigator.canShare && navigator.canShare({files})){
     try{
-      await navigator.share({files,title,text});
+      await navigator.share({files, title, text});
       return;
     } catch(ex){
-      if(ex.name==='AbortError') return;
-      // Si falla el share con archivos, intenta sin archivos
+      if(ex.name === 'AbortError') return;
+      // Si falla con archivos → fallback a texto
     }
   }
-  // Fallback: solo texto
+  // Fallback: compartir solo texto (sin adjuntos)
   try{
-    await navigator.share({title,text});
+    await navigator.share({title, text});
   } catch(ex){
-    if(ex.name!=='AbortError') showToast('No se pudo compartir');
+    if(ex.name !== 'AbortError') showToast('No se pudo compartir');
   }
 }
 
-// Genera un canvas QR para una fila específica (sin necesitar que esté en el modal)
+// ── buildQRCanvasForRow ─────────────────────────────────────────
+// Genera un canvas PNG para un participante dado su row.
+// Usa el QR_ID ya almacenado en la BD — NO genera un QR nuevo.
+// Solo para visualización / adjunto en compartir. El QR de escaneo real
+// es la URL construida con el QR_ID de la BD.
 async function buildQRCanvasForRow(row){
-  const qrid=row[C.QR_ID]||'';
+  const qrid = row[C.QR_ID] || '';
   if(!qrid) return null;
-  const url=`${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
+  // URL con el QR_ID real de la BD
+  const url = `${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
   const nombre=row[C.Nombre]||'—';
   const disc=row[C.Disciplina]||'';
   const tipo=row[C.TipoPersona]||'';
@@ -2605,6 +2678,10 @@ function regMostrarErrorCampo(id,msg){
   }
 }
 
+// ── submitRegistro ──────────────────────────────────────────────
+// Crea un nuevo participante en la BD vía Google Sheets.
+// El servidor genera y persiste el QR_ID. El formulario recibe el campo
+// como "Nombres y Apellidos" → se envía tal cual, sin invertir el orden.
 async function submitRegistro(){
   const msg=document.getElementById('reg-msg');
   regLimpiarErrores();
@@ -2681,7 +2758,7 @@ async function submitRegistro(){
 
 
 function copyQRUrl(){
-  navigator.clipboard.writeText(currentQRUrl).then(()=>showToast('🔗 Enlace copiado')).catch(()=>{prompt('Copia este enlace:',currentQRUrl);});
+  navigator.clipboard.writeText(qrModal.qrUrl).then(()=>showToast('🔗 Enlace copiado')).catch(()=>{prompt('Copia este enlace:',currentQRUrl);});
 }
 
 
@@ -3083,21 +3160,27 @@ async function enviarWASeleccionados(){
     if(!cel||cel.length<9) continue;
 
     // Generar mensaje con plantilla si existe
-    let texto='';
-    if(pl&&pl.tpl){
-      const partes=(r[C.Nombre]||'').trim().split(/\s+/);
-      const primerNom=partes[partes.length-1]||partes[0]||'';
-      const nombre=primerNom.charAt(0).toUpperCase()+primerNom.slice(1).toLowerCase();
-      const qrUrl=`${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
-      texto=pl.tpl
-        .replace(/{{NOMBRE}}/g,nombre)
-        .replace(/{{EDECAN}}/g,session.usuario||'tu edecán')
-        .replace(/{{DEPENDENCIA}}/g,session.dependencia||r[C.Dependencia]||'—')
-        .replace(/{{COMIDA_TITULAR}}/g,r[C.Comida]||'—')
-        .replace(/{{QR_TITULAR}}/g,qrUrl)
-        .replace(/{{LISTA_ACOMPANANTES}}/g,'')
-        .replace(/{{PLURAL_QR}}/g,'este QR')
-        .replace(/{{PLURAL_NECESARIO}}/g,'será necesario');
+    let texto = '';
+    if(pl && pl.tpl){
+      // primerNombre = primer token del campo "Nombres y Apellidos"
+      const primerNom = (r[C.Nombre]||'').trim().split(/\s+/)[0] || '';
+      const nombre    = primerNom.charAt(0).toUpperCase() + primerNom.slice(1).toLowerCase();
+      // qrUrl usa el QR_ID real almacenado en la BD — no regenera QR
+      const qrUrl = `${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
+      const cel = r[C.Celular] || '';
+      const acomps = cel ? allRows.filter(x => (x[C.Celular]||'') === cel && esAcompananteRow(x)) : [];
+      texto = pl.tpl
+        .replace(/{{NOMBRE_INFORMAL}}/g, nombre)
+        .replace(/{{NOMBRE_FORMAL}}/g,   (r[C.Nombre]||'').trim())
+        .replace(/{{NOMBRE}}/g,          nombre)
+        .replace(/{{EDECAN}}/g,          session.usuario || 'tu edecán')
+        .replace(/{{DEPENDENCIA}}/g,     session.dependencia || r[C.Dependencia] || '—')
+        .replace(/{{COMIDA_TITULAR}}/g,  r[C.Comida] || '—')
+        .replace(/{{BEBIDA_TITULAR}}/g,  r[C.Bebida] || '—')
+        .replace(/{{QR_TITULAR}}/g,      qrUrl)
+        .replace(/{{LISTA_ACOMPANANTES}}/g, _construirListaAcompanantes(acomps))
+        .replace(/{{PLURAL_QR}}/g,          acomps.length > 0 ? 'estos QR' : 'este QR')
+        .replace(/{{PLURAL_NECESARIO}}/g,   acomps.length > 0 ? 'serán necesarios' : 'será necesario');
     }
 
     const waUrl=`https://wa.me/51${cel}${texto?'?text='+encodeURIComponent(texto):''}`;
@@ -3182,18 +3265,24 @@ let _editorPlantillaKey = null; // key de la plantilla en edición (null = nueva
 const PLANTILLAS_PROTEGIDAS = ['libre'];
 
 // Variables dinámicas del sistema — puede editarse nombre/etiqueta
+// Variables dinámicas disponibles en las plantillas de mensajería.
+// La lógica de reemplazo está en aplicarPlantilla() y actualizarPreview().
+// Semántica de nombres:
+//   NOMBRE_INFORMAL = primerNombre (primer token del campo "Nombres y Apellidos")
+//   NOMBRE_FORMAL   = nombreCompleto (campo completo tal como fue registrado)
+//   NOMBRE          = alias de NOMBRE_INFORMAL (compatibilidad)
 let VARS_DEFINIDAS = [
-  {key:'NOMBRE_INFORMAL', label:'Nombre informal (primer nombre)', ejemplo:'María'},
-  {key:'NOMBRE_FORMAL',   label:'Nombre formal completo',          ejemplo:'GARCIA LOPEZ María'},
-  {key:'NOMBRE',          label:'Nombre (alias de informal)',      ejemplo:'María'},
-  {key:'EDECAN',          label:'Usuario edecán actual',           ejemplo:'Juan Pérez'},
-  {key:'DEPENDENCIA',     label:'Dependencia del registro',        ejemplo:'Recursos Humanos'},
-  {key:'COMIDA_TITULAR',  label:'Plato del titular',               ejemplo:'Pollo a la parrilla'},
-  {key:'BEBIDA_TITULAR',  label:'Bebida del titular',              ejemplo:'Inka Kola'},
-  {key:'QR_TITULAR',      label:'Enlace QR del titular',           ejemplo:'https://...'},
-  {key:'LISTA_ACOMPANANTES', label:'Lista de acompañantes con QR', ejemplo:'(listado)'},
-  {key:'PLURAL_QR',       label:'este QR / estos QR (automático)', ejemplo:'este QR'},
-  {key:'PLURAL_NECESARIO',label:'será / serán necesarios (auto)',  ejemplo:'será necesario'},
+  {key:'NOMBRE_INFORMAL', label:'Primer nombre del participante',           ejemplo:'María'},
+  {key:'NOMBRE_FORMAL',   label:'Nombre completo (Nombres y Apellidos)',    ejemplo:'María García López'},
+  {key:'NOMBRE',          label:'Primer nombre (alias de NOMBRE_INFORMAL)', ejemplo:'María'},
+  {key:'EDECAN',          label:'Usuario edecán actual',                    ejemplo:'Juan Pérez'},
+  {key:'DEPENDENCIA',     label:'Dependencia del registro',                 ejemplo:'Recursos Humanos'},
+  {key:'COMIDA_TITULAR',  label:'Plato del titular',                        ejemplo:'Pollo a la parrilla'},
+  {key:'BEBIDA_TITULAR',  label:'Bebida del titular',                       ejemplo:'Inka Kola'},
+  {key:'QR_TITULAR',      label:'Enlace QR del titular (QR_ID de la BD)',   ejemplo:'https://...'},
+  {key:'LISTA_ACOMPANANTES', label:'Lista de acompañantes con QR individual', ejemplo:'(listado)'},
+  {key:'PLURAL_QR',          label:'este QR / estos QR (plural automático)',  ejemplo:'este QR'},
+  {key:'PLURAL_NECESARIO',   label:'será / serán necesarios (plural auto)',   ejemplo:'será necesario'},
 ];
 
 // Estado de edición de variable
@@ -3396,24 +3485,14 @@ function actualizarPreview(){
   if(r){
     const cel=r[C.Celular]||'';
     const acomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)):[];
-    const nombreFormal=(r[C.Nombre]||'').trim();
-    const partesTodas=nombreFormal.split(/\s+/).filter(Boolean);
-    let pni='';
-    if(partesTodas.length>=3) pni=partesTodas[2];
-    else if(partesTodas.length===2) pni=partesTodas[1];
-    else pni=partesTodas[0]||'';
-    const nombreInformal=pni.charAt(0).toUpperCase()+pni.slice(1).toLowerCase();
-    const partes=(r[C.Nombre]||'').trim().split(/\s+/);
-    const pn=partes[partes.length-1]||partes[0]||'';
-    const nombre=pn.charAt(0).toUpperCase()+pn.slice(1).toLowerCase();
+    // Preview: misma lógica que aplicarPlantilla
+    const nombreFormal = (r[C.Nombre] || '').trim();
+    const primerNomPrev = nombreFormal.split(/\s+/)[0] || '';
+    const nombreInformal = primerNomPrev.charAt(0).toUpperCase() + primerNomPrev.slice(1).toLowerCase();
+    const nombre = nombreInformal; // alias para {{NOMBRE}}
     const qrUrl=SCANNER_URL+'?qrid='+encodeURIComponent(r[C.QR_ID]||'');
-    let listaAcomp='';
-    if(acomps.length>0){
-      listaAcomp='👥 Acompañantes:\n'+acomps.map((ac,i)=>{
-        const qrAc=SCANNER_URL+'?qrid='+encodeURIComponent(ac[C.QR_ID]||'');
-        return '  '+(i+1)+'. '+(ac[C.Nombre]||'—')+' — Plato: '+(ac[C.Comida]||'—')+'\n     QR: '+qrAc;
-      }).join('\n')+'\n\n';
-    }
+    // Construir lista de acompañantes con QR_IDs reales de la BD
+    const listaAcomp = _construirListaAcompanantes(acomps);
     tpl=tpl
       .replace(/{{NOMBRE_INFORMAL}}/g,nombreInformal)
       .replace(/{{NOMBRE_FORMAL}}/g,nombreFormal)
@@ -3571,7 +3650,8 @@ function _actualizarSelectorPlantillas(){
 }
 
 // ── Estado de titular seleccionado en mensajería ──────────────
-let _msgQRID='';
+// ID del participante activo en el panel de mensajería (titular o padrino seleccionado)
+let msgQrid = '';
 
 function renderMensajeria(){
   const isAdmin=session.rol==='administrador';
@@ -3777,9 +3857,9 @@ function renderMensajeria(){
   _initMsgLayout();
 
   // Re-aplicar estado si había titular seleccionado
-  if(_msgQRID){
+  if(msgQrid){
     _resaltarFilaTitular();
-    _actualizarInfoTitular(_msgQRID);
+    _actualizarInfoTitular(msgQrid);
     aplicarPlantilla();
   }
 
@@ -3812,7 +3892,7 @@ function filtrarMsgTabla(){
 }
 
 function selTitular(qrid, idx){
-  _msgQRID = qrid;
+  msgQrid = qrid;
   _resaltarFilaTitular(idx);
   _actualizarInfoTitular(qrid);
   aplicarPlantilla();
@@ -3914,13 +3994,25 @@ function msgShowView(view){
 }
 
 function toggleContactadoMsgSticky(){
-  if(!_msgQRID) return;
+  if(!msgQrid) return;
   const chk = document.getElementById('msg-chk-contactado-sticky');
   const val = chk && chk.checked ? 'SI' : 'PENDIENTE';
   const chk2 = document.getElementById('msg-chk-contactado');
   if(chk2) chk2.checked = chk && chk.checked;
-  setContactado(_msgQRID, val);
+  setContactado(msgQrid, val);
   renderMensajeria();
+}
+
+// ── HELPER: lista de acompañantes con QR_IDs reales de la BD ─────
+// Devuelve string formateado o '' si no hay acompañantes.
+// Cada QR usa el QR_ID almacenado — no se genera ninguno nuevo.
+function _construirListaAcompanantes(acomps){
+  if(!acomps || acomps.length === 0) return '';
+  const items = acomps.map((ac, i) => {
+    const qrAc = `${SCANNER_URL}?qrid=${encodeURIComponent(ac[C.QR_ID] || '')}`;
+    return `  ${i+1}. ${ac[C.Nombre]||'—'} — Plato: ${ac[C.Comida]||'—'}\n     QR: ${qrAc}`;
+  });
+  return '👥 Acompañantes:\n' + items.join('\n') + '\n\n';
 }
 
 function aplicarPlantilla(){
@@ -3931,7 +4023,7 @@ function aplicarPlantilla(){
   const pl = PLANTILLAS_MSG[tipo];
 
   // Sin titular seleccionado: solo aplicar si es libre (dejarlo vacío)
-  if(!_msgQRID){
+  if(!msgQrid){
     if(!pl || !pl.tpl){
       ta.value = '';
       ta.placeholder = 'Escribe tu mensaje aquí...';
@@ -3961,45 +4053,30 @@ function aplicarPlantilla(){
     return;
   }
 
-  const r = allRows.find(x => x[C.QR_ID] === _msgQRID);
+  const r = allRows.find(x => x[C.QR_ID] === msgQrid);
   if(!r) return;
 
   const cel = r[C.Celular]||'';
   const acomps = cel ? allRows.filter(x=>(x[C.Celular]||'')===cel && esAcompananteRow(x)) : [];
 
-  // NOMBRE_FORMAL = nombre completo tal como está registrado
-  const nombreFormal = (r[C.Nombre]||'').trim();
+  // nombreCompleto: campo "Nombres y Apellidos" exactamente como fue registrado
+  const nombreCompleto = (r[C.Nombre] || '').trim();
 
-  // NOMBRE_INFORMAL = primer nombre (considerando que el formato es: Apellido1 Apellido2 Nombre1 Nombre2)
-  // Se extrae el primer token que NO sea todo mayúsculas o sea el penúltimo/último token
-  // Heurística: último token si hay 3+ partes, primer token si hay 1-2 partes
-  const partesTodas = nombreFormal.split(/\s+/).filter(Boolean);
-  let primerNomInformal = '';
-  if(partesTodas.length >= 3){
-    // Apellido1 Apellido2 Nombre → tomar el 3er token
-    primerNomInformal = partesTodas[2];
-  } else if(partesTodas.length === 2){
-    primerNomInformal = partesTodas[1];
-  } else {
-    primerNomInformal = partesTodas[0] || '';
-  }
-  const nombreInformal = primerNomInformal.charAt(0).toUpperCase() + primerNomInformal.slice(1).toLowerCase();
+  // primerNombre: primer token del nombre completo (ej: "María" en "María García López")
+  // El formulario recibe "Nombres y Apellidos" → no se invierte el orden
+  const primerNombre = nombreCompleto.split(/\s+/)[0] || '';
+  const nombreInformal = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
 
-  // Compatibilidad retroactiva con {{NOMBRE}} = primer nombre informal
-  // Extraer primer nombre (apellidos primero → último token es el nombre)
-  const partes = (r[C.Nombre]||'').trim().split(/\s+/);
-  const primerNom = partes[partes.length-1] || partes[0] || '';
-  const nombre = primerNom.charAt(0).toUpperCase() + primerNom.slice(1).toLowerCase();
+  // Alias nombre = nombreInformal para compatibilidad con plantillas que usen {{NOMBRE}}
+  const nombre = nombreInformal;
+  // Alias formal = nombreCompleto para plantillas que usen {{NOMBRE_FORMAL}}
+  const nombreFormal = nombreCompleto;
 
-  const qrUrl = `${SCANNER_URL}?qrid=${encodeURIComponent(_msgQRID)}`;
+  // qrUrl usa el QR_ID almacenado en la BD — NO se genera un nuevo QR
+  const qrUrl = `${SCANNER_URL}?qrid=${encodeURIComponent(msgQrid)}`;  // QR existente en BD
 
-  let listaAcomp = '';
-  if(acomps.length > 0){
-    listaAcomp = '👥 Acompañantes:\n' + acomps.map((ac,i) => {
-      const qrAc = `${SCANNER_URL}?qrid=${encodeURIComponent(ac[C.QR_ID]||'')}`;
-      return `  ${i+1}. ${ac[C.Nombre]||'—'} — Plato: ${ac[C.Comida]||'—'}\n     QR: ${qrAc}`;
-    }).join('\n') + '\n\n';
-  }
+  // Construir lista de acompañantes con sus QR_IDs reales de la BD
+  const listaAcomp = _construirListaAcompanantes(acomps);
 
   ta.value = pl.tpl
     .replace(/{{NOMBRE_INFORMAL}}/g, nombreInformal)
@@ -4027,8 +4104,8 @@ function _resaltarFilaTitular(idx){
     r.removeAttribute('data-sel');
   });
   // Resaltar por qrid (fuente de verdad) en lugar de por índice
-  if(_msgQRID){
-    const row=document.querySelector(`[id^="mrow-"][data-qrid="${CSS.escape(_msgQRID)}"]`);
+  if(msgQrid){
+    const row=document.querySelector(`[id^="mrow-"][data-qrid="${CSS.escape(msgQrid)}"]`);
     if(row){
       row.style.background='rgba(255,215,0,.08)';
       row.setAttribute('data-sel','1');
@@ -4037,28 +4114,27 @@ function _resaltarFilaTitular(idx){
 }
 
 function toggleContactadoMsg(){
-  if(!_msgQRID) return;
+  if(!msgQrid) return;
   const chk=document.getElementById('msg-chk-contactado');
   const val=chk&&chk.checked?'SI':'PENDIENTE';
   // Sync sticky checkbox
   const chkSticky=document.getElementById('msg-chk-contactado-sticky');
   if(chkSticky) chkSticky.checked=chk&&chk.checked;
-  setContactado(_msgQRID,val);
+  setContactado(msgQrid,val);
   renderMensajeria();
 }
 
-// ── ENVIAR WHATSAPP — compatible Android e iOS ──────────────────
-// FIX 4: Formatea el número correctamente con código de país Perú (+51)
-// Valida que el número tenga 9 dígitos y empiece con 9
-// Marca como contactado en MEMORIA y en SHEETS simultáneamente
-function enviarWA(){
-  if(!_msgQRID) return;
-  const r=allRows.find(x=>x[C.QR_ID]===_msgQRID);
+// ── ENVIAR WHATSAPP CON QR ──────────────────────────────────────
+// Envía QR del titular + acompañantes como imagen mediante navigator.share.
+// Si el navegador no soporta compartir archivos, abre wa.me con el texto.
+// Compatible con Android e iOS. Código de país Perú (+51).
+async function enviarWA(){
+  if(!msgQrid) return;
+  const r = allRows.find(x => x[C.QR_ID] === msgQrid);
   if(!r){showMsg(document.getElementById('msg-status'),'err','Titular no encontrado');return;}
 
-  // FIX 4: Formateo correcto del número de teléfono
+  // Formateo del número de teléfono
   const celRaw=(r[C.Celular]||'').replace(/\D/g,'');
-  // Eliminar código de país si ya viene incluido (51 = Perú)
   let cel=celRaw;
   if(cel.startsWith('51')&&cel.length===11) cel=cel.slice(2);
   if(!cel||cel.length!==9){
@@ -4071,21 +4147,81 @@ function enviarWA(){
   }
 
   const texto=document.getElementById('msg-texto')?.value||'';
-  // FIX 4: Código de país Perú 51, siempre antepuesto
   const waUrl=`https://wa.me/51${cel}${texto?'?text='+encodeURIComponent(texto):''}`;
 
+  // ── Intentar compartir QR como imagen con navigator.share ──
   const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if(isMobile){
-    // En móvil: location.href abre la app de WhatsApp directamente (Android e iOS)
-    window.location.href=waUrl;
-  } else {
-    // En desktop: abrir en pestaña nueva sin abandonar la app
-    window.open(waUrl,'_blank','noopener,noreferrer');
+  if(navigator.share){
+    try{
+      showToast('⏳ Generando QR...');
+      // Construir canvas del titular cargando temporalmente en qrModal
+      const celGrupo=r[C.Celular]||'';
+      const acompRows=celGrupo?allRows.filter(x=>(x[C.Celular]||'')===celGrupo&&esAcompananteRow(x)):[];
+
+      // Guardar qrModal previo y cargar datos del titular actual
+      const prevModal={...qrModal};
+      qrModal.qrId=r[C.QR_ID];
+      qrModal.nombreCompleto=r[C.Nombre]||'';
+      qrModal.tipo=r[C.TipoPersona]||'';
+      qrModal.padrino=r[C.Tipo]||'';
+      qrModal.disciplina=r[C.Disciplina]||'';
+      qrModal.qrUrl=`${SCANNER_URL}?qrid=${encodeURIComponent(r[C.QR_ID])}`;
+
+      // Renderizar QR del titular en div oculto para buildQRCanvasForRow
+      const canvasTitular=await buildQRCanvasForRow(r);
+
+      // Restaurar qrModal previo
+      Object.assign(qrModal, prevModal);
+
+      const nombreCap=_capitalizarPrimero((r[C.Nombre]||'').split(/\s+/)[0]);
+
+      if(acompRows.length===0){
+        // Sin acompañantes: compartir 1 imagen + texto
+        const files=await _canvasToFileList([[canvasTitular,`QR_${r[C.QR_ID]||'titular'}.png`]]);
+        if(files.length>0&&navigator.canShare&&navigator.canShare({files})){
+          await navigator.share({files,title:`QR ${nombreCap}`,text:texto});
+          _marcarContactadoEnviado(msgQrid,cel);
+          return;
+        }
+      } else {
+        // Con acompañantes: compartir titular primero
+        const files1=await _canvasToFileList([[canvasTitular,`QR_titular_${r[C.QR_ID]||''}.png`]]);
+        const msg1=texto||`🎟️ Tu QR de acceso - ${nombreCap}`;
+        if(files1.length>0&&navigator.canShare&&navigator.canShare({files:files1})){
+          await navigator.share({files:files1,title:`QR Titular - ${nombreCap}`,text:msg1});
+          // Compartir QR de cada acompañante
+          for(let i=0;i<acompRows.length;i++){
+            const ac=acompRows[i];
+            const nomAc=ac[C.Nombre]||'—';
+            const acCanvas=await buildQRCanvasForRow(ac);
+            const filesAc=await _canvasToFileList([[acCanvas,`QR_acomp${i+1}_${ac[C.QR_ID]||''}.png`]]);
+            if(filesAc.length>0&&navigator.canShare&&navigator.canShare({files:filesAc})){
+              await navigator.share({files:filesAc,title:`QR Acompañante ${i+1} - ${nomAc}`,
+                text:`👥 Acompañante ${i+1}: ${nomAc}\n• Plato: ${ac[C.Comida]||'—'} | Bebida: ${ac[C.Bebida]||'—'}\nQR adjunto 👆`});
+            }
+          }
+          _marcarContactadoEnviado(msgQrid,cel);
+          return;
+        }
+      }
+    } catch(ex){
+      if(ex.name==='AbortError'){return;} // Usuario canceló
+      // Si falla → fallback a wa.me con texto
+    }
   }
 
-  // FIX 3+4: Marcar automáticamente como contactado en MEMORIA y SHEETS
-  setContactado(_msgQRID,'SI');
-  // Sync ambos checkboxes
+  // ── Fallback: abrir WhatsApp con texto (incluye link QR en el texto) ──
+  const isMob=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(isMob){
+    window.location.href=waUrl;
+  } else {
+    window.open(waUrl,'_blank','noopener,noreferrer');
+  }
+  _marcarContactadoEnviado(msgQrid,cel);
+}
+
+function _marcarContactadoEnviado(qrid,cel){
+  setContactado(qrid,'SI');
   ['msg-chk-contactado','msg-chk-contactado-sticky'].forEach(id=>{
     const chk=document.getElementById(id);
     if(chk) chk.checked=true;
