@@ -1469,6 +1469,35 @@ function renderDashboard(){
   const bebidas=count(allRows.map(r=>r[C.Bebida]).filter(v=>v&&v!=='—'));
   const maxC=Math.max(...Object.values(comidas),1),maxB=Math.max(...Object.values(bebidas),1),
         maxD=Math.max(...Object.values(discMap),1);
+
+  // Bebidas por dependencia (agrupado)
+  const bebByDep={};
+  allRows.forEach(r=>{
+    const dep=r[C.Dependencia]||'—';
+    const beb=r[C.Bebida]||'';
+    if(!beb||beb==='—') return;
+    if(!bebByDep[dep]) bebByDep[dep]={};
+    bebByDep[dep][beb]=(bebByDep[dep][beb]||0)+1;
+  });
+  const topDepsConBebida=Object.entries(bebByDep)
+    .sort((a,b)=>Object.values(b[1]).reduce((s,v)=>s+v,0)-Object.values(a[1]).reduce((s,v)=>s+v,0))
+    .slice(0,6);
+  const bebColors=['#FFD700','#00E676','#60a5fa','#FFA500','#a78bfa','#ff6b6b'];
+  const bebByDepHtml=topDepsConBebida.length?topDepsConBebida.map(([dep,bebs])=>{
+    const totalDep=Object.values(bebs).reduce((a,b)=>a+b,0);
+    const bebItems=Object.entries(bebs).sort((a,b)=>b[1]-a[1]).map(([beb,cnt],ci)=>{
+      const pct=totalDep>0?Math.round(cnt/totalDep*100):0;
+      const shortBeb=beb.length>20?beb.slice(0,18)+'…':beb;
+      return `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-size:11px;font-family:var(--font-h);color:${bebColors[ci%bebColors.length]};font-weight:700">${e(shortBeb)} <span style="color:var(--muted);font-weight:400">${cnt}</span></span>`;
+    }).join('');
+    return `<div class="bar-row" style="flex-direction:column;align-items:flex-start;margin-bottom:10px;gap:4px">
+      <span class="bar-lbl" style="width:auto;font-size:11px;color:var(--text)">${e(dep)}</span>
+      <div style="display:flex;flex-wrap:wrap;gap:2px 0">${bebItems}</div>
+      <div style="width:100%;height:6px;background:var(--field);border-radius:3px;overflow:hidden;display:flex">
+        ${Object.entries(bebs).sort((a,b)=>b[1]-a[1]).map(([,cnt],ci)=>`<div style="height:100%;width:${totalDep>0?Math.round(cnt/totalDep*100):0}%;background:${bebColors[ci%bebColors.length]};"></div>`).join('')}
+      </div>
+    </div>`;
+  }).join(''):'<div style="color:var(--muted);font-size:12px">Sin datos</div>';
   const bars=(data,cls,max,valColor)=>sorted(data).map(([k,v])=>`
     <div class="bar-row">
       <div class="bar-lbl" title="${e(k)}">${e(k)}</div>
@@ -1618,6 +1647,7 @@ function renderDashboard(){
       <div class="card"><div class="card-title">🍽️ Platos solicitados</div>${bars(comidas,'bf-gold',maxC)}</div>
       <div class="card"><div class="card-title">🥤 Bebidas solicitadas</div>${bars(bebidas,'bf-coral',maxB)}</div>
       <div class="card"><div class="card-title">🎨 Disciplinas</div>${bars(discMap,'bf-lav',maxD)}</div>
+      <div class="card" style="grid-column:1/-1"><div class="card-title">🥤 Bebidas por Dependencia</div>${bebByDepHtml}</div>
     </div>`;
 }
 
@@ -1827,6 +1857,8 @@ function renderParticipants(s,f){
     :'🔍 Ingresa 4 dígitos del registro (ej: A123)...';
 
   const canAddRecord=isAdmin||(session.rol==='edecan');
+  // PERMISO 5: Selección múltiple y envío masivo WA solo para Admin y Edecán
+  const canMultiSelect=isAdmin||(session.rol==='edecan');
   const headerHtml=`
     <div class="prog-wrap">
       <div class="prog-lbl">Ingresos: <strong>${withIngreso}/${total}</strong></div>
@@ -1842,21 +1874,21 @@ function renderParticipants(s,f){
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th style="width:34px;text-align:center"><input type="checkbox" id="chk-all-part" title="Seleccionar todos" onchange="toggleSeleccionTodos(this.checked)" style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer"></th>
+          ${canMultiSelect?`<th style="width:34px;text-align:center"><input type="checkbox" id="chk-all-part" title="Seleccionar todos" onchange="toggleSeleccionTodos(this.checked)" style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer"></th>`:''}
           <th>Reg.</th><th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
           <th>Ingreso</th><th>Entrega</th><th>Contactado</th><th>Acciones</th>
         </tr></thead>
         <tbody id="part-tbody"></tbody>
       </table>
     </div>
-    <!-- FIX 2: Barra de acciones para selección múltiple -->
+    ${canMultiSelect?`<!-- FIX 2: Barra de acciones para selección múltiple -->
     <div id="part-sel-bar" style="display:none;background:var(--s2);border:1px solid var(--gold);border-radius:4px;padding:10px 14px;margin-top:8px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
       <span id="part-sel-count" style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--gold)">0 seleccionados</span>
       <button class="btn btn-gold btn-sm" onclick="enviarWASeleccionados()" style="white-space:nowrap">📱 WhatsApp a seleccionados</button>
       <button class="btn btn-ghost btn-sm" onclick="marcarContactadosSeleccionados('SI')" style="white-space:nowrap">✅ Marcar contactados</button>
       <button class="btn btn-ghost btn-sm" onclick="marcarContactadosSeleccionados('PENDIENTE')" style="white-space:nowrap">⏳ Limpiar estado</button>
       <button class="btn btn-ghost btn-sm" onclick="limpiarSeleccion()" style="margin-left:auto">✕ Limpiar selección</button>
-    </div>`;
+    </div>`:''}`;
 
   document.getElementById('part-inner').innerHTML=headerHtml;
 
@@ -1865,7 +1897,7 @@ function renderParticipants(s,f){
 
   if(!rows.length){
     const tr=document.createElement('tr');
-    tr.innerHTML='<td colspan="12"><div class="empty">Sin resultados</div></td>';
+    tr.innerHTML=`<td colspan="${canMultiSelect?12:11}"><div class="empty">Sin resultados</div></td>`;
     frag.appendChild(tr);
   } else {
     rows.forEach(r=>{
@@ -1885,12 +1917,12 @@ function renderParticipants(s,f){
       if(hasI&&hasE) tr.className='attended';
       if(sel) tr.style.background='rgba(255,215,0,.07)';
       tr.innerHTML=`
-        <!-- FIX 2: Checkbox de selección por fila -->
+        ${canMultiSelect?`<!-- FIX 2: Checkbox de selección por fila -->
         <td style="text-align:center;padding:6px 8px">
           <input type="checkbox" class="chk-part-row" data-qrid="${e(qid)}"
             ${sel?'checked':''} onchange="onRowCheckChange(this)"
             style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer">
-        </td>
+        </td>`:''}
         <td><span style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--text);letter-spacing:.5px">${e(r[C.Registro]||'—')}</span></td>
         <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${esPadrinoRow(r)?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">Padrino</span>':''}</td>
         <td><span class="bdg ${tipoInfo.cls}">${e(tipoInfo.label)}</span></td>
@@ -3128,7 +3160,8 @@ const PLANTILLAS_PROTEGIDAS = ['libre'];
 
 // Variables dinámicas disponibles para insertar en plantillas
 const VARS_DISPONIBLES = [
-  '{{NOMBRE}}','{{EDECAN}}','{{DEPENDENCIA}}','{{COMIDA_TITULAR}}',
+  '{{NOMBRE_INFORMAL}}','{{NOMBRE_FORMAL}}','{{NOMBRE}}',
+  '{{EDECAN}}','{{DEPENDENCIA}}','{{COMIDA_TITULAR}}','{{BEBIDA_TITULAR}}',
   '{{QR_TITULAR}}','{{LISTA_ACOMPANANTES}}','{{PLURAL_QR}}','{{PLURAL_NECESARIO}}'
 ];
 
@@ -3350,8 +3383,18 @@ function renderMensajeria(){
   }
   _loadContactados();
 
-  let titulares=allRows.filter(r=>r[C.TipoPersona]==='Titular'&&!esPadrinoRow(r)&&!esAcompananteRow(r));
-  if(isEdecan&&session.dependencia) titulares=titulares.filter(r=>r[C.Dependencia]===session.dependencia);
+  let titulares=allRows.filter(r=>{
+    if(esPadrinoRow(r)) return false;
+    if(esAcompananteRow(r)) return false;
+    if(r[C.TipoPersona]!=='Titular') return false;
+    return true;
+  });
+  // CAMBIO 3: Edecanes ven titulares + padrinos de su dependencia
+  let padrinosDep=[];
+  if(isEdecan&&session.dependencia){
+    titulares=titulares.filter(r=>r[C.Dependencia]===session.dependencia);
+    padrinosDep=allRows.filter(r=>esPadrinoRow(r)&&r[C.Dependencia]===session.dependencia);
+  }
 
   // Dashboard contactados por dependencia (admin only)
   let dashHtml='';
@@ -3386,14 +3429,19 @@ function renderMensajeria(){
     </div>`;
   }
 
-  const titRows=titulares.map((r,i)=>{
+  // ── Construir lista combinada para mensajería (titulares + padrinos si edecan) ──
+  const allMsgRows = isEdecan ? [...titulares, ...padrinosDep] : titulares;
+
+  const titRows=allMsgRows.map((r,i)=>{
     const cel=r[C.Celular]||'';
     const nacomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).length:0;
     const c=contactados[r[C.QR_ID]||'']||'PENDIENTE';
     const cCol=c==='SI'?'var(--mint)':c==='NO'?'var(--err)':'var(--warn)';
+    const esPad=esPadrinoRow(r);
+    const tipoBadge=esPad?'<span class="bdg bdg-p" style="font-size:9px">Padrino</span>':'';
     // FIX 4: data-qrid permite selección fiable sin depender del índice numérico
-    return `<tr id="mrow-${i}" data-qrid="${e(r[C.QR_ID]||'')}" onclick="selTitular('${e(r[C.QR_ID]||'')}',${i})" style="cursor:pointer">
-      <td><span class="pname" style="font-size:13px">${e(r[C.Nombre]||'—')}</span></td>
+    return `<tr id="mrow-${i}" data-qrid="${e(r[C.QR_ID]||'')}" data-nombre="${e((r[C.Nombre]||'').toLowerCase())}" data-dep="${e((r[C.Dependencia]||'').toLowerCase())}" data-contactado="${c}" data-tipo="${esPad?'padrino':'titular'}" onclick="selTitular('${e(r[C.QR_ID]||'')}',${i})" style="cursor:pointer">
+      <td><span class="pname" style="font-size:13px">${e(r[C.Nombre]||'—')}</span>${tipoBadge}</td>
       <td style="color:var(--muted);font-size:12px">${e(r[C.Dependencia]||'—')}</td>
       <td style="font-size:12px">${e(cel||'—')}</td>
       <td><span style="font-family:var(--font-h);font-size:11px;font-weight:700;color:${cCol}">${c==='SI'?'✅ Sí':c==='NO'?'❌ No':'⏳ Pend.'}</span></td>
@@ -3424,7 +3472,29 @@ function renderMensajeria(){
     <!-- PANEL LISTA -->
     <div class="msg-view active" id="msg-view-lista">
       <div class="sec-title" style="margin-bottom:10px">
-        👥 Titulares${isEdecan&&session.dependencia?' — <span style="color:var(--gold)">'+e(session.dependencia)+'</span>':''}
+        👥 Participantes${isEdecan&&session.dependencia?' — <span style="color:var(--gold)">'+e(session.dependencia)+'</span>':''}
+      </div>
+
+      <!-- FILTROS AVANZADOS -->
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
+        <input type="text" id="msg-filter-nombre" placeholder="🔍 Buscar por nombre..."
+          style="flex:1;min-width:160px;background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;padding:9px 12px;color:var(--text);font-family:var(--font-b);font-size:13px;outline:none;min-height:40px;"
+          oninput="filtrarMsgTabla()">
+        <select id="msg-filter-estado" class="filter" style="min-height:40px;font-size:12px" onchange="filtrarMsgTabla()">
+          <option value="">Todos los estados</option>
+          <option value="SI">✅ Contactados</option>
+          <option value="PENDIENTE">⏳ No contactados</option>
+          <option value="NO">❌ No contactar</option>
+        </select>
+        <select id="msg-filter-tipo" class="filter" style="min-height:40px;font-size:12px" onchange="filtrarMsgTabla()">
+          <option value="">Titular + Padrino</option>
+          <option value="titular">Solo Titulares</option>
+          <option value="padrino">Solo Padrinos</option>
+        </select>
+        ${isAdmin ? `<select id="msg-filter-dep" class="filter" style="min-height:40px;font-size:12px;max-width:200px" onchange="filtrarMsgTabla()">
+          <option value="">Todas las dependencias</option>
+          ${[...new Set(allMsgRows.map(r=>r[C.Dependencia]||'—').filter(Boolean))].sort().map(d=>`<option value="${e(d.toLowerCase())}">${e(d)}</option>`).join('')}
+        </select>` : ''}
       </div>
       <div class="tit-tbl-wrap tbl-wrap" style="max-height:55vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
         <table>
@@ -3519,6 +3589,28 @@ function renderMensajeria(){
   if(isAdmin){
     renderEditorPlantillas();
   }
+}
+
+/** Filtra las filas de la tabla de mensajería según los filtros activos */
+function filtrarMsgTabla(){
+  const busqueda=(document.getElementById('msg-filter-nombre')?.value||'').toLowerCase().trim();
+  const estado=document.getElementById('msg-filter-estado')?.value||'';
+  const tipo=document.getElementById('msg-filter-tipo')?.value||'';
+  const dep=document.getElementById('msg-filter-dep')?.value||''; // solo admin
+
+  document.querySelectorAll('[id^="mrow-"]').forEach(tr=>{
+    const nombre=tr.dataset.nombre||'';
+    const rowDep=tr.dataset.dep||'';
+    const rowContactado=tr.dataset.contactado||'PENDIENTE';
+    const rowTipo=tr.dataset.tipo||'titular';
+
+    const matchNombre=!busqueda||nombre.includes(busqueda);
+    const matchEstado=!estado||(estado==='PENDIENTE'?rowContactado==='PENDIENTE':rowContactado===estado);
+    const matchTipo=!tipo||rowTipo===tipo;
+    const matchDep=!dep||rowDep===dep;
+
+    tr.style.display=(matchNombre&&matchEstado&&matchTipo&&matchDep)?'':'none';
+  });
 }
 
 function selTitular(qrid, idx){
@@ -3648,10 +3740,13 @@ function aplicarPlantilla(){
     } else {
       // Mostrar plantilla con placeholders sin reemplazar para que el usuario vea la estructura
       ta.value = pl.tpl
+        .replace(/{{NOMBRE_INFORMAL}}/g,'[NOMBRE INFORMAL]')
+        .replace(/{{NOMBRE_FORMAL}}/g,'[NOMBRE FORMAL]')
         .replace(/{{NOMBRE}}/g,'[NOMBRE]')
         .replace(/{{EDECAN}}/g, session.usuario||'[EDECAN]')
         .replace(/{{DEPENDENCIA}}/g, session.dependencia||'[DEPENDENCIA]')
         .replace(/{{COMIDA_TITULAR}}/g,'[COMIDA]')
+        .replace(/{{BEBIDA_TITULAR}}/g,'[BEBIDA]')
         .replace(/{{QR_TITULAR}}/g,'[QR_LINK]')
         .replace(/{{LISTA_ACOMPANANTES}}/g,'')
         .replace(/{{PLURAL_QR}}/g,'este QR')
@@ -3674,6 +3769,25 @@ function aplicarPlantilla(){
   const cel = r[C.Celular]||'';
   const acomps = cel ? allRows.filter(x=>(x[C.Celular]||'')===cel && esAcompananteRow(x)) : [];
 
+  // NOMBRE_FORMAL = nombre completo tal como está registrado
+  const nombreFormal = (r[C.Nombre]||'').trim();
+
+  // NOMBRE_INFORMAL = primer nombre (considerando que el formato es: Apellido1 Apellido2 Nombre1 Nombre2)
+  // Se extrae el primer token que NO sea todo mayúsculas o sea el penúltimo/último token
+  // Heurística: último token si hay 3+ partes, primer token si hay 1-2 partes
+  const partesTodas = nombreFormal.split(/\s+/).filter(Boolean);
+  let primerNomInformal = '';
+  if(partesTodas.length >= 3){
+    // Apellido1 Apellido2 Nombre → tomar el 3er token
+    primerNomInformal = partesTodas[2];
+  } else if(partesTodas.length === 2){
+    primerNomInformal = partesTodas[1];
+  } else {
+    primerNomInformal = partesTodas[0] || '';
+  }
+  const nombreInformal = primerNomInformal.charAt(0).toUpperCase() + primerNomInformal.slice(1).toLowerCase();
+
+  // Compatibilidad retroactiva con {{NOMBRE}} = primer nombre informal
   // Extraer primer nombre (apellidos primero → último token es el nombre)
   const partes = (r[C.Nombre]||'').trim().split(/\s+/);
   const primerNom = partes[partes.length-1] || partes[0] || '';
@@ -3690,10 +3804,13 @@ function aplicarPlantilla(){
   }
 
   ta.value = pl.tpl
+    .replace(/{{NOMBRE_INFORMAL}}/g, nombreInformal)
+    .replace(/{{NOMBRE_FORMAL}}/g, nombreFormal)
     .replace(/{{NOMBRE}}/g, nombre)
     .replace(/{{EDECAN}}/g, session.usuario||'tu edecán')
     .replace(/{{DEPENDENCIA}}/g, session.dependencia||r[C.Dependencia]||'—')
     .replace(/{{COMIDA_TITULAR}}/g, r[C.Comida]||'—')
+    .replace(/{{BEBIDA_TITULAR}}/g, r[C.Bebida]||'—')
     .replace(/{{QR_TITULAR}}/g, qrUrl)
     .replace(/{{LISTA_ACOMPANANTES}}/g, listaAcomp)
     .replace(/{{PLURAL_QR}}/g, acomps.length>0 ? 'estos QR' : 'este QR')
