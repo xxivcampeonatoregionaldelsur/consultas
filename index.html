@@ -6,6 +6,7 @@
 <title>🏆 XXIV Campeonato Regional del Sur · Eliana Amparo R. Molina del Carpio</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════
    CAMPEONATO REGIONAL DEL SUR — UI OPTIMIZADA PARA CAMPO
@@ -4124,21 +4125,87 @@ function toggleContactadoMsg(){
   renderMensajeria();
 }
 
-// ── ENVIAR WHATSAPP CON QR ──────────────────────────────────────
-// Envía QR del titular + acompañantes como imagen mediante navigator.share.
-// Si el navegador no soporta compartir archivos, abre wa.me con el texto.
-// Compatible con Android e iOS. Código de país Perú (+51).
+// ── GENERAR PDF CON TODOS LOS QR (titular + acompañantes) ───────
+// Produce un único archivo PDF con una tarjeta QR por participante,
+// dispuestas en cuadrícula. Devuelve un File o null si falla.
+async function _generarPDFQRs(titularRow, acompRows){
+  try{
+    const { jsPDF } = window.jspdf;
+    const todos = [titularRow, ...acompRows];
+
+    // Cada tarjeta: 90mm × 120mm. Margen exterior 8mm. Gap entre tarjetas 5mm.
+    const CARD_W = 90, CARD_H = 120, MARGIN = 8, GAP = 5;
+    const COLS = todos.length === 1 ? 1 : 2;
+    const ROWS = Math.ceil(todos.length / COLS);
+    const PW = MARGIN * 2 + COLS * CARD_W + (COLS - 1) * GAP;
+    const PH = MARGIN * 2 + 10 + ROWS * CARD_H + (ROWS - 1) * GAP; // +10 para título
+
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:[PW, PH] });
+
+    // Fondo oscuro página
+    doc.setFillColor(7, 9, 15);
+    doc.rect(0, 0, PW, PH, 'F');
+
+    // Título evento
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(7);
+    doc.setTextColor(255, 215, 0);
+    doc.text('XXIV CAMPEONATO REGIONAL DEL SUR', PW / 2, MARGIN - 1, {align:'center'});
+    doc.setFontSize(5.5);
+    doc.setTextColor(140, 144, 176);
+    doc.text('Eliana Amparo R. Molina del Carpio · MDD 2026', PW / 2, MARGIN + 2.5, {align:'center'});
+
+    // Línea dorada separadora
+    doc.setDrawColor(255, 165, 0);
+    doc.setLineWidth(0.4);
+    doc.line(MARGIN, MARGIN + 4, PW - MARGIN, MARGIN + 4);
+
+    // Generar y colocar cada QR
+    for(let i = 0; i < todos.length; i++){
+      const row = todos[i];
+      const canvas = await buildQRCanvasForRow(row);
+      if(!canvas) continue;
+
+      const col = i % COLS;
+      const rowIdx = Math.floor(i / COLS);
+      const x = MARGIN + col * (CARD_W + GAP);
+      const y = MARGIN + 7 + rowIdx * (CARD_H + GAP);
+
+      // Fondo blanco redondeado para la tarjeta
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(x, y, CARD_W, CARD_H, 2, 2, 'F');
+
+      // Imagen del canvas (contiene QR + logo + banner con nombre)
+      const imgData = canvas.toDataURL('image/png');
+      doc.addImage(imgData, 'PNG', x, y, CARD_W, CARD_H, undefined, 'FAST');
+    }
+
+    const nombreArchivo = `QRs_${(titularRow[C.Nombre]||'participante')
+      .replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g,'_').trim()}.pdf`;
+    const pdfBlob = doc.output('blob');
+    return new File([pdfBlob], nombreArchivo, {type:'application/pdf'});
+  } catch(ex){
+    console.error('Error generando PDF QRs:', ex);
+    return null;
+  }
+}
+
+// ── ENVIAR WHATSAPP CON PDF DE QRs ──────────────────────────────
+// Genera un único PDF con todos los QR (titular + acompañantes) y lo
+// comparte en UN SOLO mensaje vía navigator.share.
+// Fallback: abre wa.me con el texto si el navegador no soporta archivos.
 async function enviarWA(){
   if(!msgQrid) return;
   const r = allRows.find(x => x[C.QR_ID] === msgQrid);
   if(!r){showMsg(document.getElementById('msg-status'),'err','Titular no encontrado');return;}
 
-  // Formateo del número de teléfono
-  const celRaw=(r[C.Celular]||'').replace(/\D/g,'');
-  let cel=celRaw;
-  if(cel.startsWith('51')&&cel.length===11) cel=cel.slice(2);
-  if(!cel||cel.length!==9){
-    showMsg(document.getElementById('msg-status'),'err',`Número inválido: "${r[C.Celular]||'vacío'}" · Debe tener 9 dígitos`);
+  // Validar número
+  const celRaw = (r[C.Celular]||'').replace(/\D/g,'');
+  let cel = celRaw;
+  if(cel.startsWith('51') && cel.length===11) cel = cel.slice(2);
+  if(!cel || cel.length!==9){
+    showMsg(document.getElementById('msg-status'),'err',
+      `Número inválido: "${r[C.Celular]||'vacío'}" · Debe tener 9 dígitos`);
     return;
   }
   if(!cel.startsWith('9')){
@@ -4146,85 +4213,58 @@ async function enviarWA(){
     return;
   }
 
-  const texto=document.getElementById('msg-texto')?.value||'';
-  const waUrl=`https://wa.me/51${cel}${texto?'?text='+encodeURIComponent(texto):''}`;
+  const texto = document.getElementById('msg-texto')?.value || '';
+  const waUrl = `https://wa.me/51${cel}${texto ? '?text='+encodeURIComponent(texto) : ''}`;
 
-  // ── Intentar compartir QR como imagen con navigator.share ──
-  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if(navigator.share){
+  // ── Intentar compartir PDF único con todos los QR ──
+  if(navigator.share && window.jspdf){
+    const btns = ['btn-wa','btn-wa-sticky'].map(id=>document.getElementById(id)).filter(Boolean);
+    btns.forEach(b=>{ b.disabled=true; b.textContent='⏳ Generando PDF...'; });
     try{
-      showToast('⏳ Generando QR...');
-      // Construir canvas del titular cargando temporalmente en qrModal
-      const celGrupo=r[C.Celular]||'';
-      const acompRows=celGrupo?allRows.filter(x=>(x[C.Celular]||'')===celGrupo&&esAcompananteRow(x)):[];
+      const celGrupo = r[C.Celular] || '';
+      const acompRows = celGrupo
+        ? allRows.filter(x => (x[C.Celular]||'')=== celGrupo && esAcompananteRow(x))
+        : [];
 
-      // Guardar qrModal previo y cargar datos del titular actual
-      const prevModal={...qrModal};
-      qrModal.qrId=r[C.QR_ID];
-      qrModal.nombreCompleto=r[C.Nombre]||'';
-      qrModal.tipo=r[C.TipoPersona]||'';
-      qrModal.padrino=r[C.Tipo]||'';
-      qrModal.disciplina=r[C.Disciplina]||'';
-      qrModal.qrUrl=`${SCANNER_URL}?qrid=${encodeURIComponent(r[C.QR_ID])}`;
+      showToast('⏳ Preparando QR' + (acompRows.length > 0 ? 's...' : '...'));
+      const pdfFile = await _generarPDFQRs(r, acompRows);
 
-      // Renderizar QR del titular en div oculto para buildQRCanvasForRow
-      const canvasTitular=await buildQRCanvasForRow(r);
-
-      // Restaurar qrModal previo
-      Object.assign(qrModal, prevModal);
-
-      const nombreCap=_capitalizarPrimero((r[C.Nombre]||'').split(/\s+/)[0]);
-
-      if(acompRows.length===0){
-        // Sin acompañantes: compartir 1 imagen + texto
-        const files=await _canvasToFileList([[canvasTitular,`QR_${r[C.QR_ID]||'titular'}.png`]]);
-        if(files.length>0&&navigator.canShare&&navigator.canShare({files})){
-          await navigator.share({files,title:`QR ${nombreCap}`,text:texto});
-          _marcarContactadoEnviado(msgQrid,cel);
-          return;
-        }
-      } else {
-        // Con acompañantes: compartir titular primero
-        const files1=await _canvasToFileList([[canvasTitular,`QR_titular_${r[C.QR_ID]||''}.png`]]);
-        const msg1=texto||`🎟️ Tu QR de acceso - ${nombreCap}`;
-        if(files1.length>0&&navigator.canShare&&navigator.canShare({files:files1})){
-          await navigator.share({files:files1,title:`QR Titular - ${nombreCap}`,text:msg1});
-          // Compartir QR de cada acompañante
-          for(let i=0;i<acompRows.length;i++){
-            const ac=acompRows[i];
-            const nomAc=ac[C.Nombre]||'—';
-            const acCanvas=await buildQRCanvasForRow(ac);
-            const filesAc=await _canvasToFileList([[acCanvas,`QR_acomp${i+1}_${ac[C.QR_ID]||''}.png`]]);
-            if(filesAc.length>0&&navigator.canShare&&navigator.canShare({files:filesAc})){
-              await navigator.share({files:filesAc,title:`QR Acompañante ${i+1} - ${nomAc}`,
-                text:`👥 Acompañante ${i+1}: ${nomAc}\n• Plato: ${ac[C.Comida]||'—'} | Bebida: ${ac[C.Bebida]||'—'}\nQR adjunto 👆`});
-            }
-          }
-          _marcarContactadoEnviado(msgQrid,cel);
-          return;
-        }
+      if(pdfFile && navigator.canShare && navigator.canShare({files:[pdfFile]})){
+        await navigator.share({
+          files: [pdfFile],
+          title: `QR Acceso — ${_capitalizarPrimero((r[C.Nombre]||'').split(/\s+/)[0])}`,
+          text: texto
+        });
+        _marcarContactadoEnviado(msgQrid, cel);
+        return;
       }
+      // navigator.share no soporta PDF en este dispositivo → fallback
     } catch(ex){
-      if(ex.name==='AbortError'){return;} // Usuario canceló
-      // Si falla → fallback a wa.me con texto
+      if(ex.name === 'AbortError'){
+        btns.forEach(b=>{ b.disabled=false; b.textContent='📱 WhatsApp'; });
+        return; // Usuario canceló el diálogo de compartir
+      }
+      // Otro error → continúa al fallback
+    } finally {
+      btns.forEach(b=>{ b.disabled=false; b.textContent='📱 WhatsApp'; });
     }
   }
 
-  // ── Fallback: abrir WhatsApp con texto (incluye link QR en el texto) ──
-  const isMob=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  // ── Fallback: abrir WhatsApp con texto ──
+  const isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(isMob){
-    window.location.href=waUrl;
+    window.location.href = waUrl;
   } else {
-    window.open(waUrl,'_blank','noopener,noreferrer');
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
   }
-  _marcarContactadoEnviado(msgQrid,cel);
+  _marcarContactadoEnviado(msgQrid, cel);
 }
 
-function _marcarContactadoEnviado(qrid,cel){
-  setContactado(qrid,'SI');
+function _marcarContactadoEnviado(qrid, cel){
+  setContactado(qrid, 'SI');
   ['msg-chk-contactado','msg-chk-contactado-sticky'].forEach(id=>{
-    const chk=document.getElementById(id);
-    if(chk) chk.checked=true;
+    const chk = document.getElementById(id);
+    if(chk) chk.checked = true;
   });
   showToast(`📱 WhatsApp +51${cel} · Marcado contactado ✅`);
 }
