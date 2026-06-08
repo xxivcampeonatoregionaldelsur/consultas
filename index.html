@@ -2907,13 +2907,14 @@ function switchTab(name){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+name));
 }
 
-function showToast(msg){
+function showToast(msg, duration){
+  duration = duration || 2500;
   let t=document.getElementById('dash-toast');
   if(!t){t=document.createElement('div');t.id='dash-toast';
     t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--s2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:30px;font-family:var(--font-h);font-size:13px;font-weight:700;z-index:999;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.4)';
     document.body.appendChild(t);}
   t.textContent=msg;t.style.opacity='1';
-  clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',2500);
+  clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0', duration);
 }
 
 
@@ -4125,59 +4126,165 @@ function toggleContactadoMsg(){
   renderMensajeria();
 }
 
-// ── GENERAR PDF CON TODOS LOS QR (titular + acompañantes) ───────
-// Produce un único archivo PDF con una tarjeta QR por participante,
-// dispuestas en cuadrícula. Devuelve un File o null si falla.
+// ── GENERAR PDF CON TODOS LOS QR — UNA PÁGINA POR QR ────────────
+// Cada participante ocupa una página A4 portrait completa, diseño premium.
+// La tarjeta QR usa todo el espacio disponible con diseño oscuro + dorado.
+// Devuelve un File PDF o null si falla.
 async function _generarPDFQRs(titularRow, acompRows){
   try{
     const { jsPDF } = window.jspdf;
     const todos = [titularRow, ...acompRows];
 
-    // Cada tarjeta: 90mm × 120mm. Margen exterior 8mm. Gap entre tarjetas 5mm.
-    const CARD_W = 90, CARD_H = 120, MARGIN = 8, GAP = 5;
-    const COLS = todos.length === 1 ? 1 : 2;
-    const ROWS = Math.ceil(todos.length / COLS);
-    const PW = MARGIN * 2 + COLS * CARD_W + (COLS - 1) * GAP;
-    const PH = MARGIN * 2 + 10 + ROWS * CARD_H + (ROWS - 1) * GAP; // +10 para título
+    // Página A4: 210 × 297 mm — aprovecha más el espacio que A5
+    const PW = 210, PH = 297;
+    const MARGIN = 12;
 
-    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:[PW, PH] });
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
 
-    // Fondo oscuro página
-    doc.setFillColor(7, 9, 15);
-    doc.rect(0, 0, PW, PH, 'F');
-
-    // Título evento
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(7);
-    doc.setTextColor(255, 215, 0);
-    doc.text('XXIV CAMPEONATO REGIONAL DEL SUR', PW / 2, MARGIN - 1, {align:'center'});
-    doc.setFontSize(5.5);
-    doc.setTextColor(140, 144, 176);
-    doc.text('Eliana Amparo R. Molina del Carpio · MDD 2026', PW / 2, MARGIN + 2.5, {align:'center'});
-
-    // Línea dorada separadora
-    doc.setDrawColor(255, 165, 0);
-    doc.setLineWidth(0.4);
-    doc.line(MARGIN, MARGIN + 4, PW - MARGIN, MARGIN + 4);
-
-    // Generar y colocar cada QR
     for(let i = 0; i < todos.length; i++){
       const row = todos[i];
+      if(i > 0) doc.addPage('a4', 'portrait');
+
+      // ── Fondo oscuro total ──────────────────────────────────
+      doc.setFillColor(7, 9, 15);
+      doc.rect(0, 0, PW, PH, 'F');
+
+      // ── Franja superior dorada decorativa ──────────────────
+      doc.setFillColor(255, 165, 0);
+      doc.rect(0, 0, PW, 2, 'F');
+      doc.setFillColor(255, 215, 0);
+      doc.rect(0, 0, PW * 0.6, 2, 'F');
+
+      // ── Cabecera del evento ─────────────────────────────────
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(255, 215, 0);
+      doc.text('XXIV CAMPEONATO REGIONAL DEL SUR', PW / 2, 12, {align:'center'});
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(140, 150, 180);
+      doc.text('Eliana Amparo R. Molina del Carpio  ·  MDD 2026  ·  28 de Junio 2026', PW / 2, 18, {align:'center'});
+
+      // Separador dorado delgado
+      doc.setDrawColor(255, 215, 0);
+      doc.setLineWidth(0.3);
+      doc.line(MARGIN, 22, PW - MARGIN, 22);
+
+      // ── Etiqueta tipo participante ──────────────────────────
+      const esPad = esPadrinoRow(row);
+      const esAcomp = esAcompananteRow(row);
+      const tipoLabel = esPad ? 'PADRINO' : esAcomp ? 'ACOMPAÑANTE' : 'TITULAR';
+      const tipoColor = esPad ? [255,165,0] : esAcomp ? [0,230,118] : [255,215,0];
+
+      // Píldora de tipo
+      doc.setFillColor(20, 25, 45);
+      doc.roundedRect(PW/2 - 22, 25, 44, 8, 2, 2, 'F');
+      doc.setTextColor(...tipoColor);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.text(tipoLabel, PW/2, 30.5, {align:'center'});
+
+      // ── Nombre del participante ─────────────────────────────
+      const nombre = (row[C.Nombre] || '—').toUpperCase();
+      const fontSize = nombre.length > 28 ? 13 : nombre.length > 20 ? 16 : 19;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(fontSize);
+      doc.setTextColor(255, 255, 255);
+      const nombreDisplay = nombre.length > 36 ? nombre.slice(0,34)+'…' : nombre;
+      doc.text(nombreDisplay, PW/2, 44, {align:'center'});
+
+      // Disciplina (si aplica)
+      const disc = row[C.Disciplina] || '';
+      if(disc && disc !== '—'){
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(140, 150, 180);
+        doc.text(disc.toUpperCase(), PW/2, 51, {align:'center'});
+      }
+
+      // ── Generar canvas del QR para este participante ────────
       const canvas = await buildQRCanvasForRow(row);
-      if(!canvas) continue;
 
-      const col = i % COLS;
-      const rowIdx = Math.floor(i / COLS);
-      const x = MARGIN + col * (CARD_W + GAP);
-      const y = MARGIN + 7 + rowIdx * (CARD_H + GAP);
+      if(canvas){
+        // Área disponible para el QR: desde y=55 hasta y=233 (~178mm)
+        const QR_AREA_TOP = 56;
+        const QR_AREA_H   = 178;
+        // Canvas tiene ratio 360:480 = 0.75
+        const MAX_W = PW - 2 * MARGIN;  // 186mm
+        const MAX_H = QR_AREA_H;        // 178mm
+        let cardW, cardH;
+        if(MAX_W / MAX_H < 0.75){
+          cardW = MAX_W;
+          cardH = cardW / 0.75;
+        } else {
+          cardH = MAX_H;
+          cardW = cardH * 0.75;
+        }
+        const cardX = (PW - cardW) / 2;
+        const cardY = QR_AREA_TOP + (QR_AREA_H - cardH) / 2;
 
-      // Fondo blanco redondeado para la tarjeta
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(x, y, CARD_W, CARD_H, 2, 2, 'F');
+        // Borde dorado redondeado alrededor de la tarjeta
+        doc.setDrawColor(255, 215, 0);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(cardX - 1, cardY - 1, cardW + 2, cardH + 2, 3, 3, 'S');
 
-      // Imagen del canvas (contiene QR + logo + banner con nombre)
-      const imgData = canvas.toDataURL('image/png');
-      doc.addImage(imgData, 'PNG', x, y, CARD_W, CARD_H, undefined, 'FAST');
+        const imgData = canvas.toDataURL('image/png');
+        doc.addImage(imgData, 'PNG', cardX, cardY, cardW, cardH, undefined, 'FAST');
+      }
+
+      // ── Datos del participante ───────────────────────────────
+      const INFO_Y = 240;
+      const comida = row[C.Comida] || '—';
+      const bebida = row[C.Bebida] || '—';
+      const dep    = row[C.Dependencia] || '—';
+
+      // Línea separadora
+      doc.setDrawColor(30, 36, 60);
+      doc.setLineWidth(0.3);
+      doc.line(MARGIN, INFO_Y - 4, PW - MARGIN, INFO_Y - 4);
+
+      // Tres columnas de info
+      const col1X = MARGIN + 22;
+      const col2X = PW / 2;
+      const col3X = PW - MARGIN - 22;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(90, 98, 128);
+      doc.text('DEPENDENCIA', col1X, INFO_Y, {align:'center'});
+      doc.text('COMIDA', col2X, INFO_Y, {align:'center'});
+      doc.text('BEBIDA', col3X, INFO_Y, {align:'center'});
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(220, 225, 245);
+      const depShort = dep.length  > 18 ? dep.slice(0,16)+'…'  : dep;
+      const comShort = comida.length > 16 ? comida.slice(0,14)+'…' : comida;
+      const bebShort = bebida.length > 16 ? bebida.slice(0,14)+'…' : bebida;
+      doc.text(depShort, col1X, INFO_Y + 6, {align:'center'});
+      doc.text(comShort, col2X, INFO_Y + 6, {align:'center'});
+      doc.text(bebShort, col3X, INFO_Y + 6, {align:'center'});
+
+      // Instrucción de uso
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(70, 80, 110);
+      doc.text('Presenta este QR en el ingreso y al recibir tu comida · Es reutilizable', PW/2, INFO_Y + 18, {align:'center'});
+
+      // ── Franja inferior dorada decorativa ───────────────────
+      doc.setFillColor(255, 165, 0);
+      doc.rect(0, PH - 2, PW, 2, 'F');
+
+      // Pie de página
+      doc.setFontSize(6);
+      doc.setTextColor(55, 62, 90);
+      doc.text(`${i + 1} / ${todos.length}`, PW - MARGIN, PH - 5, {align:'right'});
+      const qrid = row[C.QR_ID] || '';
+      if(qrid){
+        doc.setTextColor(40, 48, 75);
+        doc.text(`ID: ${qrid}`, MARGIN, PH - 5, {align:'left'});
+      }
     }
 
     const nombreArchivo = `QRs_${(titularRow[C.Nombre]||'participante')
@@ -4190,10 +4297,11 @@ async function _generarPDFQRs(titularRow, acompRows){
   }
 }
 
-// ── ENVIAR WHATSAPP CON PDF DE QRs ──────────────────────────────
-// Genera un único PDF con todos los QR (titular + acompañantes) y lo
-// comparte en UN SOLO mensaje vía navigator.share.
-// Fallback: abre wa.me con el texto si el navegador no soporta archivos.
+// ── ENVIAR WHATSAPP: mensaje + PDF de QRs en un solo share ───────
+// Usa navigator.share con {files, text} — en Android Chrome e iOS Safari
+// WhatsApp recibe el mensaje de texto Y el PDF como adjunto en un solo gesto.
+// Fallback 1: descarga el PDF + abre WhatsApp con texto si share falla.
+// Fallback 2: solo abre WhatsApp con texto si PDF falla.
 async function enviarWA(){
   if(!msgQrid) return;
   const r = allRows.find(x => x[C.QR_ID] === msgQrid);
@@ -4216,41 +4324,61 @@ async function enviarWA(){
   const texto = document.getElementById('msg-texto')?.value || '';
   const waUrl = `https://wa.me/51${cel}${texto ? '?text='+encodeURIComponent(texto) : ''}`;
 
-  // ── Intentar compartir PDF único con todos los QR ──
-  if(navigator.share && window.jspdf){
-    const btns = ['btn-wa','btn-wa-sticky'].map(id=>document.getElementById(id)).filter(Boolean);
+  const btns = ['btn-wa','btn-wa-sticky'].map(id=>document.getElementById(id)).filter(Boolean);
+
+  // ── Intentar compartir PDF + mensaje juntos ──────────────────
+  if(window.jspdf){
     btns.forEach(b=>{ b.disabled=true; b.textContent='⏳ Generando PDF...'; });
     try{
       const celGrupo = r[C.Celular] || '';
       const acompRows = celGrupo
-        ? allRows.filter(x => (x[C.Celular]||'')=== celGrupo && esAcompananteRow(x))
+        ? allRows.filter(x => (x[C.Celular]||'') === celGrupo && esAcompananteRow(x))
         : [];
 
-      showToast('⏳ Preparando QR' + (acompRows.length > 0 ? 's...' : '...'));
+      const totalQRs = 1 + acompRows.length;
+      showToast(`⏳ Generando ${totalQRs} QR${totalQRs>1?'s':''} en PDF...`, 5000);
       const pdfFile = await _generarPDFQRs(r, acompRows);
 
-      if(pdfFile && navigator.canShare && navigator.canShare({files:[pdfFile]})){
-        await navigator.share({
-          files: [pdfFile],
-          title: `QR Acceso — ${_capitalizarPrimero((r[C.Nombre]||'').split(/\s+/)[0])}`,
-          text: texto
-        });
-        _marcarContactadoEnviado(msgQrid, cel);
-        return;
+      if(pdfFile){
+        // ── Caso A: navigator.share soporta archivos → share nativo ──
+        if(navigator.share && navigator.canShare && navigator.canShare({files:[pdfFile]})){
+          try{
+            await navigator.share({
+              files: [pdfFile],
+              text:  texto,
+              title: `QR Acceso — ${_capitalizarPrimero((r[C.Nombre]||'').split(/\s+/)[0])}`
+            });
+            _marcarContactadoEnviado(msgQrid, cel);
+            return;
+          } catch(ex){
+            if(ex.name === 'AbortError'){
+              btns.forEach(b=>{ b.disabled=false; b.textContent='📱 WhatsApp'; });
+              return;
+            }
+            // Fallo en share → continuar con fallback B
+          }
+        }
+
+        // ── Caso B: share no disponible → descargar PDF + abrir WA ──
+        // Descargar el PDF automáticamente
+        const pdfUrl = URL.createObjectURL(pdfFile);
+        const a = document.createElement('a');
+        a.href = pdfUrl; a.download = pdfFile.name; a.style.display = 'none';
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(pdfUrl); }, 3000);
+        showToast('📥 PDF descargado · Adjúntalo en WhatsApp', 4000);
+        // Pequeña pausa para que el usuario vea el toast antes de abrir WA
+        await new Promise(res=>setTimeout(res,1000));
       }
-      // navigator.share no soporta PDF en este dispositivo → fallback
     } catch(ex){
-      if(ex.name === 'AbortError'){
-        btns.forEach(b=>{ b.disabled=false; b.textContent='📱 WhatsApp'; });
-        return; // Usuario canceló el diálogo de compartir
-      }
-      // Otro error → continúa al fallback
+      console.warn('Error generando PDF:', ex);
+      // Fallo silencioso → fallback a solo texto
     } finally {
       btns.forEach(b=>{ b.disabled=false; b.textContent='📱 WhatsApp'; });
     }
   }
 
-  // ── Fallback: abrir WhatsApp con texto ──
+  // ── Fallback: abrir WhatsApp con texto preescrito ────────────
   const isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(isMob){
     window.location.href = waUrl;
