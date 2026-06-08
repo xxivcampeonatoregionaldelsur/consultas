@@ -956,7 +956,7 @@ html{scroll-behavior:smooth}
   <div class="nav">
     <div class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
     <div class="nav-tab" data-tab="participantes" onclick="switchTab('participantes')">👥 Participantes</div>
-    <div class="nav-tab admin-only" data-tab="deps-dashboard" onclick="switchTab('deps-dashboard');renderDepsDashboard()" id="tab-deps-dashboard" style="display:none">🏛️ Por Dependencia</div>
+    <div class="nav-tab admin-only" data-tab="deps-dashboard" onclick="switchTab('deps-dashboard');renderDepsDashboard()" id="tab-deps-dashboard" style="display:none!important;visibility:hidden;width:0;padding:0;overflow:hidden">🏛️ Por Dependencia</div>
     <div class="nav-tab" id="tab-mensajeria" data-tab="mensajeria" onclick="switchTab('mensajeria');renderMensajeria()" style="display:none">💬 Mensajería</div>
     <div class="nav-tab admin-only" data-tab="usuarios" onclick="switchTab('usuarios')" id="tab-usuarios" style="display:none">🔑 Usuarios</div>
   </div>
@@ -1320,11 +1320,7 @@ function startApp(){
   rb.textContent=rm[0];rb.className='role-badge '+rm[1];
   if(session.rol!=='administrador'){
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='none');
-  } else {
-    // En móvil, ocultar "Por Dependencia" del nav (se accede desde Acciones Rápidas)
-    const depTab = document.getElementById('tab-deps-dashboard');
-    if(depTab) depTab.style.display = window.innerWidth < 768 ? 'none' : '';
-  }
+  } // Tab "Por Dependencia" siempre oculto del nav — acceso solo vía Acciones Rápidas
   if(session.rol==='administrador'||session.rol==='edecan'){
     const tm=document.getElementById('tab-mensajeria');
     if(tm) tm.style.display='';
@@ -1646,8 +1642,7 @@ function renderDashboard(){
     <div class="charts">
       <div class="card"><div class="card-title">🍽️ Platos solicitados</div>${bars(comidas,'bf-gold',maxC)}</div>
       <div class="card"><div class="card-title">🥤 Bebidas solicitadas</div>${bars(bebidas,'bf-coral',maxB)}</div>
-      <div class="card"><div class="card-title">🎨 Disciplinas</div>${bars(discMap,'bf-lav',maxD)}</div>
-      <div class="card" style="grid-column:1/-1"><div class="card-title">🥤 Bebidas por Dependencia</div>${bebByDepHtml}</div>
+      <div class="card" style="grid-column:1/-1"><div class="card-title">🎨 Disciplinas</div>${bars(discMap,'bf-lav',maxD)}</div>
     </div>`;
 }
 
@@ -1662,18 +1657,21 @@ function renderDepsDashboard(){
   const colors=['bf-gold','bf-coral','bf-mint','bf-lav','bf-purple'];
   const padrinosByDep=count(allRows.filter(r=>esPadrinoRow(r)).map(r=>r[C.Dependencia]).filter(v=>v&&v!=='—'));
 
-  // Compute per-dep: ingresos, entregas, comidas breakdown
-  const ingByDep={},entByDep={},comByDep={};
+  // Compute per-dep: ingresos, entregas, comidas, bebidas breakdown
+  const ingByDep={},entByDep={},comByDep={},bebByDepDash={};
   allRows.forEach(r=>{
     const dep=r[C.Dependencia]||'—';
     const qid=r[C.QR_ID]||'';
     const com=r[C.Comida]||'—';
+    const beb=r[C.Bebida]||'';
     if(!ingByDep[dep]) ingByDep[dep]=0;
     if(!entByDep[dep]) entByDep[dep]=0;
     if(!comByDep[dep]) comByDep[dep]={};
+    if(!bebByDepDash[dep]) bebByDepDash[dep]={};
     if(checkins[qid]&&checkins[qid].ingreso) ingByDep[dep]++;
     if(checkins[qid]&&checkins[qid].entrega) entByDep[dep]++;
     if(com&&com!=='—') comByDep[dep][com]=(comByDep[dep][com]||0)+1;
+    if(beb&&beb!=='—') bebByDepDash[dep][beb]=(bebByDepDash[dep][beb]||0)+1;
   });
 
   const rows=sorted.map(([dep,cnt],i)=>{
@@ -1725,6 +1723,27 @@ function renderDepsDashboard(){
   const totalIng=Object.values(ingByDep).reduce((a,b)=>a+b,0);
   const totalEnt=Object.values(entByDep).reduce((a,b)=>a+b,0);
 
+  // Bebidas por dependencia para el panel
+  const bebColors=['#FFD700','#00E676','#60a5fa','#FFA500','#a78bfa','#ff6b6b'];
+  const topDepsConBebida=Object.entries(bebByDepDash)
+    .sort((a,b)=>Object.values(b[1]).reduce((s,v)=>s+v,0)-Object.values(a[1]).reduce((s,v)=>s+v,0))
+    .slice(0,8);
+  const bebByDepHtmlDash=topDepsConBebida.length?topDepsConBebida.map(([dep,bebs])=>{
+    const totalDep=Object.values(bebs).reduce((a,b)=>a+b,0);
+    const bebItems=Object.entries(bebs).sort((a,b)=>b[1]-a[1]).map(([beb,cnt],ci)=>{
+      const pct=totalDep>0?Math.round(cnt/totalDep*100):0;
+      const shortBeb=beb.length>22?beb.slice(0,20)+'…':beb;
+      return `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:11px;font-family:var(--font-h);color:${bebColors[ci%bebColors.length]};font-weight:700">${e(shortBeb)} <span style="color:var(--muted);font-weight:400">${cnt}</span></span>`;
+    }).join('');
+    return `<div class="bar-row" style="flex-direction:column;align-items:flex-start;margin-bottom:10px;gap:4px">
+      <span class="bar-lbl" style="width:auto;font-size:11px;color:var(--text)">${e(dep)}</span>
+      <div style="display:flex;flex-wrap:wrap;gap:2px 0">${bebItems}</div>
+      <div style="width:100%;height:6px;background:var(--field);border-radius:3px;overflow:hidden;display:flex">
+        ${Object.entries(bebs).sort((a,b)=>b[1]-a[1]).map(([,cnt],ci)=>`<div style="height:100%;width:${totalDep>0?Math.round(cnt/totalDep*100):0}%;background:${bebColors[ci%bebColors.length]};"></div>`).join('')}
+      </div>
+    </div>`;
+  }).join(''):'<div style="color:var(--muted);font-size:12px">Sin datos</div>';
+
   document.getElementById('deps-inner').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
       <div class="sec-title" style="flex:1;margin:0">Por Dependencia — Estado de Comidas</div>
@@ -1744,7 +1763,8 @@ function renderDepsDashboard(){
           <tbody>${rows||'<tr><td colspan="6"><div class="empty">Sin datos</div></td></tr>'}</tbody>
         </table>
       </div>
-    </div>`;
+    </div>
+    <div class="card" style="margin-top:16px"><div class="card-title">🥤 Bebidas por Dependencia</div>${bebByDepHtmlDash}</div>`;
 }
 
 // ── DEBOUNCE ──────────────────────────────────────────────────
@@ -1753,8 +1773,8 @@ function debouncedSearch(val){
   if(_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
   const trimmed=val.trim();
   const isAdmin=session&&session.rol==='administrador';
-  // Admin: busca desde 1 carácter. Resto: espera 4 caracteres
-  if(!isAdmin && trimmed.length>0 && trimmed.length<4) return;
+  // Admin: busca desde 1 carácter. Resto: espera 2+ caracteres
+  if(!isAdmin && trimmed.length>0 && trimmed.length<2) return;
   _searchDebounceTimer=setTimeout(()=>{
     requestAnimationFrame(()=>renderParticipants(val));
   },300);
@@ -1816,8 +1836,11 @@ function renderParticipants(s,f){
                getTipoDisplay(r).label.toLowerCase().includes(searchLower);
       });
     } else {
-      // Otros roles: busca SOLO por Registro (4+ chars) y agrupa con acompañantes
-      const matched=allRows.filter(r=>(r[C.Registro]||'').toLowerCase().includes(searchLower));
+      // Otros roles: busca por Registro O Nombre (4+ chars) y agrupa con acompañantes
+      const matched=allRows.filter(r=>
+        (r[C.Registro]||'').toLowerCase().includes(searchLower)||
+        (r[C.Nombre]||'').toLowerCase().includes(searchLower)
+      );
       const seen=new Set();
       matched.forEach(r=>{
         const cel=r[C.Celular]||'';
@@ -1854,7 +1877,7 @@ function renderParticipants(s,f){
 
   const searchPlaceholder=isAdmin
     ?'🔍 Buscar por nombre, tipo, dependencia, registro...'
-    :'🔍 Ingresa 4 dígitos del registro (ej: A123)...';
+    :'🔍 Buscar por nombre o código de registro...';
 
   const canAddRecord=isAdmin||(session.rol==='edecan');
   // PERMISO 5: Selección múltiple y envío masivo WA solo para Admin y Edecán
@@ -3158,17 +3181,24 @@ let _editorPlantillaKey = null; // key de la plantilla en edición (null = nueva
 // Claves de plantillas protegidas que no se pueden eliminar
 const PLANTILLAS_PROTEGIDAS = ['libre'];
 
-// Variables dinámicas disponibles para insertar en plantillas
-const VARS_DISPONIBLES = [
-  '{{NOMBRE_INFORMAL}}','{{NOMBRE_FORMAL}}','{{NOMBRE}}',
-  '{{EDECAN}}','{{DEPENDENCIA}}','{{COMIDA_TITULAR}}','{{BEBIDA_TITULAR}}',
-  '{{QR_TITULAR}}','{{LISTA_ACOMPANANTES}}','{{PLURAL_QR}}','{{PLURAL_NECESARIO}}'
+// Variables dinámicas del sistema — puede editarse nombre/etiqueta
+let VARS_DEFINIDAS = [
+  {key:'NOMBRE_INFORMAL', label:'Nombre informal (primer nombre)', ejemplo:'María'},
+  {key:'NOMBRE_FORMAL',   label:'Nombre formal completo',          ejemplo:'GARCIA LOPEZ María'},
+  {key:'NOMBRE',          label:'Nombre (alias de informal)',      ejemplo:'María'},
+  {key:'EDECAN',          label:'Usuario edecán actual',           ejemplo:'Juan Pérez'},
+  {key:'DEPENDENCIA',     label:'Dependencia del registro',        ejemplo:'Recursos Humanos'},
+  {key:'COMIDA_TITULAR',  label:'Plato del titular',               ejemplo:'Pollo a la parrilla'},
+  {key:'BEBIDA_TITULAR',  label:'Bebida del titular',              ejemplo:'Inka Kola'},
+  {key:'QR_TITULAR',      label:'Enlace QR del titular',           ejemplo:'https://...'},
+  {key:'LISTA_ACOMPANANTES', label:'Lista de acompañantes con QR', ejemplo:'(listado)'},
+  {key:'PLURAL_QR',       label:'este QR / estos QR (automático)', ejemplo:'este QR'},
+  {key:'PLURAL_NECESARIO',label:'será / serán necesarios (auto)',  ejemplo:'será necesario'},
 ];
 
-/**
- * Renderiza el módulo de editor de plantillas dentro del panel de mensajería.
- * Solo visible para rol administrador.
- */
+// Estado de edición de variable
+let _editandoVarKey = null;
+
 function renderEditorPlantillas(){
   const container = document.getElementById('msg-editor-plantillas');
   if(!container) return;
@@ -3185,8 +3215,8 @@ function renderEditorPlantillas(){
       </div>`;
   }).join('');
 
-  const varsHtml = VARS_DISPONIBLES.map(v =>
-    `<span onclick="insertarVarEnEditor('${v}')" title="Click para insertar" style="cursor:pointer;display:inline-block;padding:3px 8px;border-radius:3px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25);font-family:monospace;font-size:11px;color:var(--gold);margin:2px 2px 2px 0;user-select:none;">${v}</span>`
+  const varSelectOpts = VARS_DEFINIDAS.map(v=>
+    `<option value="{{${v.key}}}">${v.label} — {{${v.key}}}</option>`
   ).join('');
 
   container.innerHTML = `
@@ -3195,14 +3225,68 @@ function renderEditorPlantillas(){
         <span>🗂️ Editor de Plantillas</span>
         <button class="btn btn-gold btn-sm" onclick="abrirEditorPlantilla(null)" style="min-height:36px">+ Nueva plantilla</button>
       </div>
-
-      <!-- Lista de plantillas existentes -->
-      <div style="padding:0 10px 10px">
-        <div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Plantillas existentes</div>
+      <div style="display:flex;border-bottom:1px solid var(--border);margin:0 10px 0;gap:0;" id="editor-tabs">
+        <div onclick="switchEditorTab('plantillas')" id="etab-plantillas"
+          style="padding:8px 16px;font-family:var(--font-h);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-bottom:2px solid var(--gold);color:var(--gold);">
+          📋 Plantillas
+        </div>
+        <div onclick="switchEditorTab('variables')" id="etab-variables"
+          style="padding:8px 16px;font-family:var(--font-h);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);">
+          ⚙️ Variables
+        </div>
+        <div onclick="switchEditorTab('preview')" id="etab-preview"
+          style="padding:8px 16px;font-family:var(--font-h);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);">
+          👁️ Preview
+        </div>
+      </div>
+      <!-- TAB: PLANTILLAS -->
+      <div id="etab-pane-plantillas" style="padding:0 10px 10px">
+        <div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:10px 0 8px;">Plantillas existentes</div>
         <div id="msg-editor-lista-plantillas">${listaItems}</div>
       </div>
-
-      <!-- Formulario de edición (oculto por defecto) -->
+      <!-- TAB: VARIABLES -->
+      <div id="etab-pane-variables" style="display:none;padding:0 10px 10px">
+        <div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:10px 0 8px;">Variables dinámicas del sistema</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Estas variables se reemplazan con datos reales al generar el mensaje. Puedes editar la etiqueta descriptiva de cada una.</div>
+        <div id="vars-lista"></div>
+        <div id="var-edit-form" style="display:none;padding:10px;background:var(--field);border:1px solid var(--border2);border-radius:4px;margin-top:8px;">
+          <div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">✏️ Editando variable</div>
+          <div style="margin-bottom:8px;">
+            <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;">Clave (solo lectura)</label>
+            <input id="var-edit-key" type="text" readonly style="width:100%;background:var(--s3);border:1px solid var(--border);border-radius:3px;padding:8px 10px;color:var(--muted);font-family:monospace;font-size:12px;min-height:36px;">
+          </div>
+          <div style="margin-bottom:8px;">
+            <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;">Etiqueta descriptiva *</label>
+            <input id="var-edit-label" type="text" style="width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:8px 10px;color:var(--text);font-family:var(--font-b);font-size:13px;outline:none;min-height:36px;">
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-gold btn-sm" onclick="guardarVar()" style="min-height:36px;">💾 Guardar</button>
+            <button class="btn btn-ghost btn-sm" onclick="cancelarEditarVar()" style="min-height:36px;">Cancelar</button>
+          </div>
+        </div>
+      </div>
+      <!-- TAB: PREVIEW -->
+      <div id="etab-pane-preview" style="display:none;padding:0 10px 14px">
+        <div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:10px 0 8px;">Previsualización en tiempo real</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+          <label style="font-family:var(--font-h);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;white-space:nowrap;">Plantilla:</label>
+          <select id="preview-plantilla-sel" onchange="actualizarPreview()"
+            style="background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:6px 10px;color:var(--text);font-family:var(--font-h);font-size:12px;outline:none;flex:1;">
+            ${Object.entries(PLANTILLAS_MSG).map(([k,v])=>`<option value="${k}">${e(v.label)}</option>`).join('')}
+          </select>
+          <label style="font-family:var(--font-h);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;white-space:nowrap;">Registro:</label>
+          <select id="preview-registro-sel" onchange="actualizarPreview()"
+            style="background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:6px 10px;color:var(--text);font-family:var(--font-h);font-size:12px;outline:none;flex:1;max-width:220px;">
+            <option value="">— Usar placeholders —</option>
+            ${allRows.filter(r=>!esAcompananteRow(r)).map(r=>`<option value="${e(r[C.QR_ID]||'')}">${e((r[C.Nombre]||'—').slice(0,28))} [${e(r[C.Registro]||'')}]</option>`).join('')}
+          </select>
+        </div>
+        <div style="background:var(--field);border:1px solid var(--border2);border-radius:6px;padding:14px;min-height:120px;white-space:pre-wrap;font-family:var(--font-b);font-size:13px;line-height:1.6;color:var(--text);" id="preview-output">
+          <span style="color:var(--muted);font-style:italic">Selecciona una plantilla para ver la previsualización...</span>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--muted);">💡 Actualiza automáticamente al editar la plantilla activa.</div>
+      </div>
+      <!-- Formulario de edición de plantilla -->
       <div id="msg-editor-form" style="display:none;padding:0 10px 14px;border-top:1px solid var(--border);margin-top:8px;">
         <div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:12px 0 8px">
           <span id="msg-editor-form-titulo">✏️ Nueva plantilla</span>
@@ -3213,14 +3297,23 @@ function renderEditorPlantillas(){
             style="width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:10px 12px;color:var(--text);font-family:var(--font-b);font-size:13px;outline:none;min-height:40px;">
         </div>
         <div style="margin-bottom:8px;">
-          <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:4px;">Variables disponibles (click para insertar)</label>
-          <div>${varsHtml}</div>
+          <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:6px;">Insertar variable</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="var-insert-select" style="background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:8px 10px;color:var(--text);font-family:var(--font-h);font-size:11px;outline:none;flex:1;min-width:160px;">
+              <option value="">— Selecciona variable —</option>
+              ${varSelectOpts}
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="insertarVarDesdeSelector()" style="min-height:36px;white-space:nowrap;">⬆ Insertar</button>
+          </div>
+          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px;">
+            ${VARS_DEFINIDAS.slice(0,6).map(v=>`<span onclick="insertarVarEnEditor('{{${v.key}}}')" title="${e(v.label)}" style="cursor:pointer;display:inline-block;padding:3px 7px;border-radius:3px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25);font-family:monospace;font-size:11px;color:var(--gold);user-select:none;">{{${v.key}}}</span>`).join('')}
+          </div>
         </div>
         <div style="margin-bottom:12px;">
           <label style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:4px;">Texto de la plantilla *</label>
-          <textarea id="msg-editor-tpl" rows="8"
+          <textarea id="msg-editor-tpl" rows="8" oninput="actualizarPreviewSiActivo()"
             style="width:100%;background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;padding:12px;color:var(--text);font-family:var(--font-b);font-size:13px;line-height:1.55;resize:vertical;outline:none;min-height:160px;"
-            placeholder="Escribe el texto de la plantilla. Usa las variables de arriba para datos dinámicos."></textarea>
+            placeholder="Escribe el texto de la plantilla. Usa el selector de variables para insertar datos dinámicos."></textarea>
         </div>
         <div id="msg-editor-msg" class="msg" style="margin-bottom:8px;"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -3229,33 +3322,152 @@ function renderEditorPlantillas(){
         </div>
       </div>
     </div>`;
+
+  renderVarsLista();
+  actualizarPreview();
+}
+
+function renderVarsLista(){
+  const el=document.getElementById('vars-lista');
+  if(!el) return;
+  el.innerHTML=VARS_DEFINIDAS.map((v,i)=>{
+    const usadaEn=Object.entries(PLANTILLAS_MSG).filter(([,pl])=>pl.tpl&&pl.tpl.includes('{{'+v.key+'}}')).map(([,pl])=>pl.label);
+    const usadaHtml=usadaEn.length?`<span style="font-size:10px;color:var(--mint)">✓ ${usadaEn.length} plantilla${usadaEn.length>1?'s':''}</span>`:'<span style="font-size:10px;color:var(--muted)">sin usar</span>';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:4px;background:var(--field);border:1px solid var(--border);margin-bottom:5px;flex-wrap:wrap;">
+      <code style="font-size:11px;color:var(--gold);background:rgba(255,215,0,.1);padding:2px 6px;border-radius:3px;flex-shrink:0;">{{${e(v.key)}}}</code>
+      <span style="flex:1;font-family:var(--font-h);font-size:12px;color:var(--text)">${e(v.label)}</span>
+      ${usadaHtml}
+      <button class="btn btn-ghost btn-sm" onclick="abrirEditarVar(${i})" style="min-height:32px;padding:4px 10px;">✏️</button>
+    </div>`;
+  }).join('');
+}
+
+function switchEditorTab(tab){
+  ['plantillas','variables','preview'].forEach(t=>{
+    const btn=document.getElementById('etab-'+t);
+    const pane=document.getElementById('etab-pane-'+t);
+    if(btn){btn.style.borderBottomColor=t===tab?'var(--gold)':'transparent';btn.style.color=t===tab?'var(--gold)':'var(--muted)';}
+    if(pane) pane.style.display=t===tab?'':'none';
+  });
+  if(tab==='preview') actualizarPreview();
+  if(tab==='variables') renderVarsLista();
+}
+
+function abrirEditarVar(idx){
+  _editandoVarKey=idx;
+  const v=VARS_DEFINIDAS[idx];
+  if(!v) return;
+  const form=document.getElementById('var-edit-form');
+  const keyEl=document.getElementById('var-edit-key');
+  const labelEl=document.getElementById('var-edit-label');
+  if(keyEl) keyEl.value='{{'+v.key+'}}';
+  if(labelEl) labelEl.value=v.label;
+  if(form){form.style.display='';form.scrollIntoView({behavior:'smooth',block:'nearest'});}
+}
+
+function guardarVar(){
+  if(_editandoVarKey===null) return;
+  const labelEl=document.getElementById('var-edit-label');
+  const newLabel=(labelEl?.value||'').trim();
+  if(!newLabel){showToast('⚠️ La etiqueta no puede estar vacía');return;}
+  VARS_DEFINIDAS[_editandoVarKey].label=newLabel;
+  cancelarEditarVar();
+  renderVarsLista();
+  showToast('✓ Variable actualizada');
+}
+
+function cancelarEditarVar(){
+  _editandoVarKey=null;
+  const form=document.getElementById('var-edit-form');
+  if(form) form.style.display='none';
+}
+
+function actualizarPreview(){
+  const outEl=document.getElementById('preview-output');
+  const selPl=document.getElementById('preview-plantilla-sel');
+  const selReg=document.getElementById('preview-registro-sel');
+  if(!outEl||!selPl) return;
+  const plKey=selPl.value;
+  const pl=PLANTILLAS_MSG[plKey];
+  if(!pl||!pl.tpl){outEl.textContent='(Plantilla vacía o sin texto)';return;}
+  const qrid=selReg?selReg.value:'';
+  const r=qrid?allRows.find(x=>x[C.QR_ID]===qrid):null;
+  let tpl=pl.tpl;
+  if(r){
+    const cel=r[C.Celular]||'';
+    const acomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)):[];
+    const nombreFormal=(r[C.Nombre]||'').trim();
+    const partesTodas=nombreFormal.split(/\s+/).filter(Boolean);
+    let pni='';
+    if(partesTodas.length>=3) pni=partesTodas[2];
+    else if(partesTodas.length===2) pni=partesTodas[1];
+    else pni=partesTodas[0]||'';
+    const nombreInformal=pni.charAt(0).toUpperCase()+pni.slice(1).toLowerCase();
+    const partes=(r[C.Nombre]||'').trim().split(/\s+/);
+    const pn=partes[partes.length-1]||partes[0]||'';
+    const nombre=pn.charAt(0).toUpperCase()+pn.slice(1).toLowerCase();
+    const qrUrl=SCANNER_URL+'?qrid='+encodeURIComponent(r[C.QR_ID]||'');
+    let listaAcomp='';
+    if(acomps.length>0){
+      listaAcomp='👥 Acompañantes:\n'+acomps.map((ac,i)=>{
+        const qrAc=SCANNER_URL+'?qrid='+encodeURIComponent(ac[C.QR_ID]||'');
+        return '  '+(i+1)+'. '+(ac[C.Nombre]||'—')+' — Plato: '+(ac[C.Comida]||'—')+'\n     QR: '+qrAc;
+      }).join('\n')+'\n\n';
+    }
+    tpl=tpl
+      .replace(/{{NOMBRE_INFORMAL}}/g,nombreInformal)
+      .replace(/{{NOMBRE_FORMAL}}/g,nombreFormal)
+      .replace(/{{NOMBRE}}/g,nombre)
+      .replace(/{{EDECAN}}/g,session.usuario||'(edecán)')
+      .replace(/{{DEPENDENCIA}}/g,session.dependencia||r[C.Dependencia]||'(dependencia)')
+      .replace(/{{COMIDA_TITULAR}}/g,r[C.Comida]||'(sin comida)')
+      .replace(/{{BEBIDA_TITULAR}}/g,r[C.Bebida]||'(sin bebida)')
+      .replace(/{{QR_TITULAR}}/g,qrUrl)
+      .replace(/{{LISTA_ACOMPANANTES}}/g,listaAcomp)
+      .replace(/{{PLURAL_QR}}/g,acomps.length>0?'estos QR':'este QR')
+      .replace(/{{PLURAL_NECESARIO}}/g,acomps.length>0?'serán necesarios':'será necesario');
+  } else {
+    VARS_DEFINIDAS.forEach(v=>{
+      tpl=tpl.replace(new RegExp('{{'+v.key+'}}'.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'),'['+v.label+']');
+    });
+  }
+  outEl.textContent=tpl;
+}
+
+function actualizarPreviewSiActivo(){
+  const pane=document.getElementById('etab-pane-preview');
+  if(pane&&pane.style.display!=='none') actualizarPreview();
+}
+
+function insertarVarDesdeSelector(){
+  const sel=document.getElementById('var-insert-select');
+  if(!sel||!sel.value) return;
+  insertarVarEnEditor(sel.value);
+  sel.value='';
 }
 
 /** Abre el formulario de edición para una plantilla existente o nueva */
 function abrirEditorPlantilla(key){
   _editorPlantillaKey = key;
+  // Asegurarse de que el form existe (puede necesitar render primero)
   const form = document.getElementById('msg-editor-form');
   const titulo = document.getElementById('msg-editor-form-titulo');
   const labelEl = document.getElementById('msg-editor-label');
   const tplEl = document.getElementById('msg-editor-tpl');
   const msgEl = document.getElementById('msg-editor-msg');
   if(!form) return;
-
   if(key && PLANTILLAS_MSG[key]){
-    // Editar existente
     const pl = PLANTILLAS_MSG[key];
     if(titulo) titulo.textContent = `✏️ Editando: ${pl.label}`;
     if(labelEl) labelEl.value = pl.label;
     if(tplEl) tplEl.value = pl.tpl;
   } else {
-    // Nueva plantilla
     if(titulo) titulo.textContent = '✏️ Nueva plantilla';
     if(labelEl) labelEl.value = '';
     if(tplEl) tplEl.value = '';
   }
   if(msgEl) msgEl.style.display='none';
   form.style.display = 'block';
-  // Scroll al formulario
   form.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
@@ -3264,85 +3476,6 @@ function cerrarEditorPlantilla(){
   const form = document.getElementById('msg-editor-form');
   if(form) form.style.display = 'none';
   _editorPlantillaKey = null;
-}
-
-/** Guarda la plantilla en edición o crea una nueva */
-async function guardarPlantilla(){
-  const labelEl = document.getElementById('msg-editor-label');
-  const tplEl = document.getElementById('msg-editor-tpl');
-  const msgEl = document.getElementById('msg-editor-msg');
-
-  const label = (labelEl?.value||'').trim();
-  const tpl = (tplEl?.value||'').trim();
-
-  if(!label){
-    if(msgEl){msgEl.className='msg err';msgEl.textContent='El nombre de la plantilla no puede estar vacío.';msgEl.style.display='block';}
-    return;
-  }
-
-  // Generar key única si es nueva plantilla
-  let key = _editorPlantillaKey;
-  if(!key){
-    key = label.toLowerCase()
-      .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
-      .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n')
-      .replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')
-      .slice(0, 30) || 'plantilla_'+Date.now();
-    if(PLANTILLAS_MSG[key]) key += '_'+Date.now();
-  }
-
-  // Guardar en memoria inmediatamente
-  PLANTILLAS_MSG[key] = {label, tpl};
-
-  if(msgEl){msgEl.className='msg ok';msgEl.textContent='⏳ Guardando en Google Sheets...';msgEl.style.display='block';}
-
-  // FIX 1: Persistir en Google Sheets de forma asíncrona
-  try{
-    const body=new URLSearchParams({data:JSON.stringify({
-      action:'savePlantilla',
-      token:session.token,
-      key,label,tpl
-    })});
-    const res=await fetch(SCRIPT_URL,{method:'POST',redirect:'follow',body});
-    const d=await res.json();
-    if(d.result==='ok'){
-      if(msgEl){msgEl.textContent='✓ Plantilla guardada en Google Sheets.';msgEl.style.display='block';}
-    } else {
-      // Guardado en memoria OK pero falló Sheets — no es crítico
-      if(msgEl){msgEl.className='msg ok';msgEl.textContent='✓ Guardada localmente (Sheets: '+( d.mensaje||'error')+')';msgEl.style.display='block';}
-    }
-  } catch(ex){
-    if(msgEl){msgEl.className='msg ok';msgEl.textContent='✓ Guardada localmente (sin conexión al servidor)';msgEl.style.display='block';}
-  }
-
-  setTimeout(()=>{
-    cerrarEditorPlantilla();
-    renderEditorPlantillas();
-    _actualizarSelectorPlantillas();
-  }, 1100);
-}
-
-/** Elimina una plantilla (no protegidas) */
-async function eliminarPlantilla(key){
-  if(PLANTILLAS_PROTEGIDAS.includes(key)){
-    showToast('⚠️ Esta plantilla no puede eliminarse.');
-    return;
-  }
-  if(!PLANTILLAS_MSG[key]) return;
-  const nombre = PLANTILLAS_MSG[key].label;
-  if(!confirm(`¿Eliminar la plantilla "${nombre}"?\n\nEsta acción no puede deshacerse.`)) return;
-  delete PLANTILLAS_MSG[key];
-  // Si el selector activo tenía esta plantilla, resetear a libre
-  const sel = document.getElementById('msg-tipo');
-  if(sel && sel.value === key) sel.value = 'libre';
-  renderEditorPlantillas();
-  _actualizarSelectorPlantillas();
-  showToast('🗑 Plantilla eliminada');
-  // FIX 1: Eliminar del servidor en segundo plano
-  try{
-    const body=new URLSearchParams({data:JSON.stringify({action:'deletePlantilla',token:session.token,key})});
-    await fetch(SCRIPT_URL,{method:'POST',redirect:'follow',body});
-  } catch(ex){ console.warn('Error eliminando plantilla del servidor:',ex); }
 }
 
 /** Inserta una variable en el textarea del editor en la posición del cursor */
@@ -3354,13 +3487,79 @@ function insertarVarEnEditor(varName){
   const before = ta.value.slice(0, start);
   const after = ta.value.slice(end);
   ta.value = before + varName + after;
-  // Reposicionar cursor después de la variable insertada
   const newPos = start + varName.length;
   ta.selectionStart = ta.selectionEnd = newPos;
   ta.focus();
+  actualizarPreviewSiActivo();
 }
 
-/** Actualiza el <select> del selector de plantillas de mensajería con los datos actuales */
+/** Guarda la plantilla en edición o crea una nueva */
+async function guardarPlantilla(){
+  const labelEl = document.getElementById('msg-editor-label');
+  const tplEl = document.getElementById('msg-editor-tpl');
+  const msgEl = document.getElementById('msg-editor-msg');
+  const label = (labelEl?.value||'').trim();
+  const tpl = (tplEl?.value||'').trim();
+  if(!label){
+    if(msgEl){msgEl.className='msg err';msgEl.textContent='El nombre de la plantilla no puede estar vacío.';msgEl.style.display='block';}
+    return;
+  }
+  // Validar que no use vars eliminadas/rotas (solo advertencia)
+  const varsUsadas=[];
+  VARS_DEFINIDAS.forEach(v=>{if(tpl.includes('{{'+v.key+'}}')) varsUsadas.push(v.key);});
+  let key = _editorPlantillaKey;
+  if(!key){
+    key = label.toLowerCase()
+      .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
+      .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n')
+      .replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')
+      .slice(0, 30) || 'plantilla_'+Date.now();
+    if(PLANTILLAS_MSG[key]) key += '_'+Date.now();
+  }
+  PLANTILLAS_MSG[key] = {label, tpl};
+  if(msgEl){msgEl.className='msg ok';msgEl.textContent='⏳ Guardando en Google Sheets...';msgEl.style.display='block';}
+  try{
+    const body=new URLSearchParams({data:JSON.stringify({action:'savePlantilla',token:session.token,key,label,tpl})});
+    const res=await fetch(SCRIPT_URL,{method:'POST',redirect:'follow',body});
+    const d=await res.json();
+    if(d.result==='ok'){
+      if(msgEl){msgEl.textContent='✓ Plantilla guardada en Google Sheets.';msgEl.style.display='block';}
+    } else {
+      if(msgEl){msgEl.className='msg ok';msgEl.textContent='✓ Guardada localmente (Sheets: '+(d.mensaje||'error')+')';msgEl.style.display='block';}
+    }
+  } catch(ex){
+    if(msgEl){msgEl.className='msg ok';msgEl.textContent='✓ Guardada localmente (sin conexión al servidor)';msgEl.style.display='block';}
+  }
+  setTimeout(()=>{
+    cerrarEditorPlantilla();
+    renderEditorPlantillas();
+    _actualizarSelectorPlantillas();
+  }, 1100);
+}
+
+/** Elimina una plantilla (no protegidas) con validación previa */
+async function eliminarPlantilla(key){
+  if(PLANTILLAS_PROTEGIDAS.includes(key)){
+    showToast('⚠️ Esta plantilla no puede eliminarse.');
+    return;
+  }
+  if(!PLANTILLAS_MSG[key]) return;
+  const nombre = PLANTILLAS_MSG[key].label;
+  // Verificar si hay plantillas activas que dependan de esta key
+  if(!confirm(`¿Eliminar la plantilla "${nombre}"?\n\nEsta acción no puede deshacerse.`)) return;
+  delete PLANTILLAS_MSG[key];
+  const sel = document.getElementById('msg-tipo');
+  if(sel && sel.value === key) sel.value = 'libre';
+  renderEditorPlantillas();
+  _actualizarSelectorPlantillas();
+  showToast('🗑 Plantilla eliminada');
+  try{
+    const body=new URLSearchParams({data:JSON.stringify({action:'deletePlantilla',token:session.token,key})});
+    await fetch(SCRIPT_URL,{method:'POST',redirect:'follow',body});
+  } catch(ex){ console.warn('Error eliminando plantilla del servidor:',ex); }
+}
+
+/** Actualiza el selector de plantillas de mensajería */
 function _actualizarSelectorPlantillas(){
   const sel = document.getElementById('msg-tipo');
   if(!sel) return;
@@ -3368,7 +3567,6 @@ function _actualizarSelectorPlantillas(){
   sel.innerHTML = Object.entries(PLANTILLAS_MSG).map(([k,v]) =>
     `<option value="${k}"${k===currentVal?' selected':''}>${e(v.label)}</option>`
   ).join('');
-  // Re-aplicar plantilla si hay titular seleccionado
   aplicarPlantilla();
 }
 
