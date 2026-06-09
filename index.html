@@ -1149,6 +1149,101 @@ html{scroll-behavior:smooth}
   </div>
 </div>
 
+<!-- EDIT MODAL (admin + edecan) -->
+<div id="edit-modal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal" style="max-width:620px">
+    <button class="modal-close" onclick="closeEditModal()">✕</button>
+    <div class="qr-header">
+      <h2 style="font-size:18px">✏️ Editar Participante</h2>
+      <div class="qr-dep" id="edit-modal-qrid-label" style="font-size:11px;opacity:.6"></div>
+    </div>
+    <div style="padding:20px">
+      <div id="edit-msg" class="msg"></div>
+
+      <!-- Nombre + Dependencia -->
+      <div class="reg-row-pub">
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Nombres y Apellidos *</label>
+          <input type="text" id="edit-nombre" class="reg-input-pub" placeholder="Apellidos y nombres completos">
+        </div>
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Dependencia *</label>
+          <select id="edit-dependencia" class="reg-input-pub"></select>
+        </div>
+      </div>
+
+      <!-- Celular + Código Registro -->
+      <div class="reg-row-pub">
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Celular * <span style="font-size:9px;font-weight:400;color:var(--muted)">(9 dígitos, empieza con 9)</span></label>
+          <input type="tel" id="edit-celular" class="reg-input-pub" placeholder="9XX XXX XXX"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,9)" maxlength="9">
+        </div>
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Código Registro</label>
+          <input type="text" id="edit-codigo" class="reg-input-pub" placeholder="ej: A123"
+            oninput="this.value=this.value.replace(/[^a-zA-Z0-9]/g,'').slice(0,4).toUpperCase()" maxlength="4">
+        </div>
+      </div>
+
+      <!-- Tipo -->
+      <div class="reg-row-pub">
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Tipo de asistente *</label>
+          <select id="edit-tipo" class="reg-input-pub" onchange="editModalOnTipoChange()">
+            <option value="Titular">🏅 Participante / Titular</option>
+            <option value="Padrino">👑 Padrino</option>
+            <option value="Invitado">👥 Acompañante / Invitado</option>
+          </select>
+        </div>
+        <div class="reg-field-pub"></div>
+      </div>
+
+      <!-- Bloque disciplinas -->
+      <div id="edit-bloque-disciplinas" style="display:none;margin-bottom:14px">
+        <label class="reg-label-pub" style="margin-bottom:8px;display:block">Disciplinas <span style="font-weight:400;color:var(--muted);font-size:9px">(puede marcar varias)</span></label>
+        <div class="disc-chips-wrap" id="edit-disc-chips-wrap"></div>
+        <div id="edit-disc-sel" style="margin-top:6px;font-family:var(--font-h);font-size:11px;color:var(--gold);font-weight:700;min-height:16px;"></div>
+      </div>
+
+      <!-- Comida + Bebida -->
+      <div class="reg-row-pub">
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Comida *</label>
+          <select id="edit-comida" class="reg-input-pub">
+            <option value="">— Seleccionar —</option>
+            <option value="Chuleta de chancho con arroz y ensalada">🥩 Chuleta de chancho con arroz y ensalada</option>
+            <option value="Pollo a la parrilla con arroz y ensalada">🍗 Pollo a la parrilla con arroz y ensalada</option>
+            <option value="Carne a la parrilla con arroz y ensalada">🔥 Carne a la parrilla con arroz y ensalada</option>
+          </select>
+        </div>
+        <div class="reg-field-pub">
+          <label class="reg-label-pub">Bebida *</label>
+          <select id="edit-bebida" class="reg-input-pub">
+            <option value="">— Seleccionar —</option>
+            <option value="Copoazú">🧃 Copoazú</option>
+            <option value="Refresco de jamaica">🧃 Refresco de jamaica</option>
+            <option value="Coca Cola">🥤 Coca Cola</option>
+            <option value="Inka Kola">🥤 Inka Kola</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Observaciones -->
+      <div style="margin-bottom:18px">
+        <label class="reg-label-pub">Observaciones (opcional)</label>
+        <textarea id="edit-obs" class="reg-input-pub" rows="2" placeholder="Alergias, restricciones u otros comentarios..." style="resize:vertical"></textarea>
+      </div>
+
+      <!-- Acciones -->
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-gold" style="flex:1;justify-content:center" onclick="submitEdit()">💾 Guardar cambios</button>
+        <button class="btn btn-ghost" onclick="closeEditModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- CHANGE PASSWORD MODAL (non-admin users) -->
 <div id="chpass-modal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeChangePass()">
   <div class="modal" style="max-width:360px">
@@ -1999,6 +2094,7 @@ function renderParticipants(s,f){
         </td>
         <td style="white-space:nowrap">
           ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(r[C.TipoPersona]||'')}','${e(r[C.Dependencia]||'')}','${e(r[C.Tipo]||'')}','${e(r[C.Disciplina]||'')}')">🔲 QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
+          ${(isAdmin||(isEdecan&&(!session.dependencia||dep===session.dependencia)))?`<button class="btn btn-blue btn-sm" onclick="openEditModal('${e(qid)}')">✏️</button>`:''}
           ${canDelete?`<button class="btn btn-danger btn-sm" onclick="deleteRegistro('${e(qid)}','${e(r[C.Nombre]||'')}','${e(dep)}')">🗑</button>`:''}
         </td>`;
       frag.appendChild(tr);
@@ -2664,6 +2760,184 @@ function openRegistroModal(){
   document.getElementById('reg-modal').style.display='flex';
 }
 function closeRegistroModal(){document.getElementById('reg-modal').style.display='none';}
+
+// ══════════════════════════════════════════════════════════════
+//  EDITAR REGISTRO (admin + edecan con validación de dependencia)
+// ══════════════════════════════════════════════════════════════
+let _editQrid = ''; // QR_ID del participante en edición
+
+function openEditModal(qrid){
+  const isAdmin  = session.rol === 'administrador';
+  const isEdecan = session.rol === 'edecan';
+  if(!isAdmin && !isEdecan){ showToast('⚠️ Sin permisos para editar'); return; }
+
+  const r = allRows.find(x => x[C.QR_ID] === qrid);
+  if(!r){ showToast('❌ Participante no encontrado'); return; }
+
+  // Edecán solo puede editar su dependencia
+  if(isEdecan && session.dependencia && r[C.Dependencia] !== session.dependencia){
+    showToast('⚠️ Solo puedes editar participantes de tu dependencia'); return;
+  }
+
+  _editQrid = qrid;
+  document.getElementById('edit-msg').style.display = 'none';
+  document.getElementById('edit-modal-qrid-label').textContent = 'ID: ' + qrid;
+
+  // Poblar campos con datos actuales
+  document.getElementById('edit-nombre').value   = r[C.Nombre]       || '';
+  document.getElementById('edit-celular').value  = r[C.Celular]      || '';
+  document.getElementById('edit-codigo').value   = r[C.Registro]     || '';
+  document.getElementById('edit-obs').value      = r[C.Observaciones]|| '';
+
+  // Tipo
+  const tipoSel = document.getElementById('edit-tipo');
+  const tipoVal = esPadrinoRow(r) ? 'Padrino' : esAcompananteRow(r) ? 'Invitado' : 'Titular';
+  tipoSel.value = tipoVal;
+
+  // Dependencia
+  const depSel = document.getElementById('edit-dependencia');
+  depSel.innerHTML = '<option value="">— Seleccionar —</option>';
+  if(isEdecan && session.dependencia){
+    depSel.innerHTML = `<option value="${e(session.dependencia)}">${e(session.dependencia)}</option>`;
+    depSel.value = session.dependencia;
+    depSel.disabled = true;
+  } else {
+    depSel.disabled = false;
+    getDependencias().forEach(dep => {
+      const opt = document.createElement('option');
+      opt.value = dep; opt.textContent = dep;
+      if(dep === r[C.Dependencia]) opt.selected = true;
+      depSel.appendChild(opt);
+    });
+  }
+
+  // Comida / Bebida
+  document.getElementById('edit-comida').value = r[C.Comida] || '';
+  document.getElementById('edit-bebida').value = r[C.Bebida] || '';
+
+  // Disciplinas
+  _editPoblarDisciplinas();
+  const discActual = (r[C.Disciplina] || '').split(',').map(d => d.trim()).filter(Boolean);
+  document.querySelectorAll('.edit-disc-modal').forEach(chk => {
+    chk.checked = discActual.includes(chk.value);
+    const lbl = chk.closest('.disc-chip-label');
+    if(lbl) lbl.classList.toggle('sel', chk.checked);
+  });
+  editModalOnTipoChange();
+
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeEditModal(){
+  document.getElementById('edit-modal').style.display = 'none';
+  _editQrid = '';
+}
+
+function _editPoblarDisciplinas(){
+  const wrap = document.getElementById('edit-disc-chips-wrap');
+  if(!wrap) return;
+  function makeGroup(lista, titulo){
+    const header = `<div class="disc-group-title">${titulo}</div>`;
+    const chips = lista.map(d => `
+      <label class="disc-chip-label" id="edit-disc-chip-label-${d.replace(/\s/g,'-')}">
+        <input type="checkbox" class="edit-disc-modal" value="${d}" onchange="editModalDiscChange(this)">
+        <span>${DISC_ICONOS_M[d]||'🏅'} ${d}</span>
+      </label>`).join('');
+    return header + chips;
+  }
+  wrap.innerHTML =
+    makeGroup(DISC_GRUPAL_M,    '🏅 Disciplinas Grupales') +
+    makeGroup(DISC_INDIVIDUAL_M,'🎯 Disciplinas Individuales') +
+    makeGroup(DISC_BARRA_M,     '📣 Barra');
+}
+
+function editModalDiscChange(el){
+  const all = document.querySelectorAll('.edit-disc-modal');
+  all.forEach(c => {
+    const lbl = c.closest('.disc-chip-label');
+    if(lbl) lbl.classList.toggle('sel', c.checked);
+  });
+  const sel = document.getElementById('edit-disc-sel');
+  const checked = Array.from(document.querySelectorAll('.edit-disc-modal:checked')).map(c => c.value);
+  if(sel) sel.textContent = checked.length ? '✅ ' + checked.join(', ') : '';
+}
+
+function editModalOnTipoChange(){
+  const tipo  = document.getElementById('edit-tipo').value;
+  const bloq  = document.getElementById('edit-bloque-disciplinas');
+  if(bloq) bloq.style.display = (tipo === 'Titular' || tipo === 'Padrino') ? '' : 'none';
+}
+
+async function submitEdit(){
+  const isAdmin  = session.rol === 'administrador';
+  const isEdecan = session.rol === 'edecan';
+  if(!isAdmin && !isEdecan){ showToast('⚠️ Sin permisos'); return; }
+  if(!_editQrid){ showToast('❌ Sin participante seleccionado'); return; }
+
+  const msg       = document.getElementById('edit-msg');
+  const nombre    = (document.getElementById('edit-nombre')?.value    || '').trim();
+  const celular   = (document.getElementById('edit-celular')?.value   || '').trim();
+  const dependencia=(document.getElementById('edit-dependencia')?.value|| '').trim();
+  const codigo    = (document.getElementById('edit-codigo')?.value    || '').trim().toUpperCase();
+  const tipo      = document.getElementById('edit-tipo')?.value       || 'Titular';
+  const comida    = (document.getElementById('edit-comida')?.value    || '').trim();
+  const bebida    = (document.getElementById('edit-bebida')?.value    || '').trim();
+  const obs       = (document.getElementById('edit-obs')?.value       || '').trim();
+
+  // Validaciones básicas
+  if(!nombre)    { showMsg(msg,'err','El nombre es obligatorio.');        return; }
+  if(!dependencia){ showMsg(msg,'err','Selecciona la dependencia.');      return; }
+  if(!celular || !/^\d{9}$/.test(celular) || !celular.startsWith('9')){
+    showMsg(msg,'err','Celular inválido: 9 dígitos, empieza con 9.');     return;
+  }
+  if(!comida)    { showMsg(msg,'err','Selecciona la comida.');            return; }
+  if(!bebida)    { showMsg(msg,'err','Selecciona la bebida.');            return; }
+
+  // Disciplinas
+  let disciplina = '';
+  if(tipo === 'Titular' || tipo === 'Padrino'){
+    const checked = Array.from(document.querySelectorAll('.edit-disc-modal:checked')).map(c => c.value);
+    disciplina = checked.join(', ');
+    if(!disciplina){
+      showMsg(msg,'err','Selecciona al menos una disciplina.'); return;
+    }
+  }
+
+  // Mapear tipo al formato del servidor
+  const tipoServidor  = tipo === 'Titular' ? 'Titular' : tipo === 'Padrino' ? 'Padrino' : 'Invitado';
+  const tipoPersona   = tipo === 'Invitado' ? 'Acompañante' : 'Titular';
+  const padrinoFlag   = tipo === 'Padrino' ? 'SI' : 'NO';
+
+  const btn = document.querySelector('#edit-modal .btn-gold');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
+
+  try{
+    const res = await apiFetch('updateRegistro', {
+      qrid:        _editQrid,
+      Nombre:      nombre,
+      Dependencia: dependencia,
+      Celular:     celular,
+      Registro:    codigo,
+      Tipo:        tipoServidor,
+      TipoPersona: tipoPersona,
+      Padrino:     padrinoFlag,
+      Disciplina:  disciplina,
+      Comida:      comida,
+      Bebida:      bebida,
+      Observaciones: obs
+    });
+    if(res.result === 'ok'){
+      showMsg(msg,'ok','✓ Cambios guardados correctamente');
+      setTimeout(async () => { closeEditModal(); await loadData(); }, 1500);
+    } else {
+      showMsg(msg,'err', res.mensaje || 'Error al guardar cambios');
+    }
+  } catch(ex){
+    showMsg(msg,'err','Error de conexión: ' + ex.message);
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '💾 Guardar cambios'; }
+  }
+}
 
 // Limpia errores visuales del modal
 function regLimpiarErrores(){
@@ -4121,8 +4395,7 @@ function _construirListaAcompanantes(acomps){
   const items = ListaAcompanantes.map((ac, i) => {
     const comida = ListaComidasAcompanantes.find(c => c.acompanante_id === ac.id);
     const bebida = ListaBebidasAcompanantes.find(b => b.acompanante_id === ac.id);
-    const qrAc = `${SCANNER_URL}?qrid=${encodeURIComponent(ac.id)}`;
-    return `  ${i+1}. ${ac.nombre} — Plato: ${comida ? comida.tipo_comida : '—'} | Bebida: ${bebida ? bebida.tipo_bebida : '—'}\n     QR: ${qrAc}`;
+    return `  ${i+1}. ${ac.nombre}\n     🍽️ ${comida ? comida.tipo_comida : '—'} · 🥤 ${bebida ? bebida.tipo_bebida : '—'}`;
   });
   return '👥 Acompañantes:\n' + items.join('\n') + '\n\n';
 }
