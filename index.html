@@ -4261,13 +4261,13 @@ function renderMensajeria(){
     return true;
   });
   // Admin ve todos los titulares + todos los padrinos
-  // Edecán ve titulares + padrinos de su dependencia
+  // Edecán ve SOLO titulares de su dependencia (sin acceso a padrinos)
   let padrinosDep=[];
   if(isAdmin){
     padrinosDep=allRows.filter(r=>esPadrinoRow(r));
   } else if(isEdecan&&session.dependencia){
     titulares=titulares.filter(r=>r[C.Dependencia]===session.dependencia);
-    padrinosDep=allRows.filter(r=>esPadrinoRow(r)&&r[C.Dependencia]===session.dependencia);
+    // padrinosDep queda vacío para edecanes — acceso restringido a administradores
   }
 
   // Dashboard contactados por dependencia (admin only)
@@ -4290,7 +4290,45 @@ function renderMensajeria(){
         </div>
         <span style="font-size:10px;color:var(--muted);min-width:28px">${s.tot>0?Math.round(s.SI/s.tot*100):0}%</span>
       </div>`).join('');
-    dashHtml=`<div class="card" style="margin-bottom:18px">
+    // ── Dashboard padrinos contactados (solo admin) ──────────────
+    const allPadrinos=allRows.filter(r=>esPadrinoRow(r));
+    const padSI=allPadrinos.filter(r=>contactados[r[C.QR_ID]||'']==='SI').length;
+    const padPEND=allPadrinos.filter(r=>!contactados[r[C.QR_ID]||'']||contactados[r[C.QR_ID]||'']==='PENDIENTE').length;
+    const padNO=allPadrinos.filter(r=>contactados[r[C.QR_ID]||'']==='NO').length;
+    const padTot=allPadrinos.length;
+    const padPct=padTot>0?Math.round(padSI/padTot*100):0;
+    const padrinosDashHtml=`<div class="card" style="margin-bottom:18px;border-left:3px solid var(--gold2)">
+      <div class="card-title">👑 Estado de Contacto — Padrinos</div>
+      <div style="padding:0 10px 6px">
+        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:100px;background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:4px;padding:12px;text-align:center;">
+            <div style="font-family:var(--font-h);font-size:32px;font-weight:900;color:var(--ok);line-height:1">${padSI}</div>
+            <div style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--ok);text-transform:uppercase;letter-spacing:1.5px;margin-top:4px">✅ Contactados</div>
+          </div>
+          <div style="flex:1;min-width:100px;background:rgba(255,165,0,.1);border:1px solid rgba(255,165,0,.28);border-radius:4px;padding:12px;text-align:center;">
+            <div style="font-family:var(--font-h);font-size:32px;font-weight:900;color:var(--warn);line-height:1">${padPEND}</div>
+            <div style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:1.5px;margin-top:4px">⏳ Pendientes</div>
+          </div>
+          <div style="flex:1;min-width:100px;background:var(--err-bg);border:1px solid var(--err-border);border-radius:4px;padding:12px;text-align:center;">
+            <div style="font-family:var(--font-h);font-size:32px;font-weight:900;color:var(--err);line-height:1">${padNO}</div>
+            <div style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--err);text-transform:uppercase;letter-spacing:1.5px;margin-top:4px">❌ No contactar</div>
+          </div>
+          <div style="flex:1;min-width:100px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:4px;padding:12px;text-align:center;">
+            <div style="font-family:var(--font-h);font-size:32px;font-weight:900;color:var(--gold);line-height:1">${padTot}</div>
+            <div style="font-family:var(--font-h);font-size:9px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin-top:4px">👑 Total</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="flex:1;height:10px;background:var(--field);border-radius:5px;overflow:hidden">
+            <div style="height:100%;width:${padPct}%;background:linear-gradient(90deg,var(--gold2),var(--ok));border-radius:5px;transition:width .4s"></div>
+          </div>
+          <span style="font-family:var(--font-h);font-size:12px;font-weight:700;color:var(--mint);min-width:36px">${padPct}%</span>
+        </div>
+        <div style="margin-top:6px;font-family:var(--font-h);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">${padSI} de ${padTot} padrinos contactados</div>
+      </div>
+    </div>`;
+
+    dashHtml=padrinosDashHtml+`<div class="card" style="margin-bottom:18px">
       <div class="card-title">📊 Estado de Contacto por Dependencia</div>
       <div style="padding:0 10px">
         <div style="display:flex;gap:16px;margin-bottom:10px;font-family:var(--font-h);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px">
@@ -4362,11 +4400,11 @@ function renderMensajeria(){
           <option value="PENDIENTE">⏳ No contactados</option>
           <option value="NO">❌ No contactar</option>
         </select>
-        <select id="msg-filter-tipo" class="filter" style="min-height:40px;font-size:12px" onchange="filtrarMsgTabla()">
+        ${isAdmin ? `<select id="msg-filter-tipo" class="filter" style="min-height:40px;font-size:12px" onchange="filtrarMsgTabla()">
           <option value="">Titular + Padrino</option>
           <option value="titular">Solo Titulares</option>
           <option value="padrino">Solo Padrinos</option>
-        </select>
+        </select>` : ''}
         ${isAdmin ? `<select id="msg-filter-dep" class="filter" style="min-height:40px;font-size:12px;max-width:200px" onchange="filtrarMsgTabla()">
           <option value="">Todas las dependencias</option>
           ${[...new Set(allMsgRows.map(r=>r[C.Dependencia]||'—').filter(Boolean))].sort().map(d=>`<option value="${e(d.toLowerCase())}">${e(d)}</option>`).join('')}
