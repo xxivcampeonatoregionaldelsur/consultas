@@ -2363,11 +2363,14 @@ En los siguientes mensajes te envío los datos y QR de cada uno de tus acompaña
     await _compartir(filesMsg1, `QR Titular - ${primerNombreCap}`, msg1);
 
     // Mensajes por acompañante — QR_ID real de cada uno
-    for(let i = 0; i < acompRows.length; i++){
-      const ac    = acompRows[i];
-      const nomAc = ac[C.Nombre] || '—';
-      const comAc = ac[C.Comida] || '—';
-      const bebAc = ac[C.Bebida] || '—';
+    const { ListaAcompanantes, ListaComidasAcompanantes, ListaBebidasAcompanantes } =
+      _buildListasAcompanantes(acompRows);
+
+    for(let i = 0; i < ListaAcompanantes.length; i++){
+      const ac    = acompRows[i]; // fila original para buildQRCanvasForRow
+      const nomAc = ListaAcompanantes[i].nombre;
+      const comAc = (ListaComidasAcompanantes.find(c=>c.acompanante_id===ListaAcompanantes[i].id)||{}).tipo_comida || '—';
+      const bebAc = (ListaBebidasAcompanantes.find(b=>b.acompanante_id===ListaAcompanantes[i].id)||{}).tipo_bebida || '—';
       const numAc = i + 1;
       // Renderiza canvas usando el QR_ID del acompañante (de la BD)
       const acCanvas = await buildQRCanvasForRow(ac);
@@ -3669,9 +3672,12 @@ function renderMensajeria(){
     if(r[C.TipoPersona]!=='Titular') return false;
     return true;
   });
-  // CAMBIO 3: Edecanes ven titulares + padrinos de su dependencia
+  // Admin ve todos los titulares + todos los padrinos
+  // Edecán ve titulares + padrinos de su dependencia
   let padrinosDep=[];
-  if(isEdecan&&session.dependencia){
+  if(isAdmin){
+    padrinosDep=allRows.filter(r=>esPadrinoRow(r));
+  } else if(isEdecan&&session.dependencia){
     titulares=titulares.filter(r=>r[C.Dependencia]===session.dependencia);
     padrinosDep=allRows.filter(r=>esPadrinoRow(r)&&r[C.Dependencia]===session.dependencia);
   }
@@ -3709,8 +3715,10 @@ function renderMensajeria(){
     </div>`;
   }
 
-  // ── Construir lista combinada para mensajería (titulares + padrinos si edecan) ──
-  const allMsgRows = isEdecan ? [...titulares, ...padrinosDep] : titulares;
+  // ── Construir lista combinada para mensajería (titulares + padrinos) ──
+  // Admin: todos los titulares + todos los padrinos
+  // Edecán: titulares + padrinos de su dependencia
+  const allMsgRows = (isAdmin || isEdecan) ? [...titulares, ...padrinosDep] : titulares;
 
   const titRows=allMsgRows.map((r,i)=>{
     const cel=r[C.Celular]||'';
@@ -3828,11 +3836,21 @@ function renderMensajeria(){
         ></textarea>
       </div>
 
+      <!-- Opciones QR -->
+      <div style="margin-bottom:12px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:4px;display:flex;align-items:center;gap:10px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-family:var(--font-h);font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:1px;">
+          <input type="checkbox" id="msg-chk-generar-qr" style="accent-color:var(--gold);width:16px;height:16px;" onchange="onGenQrChange()">
+          Generar QR en PDF
+        </label>
+        <span style="font-size:11px;color:var(--muted)">Solo si el participante lo necesita</span>
+      </div>
+
       <!-- Acciones desktop (dentro del panel) -->
       <div id="msg-actions-inline" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px;">
         <!-- FIX: btn-share (navigator.share) eliminado completamente -->
         <button class="btn btn-gold" id="btn-wa" onclick="enviarWA()" disabled style="opacity:.45;">📱 WhatsApp</button>
         <button class="btn btn-ghost" onclick="copiarMsg()">📋 Copiar</button>
+        <button class="btn btn-blue" id="btn-pdf-qr" onclick="generarPDFConQR()" disabled style="opacity:.45;display:none;">📄 Generar PDF con QR</button>
         <label id="msg-contactado-lbl" style="display:none;margin-left:auto;font-family:var(--font-h);font-size:11px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px;">
           <input type="checkbox" id="msg-chk-contactado" onchange="toggleContactadoMsg()" style="accent-color:var(--mint);width:16px;height:16px;">
           Marcar contactado
@@ -3845,6 +3863,7 @@ function renderMensajeria(){
   <!-- Barra sticky de envío — sólo móvil, siempre al fondo -->
   <div class="msg-sticky-bar" id="msg-sticky-bar">
     <button class="btn btn-gold" id="btn-wa-sticky" onclick="enviarWA()" disabled style="opacity:.45;flex:2;">📱 WhatsApp</button>
+    <button class="btn btn-blue" id="btn-pdf-qr-sticky" onclick="generarPDFConQR()" disabled style="opacity:.45;display:none;flex:1.5;">📄 PDF QR</button>
     <button class="btn btn-ghost" onclick="copiarMsg()" style="flex:1;">📋 Copiar</button>
     <label id="msg-contactado-lbl-sticky" style="display:none;font-family:var(--font-h);font-size:11px;color:var(--muted);cursor:pointer;align-items:center;gap:4px;flex-shrink:0;">
       <input type="checkbox" id="msg-chk-contactado-sticky" onchange="toggleContactadoMsgSticky()" style="accent-color:var(--mint);width:16px;height:16px;">
@@ -3931,6 +3950,17 @@ function _actualizarInfoTitular(qrid){
     if(btn){ btn.disabled = !habilitado; btn.style.opacity = habilitado ? '1' : '.45'; }
   });
 
+  // Gestionar botón PDF QR según checkbox generar_qr
+  const chkQr = document.getElementById('msg-chk-generar-qr');
+  const qrActivo = chkQr && chkQr.checked;
+  ['btn-pdf-qr','btn-pdf-qr-sticky'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(!btn) return;
+    btn.style.display = qrActivo ? '' : 'none';
+    btn.disabled = !(qrActivo && habilitado);
+    btn.style.opacity = (qrActivo && habilitado) ? '1' : '.45';
+  });
+
   // FIX: Botón compartir eliminado — se omite la referencia a btn-share
 
   // Mostrar labels contactado
@@ -4005,14 +4035,94 @@ function toggleContactadoMsgSticky(){
   renderMensajeria();
 }
 
+// ── HELPERS: listas separadas de acompañantes ────────────────────
+// ListaAcompanantes     → datos del acompañante (id, nombre)
+// ListaComidasAcompanantes → comida por acompañante
+// ListaBebidasAcompanantes → bebida por acompañante
+// Las tres se relacionan por acompanante_id (QR_ID del acompañante).
+
+/**
+ * Estructura normalizada de acompañante para uso interno.
+ * @param {object} row - fila de allRows de un acompañante
+ * @returns {{ id:string, nombre:string }}
+ */
+function _buildAcompanante(row){
+  return {
+    id:     row[C.QR_ID]  || '',
+    nombre: row[C.Nombre] || '—'
+  };
+}
+
+/**
+ * Estructura de comida por acompañante.
+ * @param {object} row - fila de allRows de un acompañante
+ * @returns {{ acompanante_id:string, tipo_comida:string }}
+ */
+function _buildComidaAcompanante(row){
+  return {
+    acompanante_id: row[C.QR_ID]  || '',
+    tipo_comida:    row[C.Comida] || '—'
+  };
+}
+
+/**
+ * Estructura de bebida por acompañante.
+ * @param {object} row - fila de allRows de un acompañante
+ * @returns {{ acompanante_id:string, tipo_bebida:string }}
+ */
+function _buildBebidaAcompanante(row){
+  return {
+    acompanante_id: row[C.QR_ID]  || '',
+    tipo_bebida:    row[C.Bebida] || '—'
+  };
+}
+
+/**
+ * Devuelve las tres listas separadas para un grupo de acompañantes.
+ * No mezcla datos entre listas; cada una se relaciona por acompanante_id.
+ * @param {Array} acompRows - filas de acompañantes del mismo titular
+ * @returns {{ ListaAcompanantes, ListaComidasAcompanantes, ListaBebidasAcompanantes }}
+ */
+function _buildListasAcompanantes(acompRows){
+  if(!acompRows || acompRows.length === 0){
+    return { ListaAcompanantes:[], ListaComidasAcompanantes:[], ListaBebidasAcompanantes:[] };
+  }
+  return {
+    ListaAcompanantes:        acompRows.map(_buildAcompanante),
+    ListaComidasAcompanantes: acompRows.map(_buildComidaAcompanante),
+    ListaBebidasAcompanantes: acompRows.map(_buildBebidaAcompanante)
+  };
+}
+
+/**
+ * Valida consistencia entre las tres listas:
+ * - Cada comida/bebida debe tener acompanante_id que exista en ListaAcompanantes.
+ * @param {object} listas - resultado de _buildListasAcompanantes
+ * @returns {boolean}
+ */
+function _validarConsistenciaAcompanantes(listas){
+  const ids = new Set(listas.ListaAcompanantes.map(a => a.id));
+  const comOk = listas.ListaComidasAcompanantes.every(c => ids.has(c.acompanante_id));
+  const bebOk = listas.ListaBebidasAcompanantes.every(b => ids.has(b.acompanante_id));
+  return comOk && bebOk;
+}
+
 // ── HELPER: lista de acompañantes con QR_IDs reales de la BD ─────
 // Devuelve string formateado o '' si no hay acompañantes.
 // Cada QR usa el QR_ID almacenado — no se genera ninguno nuevo.
+// Usa las tres listas separadas para construir el texto, relacionando por acompanante_id.
 function _construirListaAcompanantes(acomps){
   if(!acomps || acomps.length === 0) return '';
-  const items = acomps.map((ac, i) => {
-    const qrAc = `${SCANNER_URL}?qrid=${encodeURIComponent(ac[C.QR_ID] || '')}`;
-    return `  ${i+1}. ${ac[C.Nombre]||'—'} — Plato: ${ac[C.Comida]||'—'}\n     QR: ${qrAc}`;
+
+  const { ListaAcompanantes, ListaComidasAcompanantes, ListaBebidasAcompanantes } =
+    _buildListasAcompanantes(acomps);
+
+  // Relacionar por acompanante_id — no mezclar datos entre listas
+  const items = ListaAcompanantes.map((ac, i) => {
+    const comida = ListaComidasAcompanantes.find(c => c.acompanante_id === ac.id);
+    const bebida = ListaBebidasAcompanantes.find(b => b.acompanante_id === ac.id);
+    const qrAc = `${SCANNER_URL}?qrid=${encodeURIComponent(ac.id)}`;
+    return `  ${i+1}. ${ac.nombre} — Plato: ${comida ? comida.tipo_comida : '—'} | Bebida: ${bebida ? bebida.tipo_bebida : '—'}\n     QR: ${qrAc}`;
   });
   return '👥 Acompañantes:\n' + items.join('\n') + '\n\n';
 }
@@ -4297,11 +4407,8 @@ async function _generarPDFQRs(titularRow, acompRows){
   }
 }
 
-// ── ENVIAR WHATSAPP: mensaje + PDF de QRs en un solo share ───────
-// Usa navigator.share con {files, text} — en Android Chrome e iOS Safari
-// WhatsApp recibe el mensaje de texto Y el PDF como adjunto en un solo gesto.
-// Fallback 1: descarga el PDF + abre WhatsApp con texto si share falla.
-// Fallback 2: solo abre WhatsApp con texto si PDF falla.
+// ── ENVIAR WHATSAPP: solo texto, sin QR automático ───────────────
+// El QR solo se genera si el usuario activa el checkbox y hace clic en "Generar PDF con QR"
 async function enviarWA(){
   if(!msgQrid) return;
   const r = allRows.find(x => x[C.QR_ID] === msgQrid);
@@ -4324,61 +4431,7 @@ async function enviarWA(){
   const texto = document.getElementById('msg-texto')?.value || '';
   const waUrl = `https://wa.me/51${cel}${texto ? '?text='+encodeURIComponent(texto) : ''}`;
 
-  const btns = ['btn-wa','btn-wa-sticky'].map(id=>document.getElementById(id)).filter(Boolean);
-
-  // ── Intentar compartir PDF + mensaje juntos ──────────────────
-  if(window.jspdf){
-    btns.forEach(b=>{ b.disabled=true; b.textContent='⏳ Generando PDF...'; });
-    try{
-      const celGrupo = r[C.Celular] || '';
-      const acompRows = celGrupo
-        ? allRows.filter(x => (x[C.Celular]||'') === celGrupo && esAcompananteRow(x))
-        : [];
-
-      const totalQRs = 1 + acompRows.length;
-      showToast(`⏳ Generando ${totalQRs} QR${totalQRs>1?'s':''} en PDF...`, 5000);
-      const pdfFile = await _generarPDFQRs(r, acompRows);
-
-      if(pdfFile){
-        // ── Caso A: navigator.share soporta archivos → share nativo ──
-        if(navigator.share && navigator.canShare && navigator.canShare({files:[pdfFile]})){
-          try{
-            await navigator.share({
-              files: [pdfFile],
-              text:  texto,
-              title: `QR Acceso — ${_capitalizarPrimero((r[C.Nombre]||'').split(/\s+/)[0])}`
-            });
-            _marcarContactadoEnviado(msgQrid, cel);
-            return;
-          } catch(ex){
-            if(ex.name === 'AbortError'){
-              btns.forEach(b=>{ b.disabled=false; b.textContent='📱 WhatsApp'; });
-              return;
-            }
-            // Fallo en share → continuar con fallback B
-          }
-        }
-
-        // ── Caso B: share no disponible → descargar PDF + abrir WA ──
-        // Descargar el PDF automáticamente
-        const pdfUrl = URL.createObjectURL(pdfFile);
-        const a = document.createElement('a');
-        a.href = pdfUrl; a.download = pdfFile.name; a.style.display = 'none';
-        document.body.appendChild(a); a.click();
-        setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(pdfUrl); }, 3000);
-        showToast('📥 PDF descargado · Adjúntalo en WhatsApp', 4000);
-        // Pequeña pausa para que el usuario vea el toast antes de abrir WA
-        await new Promise(res=>setTimeout(res,1000));
-      }
-    } catch(ex){
-      console.warn('Error generando PDF:', ex);
-      // Fallo silencioso → fallback a solo texto
-    } finally {
-      btns.forEach(b=>{ b.disabled=false; b.textContent='📱 WhatsApp'; });
-    }
-  }
-
-  // ── Fallback: abrir WhatsApp con texto preescrito ────────────
+  // Abrir WhatsApp con solo el texto (sin PDF ni QR)
   const isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(isMob){
     window.location.href = waUrl;
@@ -4386,6 +4439,83 @@ async function enviarWA(){
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   }
   _marcarContactadoEnviado(msgQrid, cel);
+}
+
+// ── ENDPOINT INDEPENDIENTE: Generar PDF con QR ───────────────────
+// Solo se ejecuta si generar_qr = true (checkbox activado por el usuario)
+// No se llama automáticamente en ningún flujo.
+async function generarPDFConQR(){
+  // Validar que el checkbox esté activo
+  const chkQr = document.getElementById('msg-chk-generar-qr');
+  if(!chkQr || !chkQr.checked){
+    showToast('⚠️ Activa "Generar QR en PDF" para usar esta función');
+    return;
+  }
+  if(!msgQrid) return;
+  const r = allRows.find(x => x[C.QR_ID] === msgQrid);
+  if(!r){showToast('❌ Titular no encontrado');return;}
+
+  const btns = ['btn-pdf-qr','btn-pdf-qr-sticky'].map(id=>document.getElementById(id)).filter(Boolean);
+  btns.forEach(b=>{ b.disabled=true; b.textContent='⏳ Generando PDF...'; });
+
+  try{
+    const cel = r[C.Celular] || '';
+    const acompRows = cel
+      ? allRows.filter(x => (x[C.Celular]||'') === cel && esAcompananteRow(x))
+      : [];
+
+    const totalQRs = 1 + acompRows.length;
+    showToast(`⏳ Generando ${totalQRs} QR${totalQRs>1?'s':''} en PDF...`, 5000);
+    const pdfFile = await _generarPDFQRs(r, acompRows);
+
+    if(pdfFile){
+      if(navigator.share && navigator.canShare && navigator.canShare({files:[pdfFile]})){
+        try{
+          await navigator.share({
+            files: [pdfFile],
+            text: document.getElementById('msg-texto')?.value || '',
+            title: `QR Acceso — ${_capitalizarPrimero((r[C.Nombre]||'').split(/\s+/)[0])}`
+          });
+          return;
+        } catch(ex){
+          if(ex.name === 'AbortError') return;
+        }
+      }
+      // Fallback: descargar PDF
+      const pdfUrl = URL.createObjectURL(pdfFile);
+      const a = document.createElement('a');
+      a.href = pdfUrl; a.download = pdfFile.name; a.style.display = 'none';
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(pdfUrl); }, 3000);
+      showToast('📥 PDF descargado · Adjúntalo en WhatsApp', 4000);
+    } else {
+      showToast('❌ Error al generar el PDF');
+    }
+  } catch(ex){
+    console.error('Error generando PDF con QR:', ex);
+    showToast('❌ Error: ' + ex.message);
+  } finally {
+    btns.forEach(b=>{ b.disabled=false; b.textContent='📄 Generar PDF con QR'; });
+    // Restaurar texto del sticky
+    const stickyBtn = document.getElementById('btn-pdf-qr-sticky');
+    if(stickyBtn) stickyBtn.textContent = '📄 PDF QR';
+  }
+}
+
+// ── onGenQrChange: muestra/oculta botón "Generar PDF con QR" ────
+// Responde al checkbox "Generar QR en PDF" en la UI de mensajería.
+function onGenQrChange(){
+  const chk = document.getElementById('msg-chk-generar-qr');
+  const activo = chk && chk.checked;
+  const hayTitular = !!msgQrid;
+
+  ['btn-pdf-qr','btn-pdf-qr-sticky'].forEach(id=>{
+    const btn = document.getElementById(id);
+    if(!btn) return;
+    btn.style.display = activo ? '' : 'none';
+    btn.disabled = !(activo && hayTitular);
+    btn.style.opacity = (activo && hayTitular) ? '1' : '.45';
+  });
 }
 
 function _marcarContactadoEnviado(qrid, cel){
