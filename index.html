@@ -1159,6 +1159,10 @@ html{scroll-behavior:smooth}
     </div>
     <div style="padding:20px">
       <div id="edit-msg" class="msg"></div>
+      <!-- Nota para administrador: campos mínimos requeridos -->
+      <div id="edit-admin-hint" style="display:none;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:4px;padding:8px 12px;margin-bottom:14px;font-family:var(--font-h);font-size:11px;color:var(--gold);letter-spacing:.5px;">
+        ⚡ Modo Admin — Solo son obligatorios: Código registro, Nombres y Apellidos, Celular y Dependencia.
+      </div>
 
       <!-- Nombre + Dependencia -->
       <div class="reg-row-pub">
@@ -2782,6 +2786,9 @@ function openEditModal(qrid){
   _editQrid = qrid;
   document.getElementById('edit-msg').style.display = 'none';
   document.getElementById('edit-modal-qrid-label').textContent = 'ID: ' + qrid;
+  // Mostrar nota de campos mínimos solo para administrador
+  const hintEl = document.getElementById('edit-admin-hint');
+  if(hintEl) hintEl.style.display = isAdmin ? '' : 'none';
 
   // Poblar campos con datos actuales
   document.getElementById('edit-nombre').value   = r[C.Nombre]       || '';
@@ -2890,15 +2897,18 @@ async function submitEdit(){
   if(!celular || !/^\d{9}$/.test(celular) || !celular.startsWith('9')){
     showMsg(msg,'err','Celular inválido: 9 dígitos, empieza con 9.');     return;
   }
-  if(!comida)    { showMsg(msg,'err','Selecciona la comida.');            return; }
-  if(!bebida)    { showMsg(msg,'err','Selecciona la bebida.');            return; }
+  // Edecán requiere comida y bebida; administrador puede grabar sin ellos
+  if(!isAdmin){
+    if(!comida) { showMsg(msg,'err','Selecciona la comida.');             return; }
+    if(!bebida) { showMsg(msg,'err','Selecciona la bebida.');             return; }
+  }
 
-  // Disciplinas
+  // Disciplinas — solo obligatorias para edecán; admin puede omitir
   let disciplina = '';
   if(tipo === 'Titular' || tipo === 'Padrino'){
     const checked = Array.from(document.querySelectorAll('.edit-disc-modal:checked')).map(c => c.value);
     disciplina = checked.join(', ');
-    if(!disciplina){
+    if(!disciplina && !isAdmin){
       showMsg(msg,'err','Selecciona al menos una disciplina.'); return;
     }
   }
