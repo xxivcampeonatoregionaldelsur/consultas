@@ -1044,10 +1044,22 @@ html{scroll-behavior:smooth}
     <button class="modal-close" onclick="closeRegistroModal()">✕</button>
     <div class="qr-header">
       <h2 style="font-size:18px">➕ Nuevo Registro de Participante</h2>
-      <div class="qr-dep">Complete todos los campos obligatorios (*)</div>
+      <div class="qr-dep" id="reg-modal-subtitle">Complete todos los campos obligatorios (*)</div>
     </div>
     <div style="padding:20px">
       <div id="reg-msg" class="msg"></div>
+
+      <!-- Toggle: Registro Rápido (solo admin) -->
+      <div id="reg-quick-toggle-wrap" style="display:none;margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.2);border-radius:4px;padding:10px 14px;">
+          <input type="checkbox" id="reg-quick-mode" onchange="regToggleQuickMode()"
+            style="accent-color:var(--gold);width:16px;height:16px;flex-shrink:0;cursor:pointer">
+          <div>
+            <div style="font-family:var(--font-h);font-size:12px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">⚡ Registro Rápido</div>
+            <div style="font-family:var(--font-h);font-size:10px;color:var(--muted);margin-top:1px;">Solo Registro · Nombres y Apellidos · Celular</div>
+          </div>
+        </label>
+      </div>
 
       <!-- Fila 1: Registro + Tipo -->
       <div class="reg-row-pub">
@@ -1056,7 +1068,7 @@ html{scroll-behavior:smooth}
           <input type="text" id="reg-codigo" class="reg-input-pub" placeholder="ej: A123"
             oninput="this.value=this.value.replace(/[^a-zA-Z0-9]/g,'').slice(0,4).toUpperCase()" maxlength="4">
         </div>
-        <div class="reg-field-pub">
+        <div class="reg-field-pub" id="reg-field-tipo">
           <label class="reg-label-pub">Tipo de asistente *</label>
           <select id="reg-tipo" class="reg-input-pub" onchange="regModalOnTipoChange()">
             <option value="">— Seleccionar —</option>
@@ -1073,7 +1085,7 @@ html{scroll-behavior:smooth}
           <label class="reg-label-pub">Nombres y Apellidos *</label>
           <input type="text" id="reg-nombre" class="reg-input-pub" placeholder="Apellidos y nombres completos">
         </div>
-        <div class="reg-field-pub">
+        <div class="reg-field-pub" id="reg-field-dependencia">
           <label class="reg-label-pub">Dependencia *</label>
           <select id="reg-dependencia" class="reg-input-pub">
             <option value="">— Seleccionar —</option>
@@ -1091,53 +1103,56 @@ html{scroll-behavior:smooth}
         <div class="reg-field-pub"></div>
       </div>
 
-      <!-- Bloque disciplinas (solo para Titular/Padrino) -->
-      <div id="reg-bloque-disciplinas" style="display:none;margin-bottom:14px">
-        <label class="reg-label-pub" style="margin-bottom:8px;display:block">Disciplinas en las que participa <span style="font-weight:400;color:var(--muted);font-size:9px">(puede marcar varias)</span></label>
-        <div class="disc-chips-wrap" id="reg-disc-chips-wrap"></div>
-        <div id="reg-disc-sel" style="margin-top:6px;font-family:var(--font-h);font-size:11px;color:var(--gold);font-weight:700;min-height:16px;"></div>
-      </div>
-
-      <!-- Comida + Bebida -->
-      <div class="reg-row-pub">
-        <div class="reg-field-pub">
-          <label class="reg-label-pub">Comida *</label>
-          <select id="reg-comida" class="reg-input-pub">
-            <option value="">— Seleccionar —</option>
-            <option value="Chuleta de chancho con arroz y ensalada">🥩 Chuleta de chancho con arroz y ensalada</option>
-            <option value="Pollo a la parrilla con arroz y ensalada">🍗 Pollo a la parrilla con arroz y ensalada</option>
-            <option value="Carne a la parrilla con arroz y ensalada">🔥 Carne a la parrilla con arroz y ensalada</option>
-          </select>
+      <!-- Campos opcionales en modo rápido — se ocultan con clase reg-optional-block -->
+      <div id="reg-optional-fields">
+        <!-- Bloque disciplinas (solo para Titular/Padrino) -->
+        <div id="reg-bloque-disciplinas" style="display:none;margin-bottom:14px">
+          <label class="reg-label-pub" style="margin-bottom:8px;display:block">Disciplinas en las que participa <span style="font-weight:400;color:var(--muted);font-size:9px">(puede marcar varias)</span></label>
+          <div class="disc-chips-wrap" id="reg-disc-chips-wrap"></div>
+          <div id="reg-disc-sel" style="margin-top:6px;font-family:var(--font-h);font-size:11px;color:var(--gold);font-weight:700;min-height:16px;"></div>
         </div>
-        <div class="reg-field-pub">
-          <label class="reg-label-pub">Bebida *</label>
-          <select id="reg-bebida" class="reg-input-pub">
-            <option value="">— Seleccionar —</option>
-            <option value="Copoazú">🧃 Copoazú</option>
-            <option value="Refresco de jamaica">🧃 Refresco de jamaica</option>
-            <option value="Coca Cola">🥤 Coca Cola</option>
-            <option value="Inka Kola">🥤 Inka Kola</option>
-          </select>
-        </div>
-      </div>
 
-      <!-- Acompañantes -->
-      <div style="margin-bottom:14px">
-        <div class="reg-row-pub" style="margin-bottom:6px">
+        <!-- Comida + Bebida -->
+        <div class="reg-row-pub">
           <div class="reg-field-pub">
-            <label class="reg-label-pub">Cantidad de acompañantes <span style="font-weight:400;color:var(--muted);font-size:9px">(máx 99)</span></label>
-            <input type="number" id="reg-cant-acomp" class="reg-input-pub" min="0" max="99" value="0"
-              oninput="regModalAcompChange()">
+            <label class="reg-label-pub">Comida *</label>
+            <select id="reg-comida" class="reg-input-pub">
+              <option value="">— Seleccionar —</option>
+              <option value="Chuleta de chancho con arroz y ensalada">🥩 Chuleta de chancho con arroz y ensalada</option>
+              <option value="Pollo a la parrilla con arroz y ensalada">🍗 Pollo a la parrilla con arroz y ensalada</option>
+              <option value="Carne a la parrilla con arroz y ensalada">🔥 Carne a la parrilla con arroz y ensalada</option>
+            </select>
           </div>
-          <div class="reg-field-pub"></div>
+          <div class="reg-field-pub">
+            <label class="reg-label-pub">Bebida *</label>
+            <select id="reg-bebida" class="reg-input-pub">
+              <option value="">— Seleccionar —</option>
+              <option value="Copoazú">🧃 Copoazú</option>
+              <option value="Refresco de jamaica">🧃 Refresco de jamaica</option>
+              <option value="Coca Cola">🥤 Coca Cola</option>
+              <option value="Inka Kola">🥤 Inka Kola</option>
+            </select>
+          </div>
         </div>
-        <div id="reg-acompanantes-list"></div>
-      </div>
 
-      <!-- Observaciones -->
-      <div style="margin-bottom:18px">
-        <label class="reg-label-pub">Observaciones (opcional)</label>
-        <textarea id="reg-obs" class="reg-input-pub" rows="2" placeholder="Alergias, restricciones u otros comentarios..." style="resize:vertical"></textarea>
+        <!-- Acompañantes -->
+        <div style="margin-bottom:14px">
+          <div class="reg-row-pub" style="margin-bottom:6px">
+            <div class="reg-field-pub">
+              <label class="reg-label-pub">Cantidad de acompañantes <span style="font-weight:400;color:var(--muted);font-size:9px">(máx 99)</span></label>
+              <input type="number" id="reg-cant-acomp" class="reg-input-pub" min="0" max="99" value="0"
+                oninput="regModalAcompChange()">
+            </div>
+            <div class="reg-field-pub"></div>
+          </div>
+          <div id="reg-acompanantes-list"></div>
+        </div>
+
+        <!-- Observaciones -->
+        <div style="margin-bottom:18px">
+          <label class="reg-label-pub">Observaciones (opcional)</label>
+          <textarea id="reg-obs" class="reg-input-pub" rows="2" placeholder="Alergias, restricciones u otros comentarios..." style="resize:vertical"></textarea>
+        </div>
       </div>
 
       <!-- Acciones -->
@@ -2746,6 +2761,13 @@ function openRegistroModal(){
   if(sel) sel.textContent='';
   document.getElementById('reg-msg').style.display='none';
   regModalPoblarDisciplinas();
+  // Toggle registro rápido: solo visible para admin
+  const toggleWrap=document.getElementById('reg-quick-toggle-wrap');
+  const chkQuick=document.getElementById('reg-quick-mode');
+  if(toggleWrap) toggleWrap.style.display=isAdmin?'':'none';
+  if(chkQuick) chkQuick.checked=false;
+  // Restaurar modo completo
+  _regSetQuickMode(false);
   // Poblar dependencias
   const depSel=document.getElementById('reg-dependencia');
   if(isEdecan&&session.dependencia){
@@ -2762,6 +2784,34 @@ function openRegistroModal(){
     });
   }
   document.getElementById('reg-modal').style.display='flex';
+}
+
+// ── Registro Rápido: toggle UI ──────────────────────────────────
+function regToggleQuickMode(){
+  const chk=document.getElementById('reg-quick-mode');
+  _regSetQuickMode(chk&&chk.checked);
+}
+
+function _regSetQuickMode(active){
+  const optional=document.getElementById('reg-optional-fields');
+  const fieldTipo=document.getElementById('reg-field-tipo');
+  const fieldDep=document.getElementById('reg-field-dependencia');
+  const subtitle=document.getElementById('reg-modal-subtitle');
+  if(active){
+    if(optional) optional.style.display='none';
+    if(fieldTipo) fieldTipo.style.display='none';
+    if(fieldDep) fieldDep.style.display='none';
+    if(subtitle){subtitle.textContent='⚡ Modo rápido: solo Registro · Nombres y Apellidos · Celular';}
+    // Limpiar validaciones previas
+    ['reg-tipo','reg-dependencia','reg-comida','reg-bebida'].forEach(id=>{
+      const el=document.getElementById(id);if(el){el.classList.remove('error');}
+    });
+  } else {
+    if(optional) optional.style.display='';
+    if(fieldTipo) fieldTipo.style.display='';
+    if(fieldDep) fieldDep.style.display='';
+    if(subtitle){subtitle.textContent='Complete todos los campos obligatorios (*)';}
+  }
 }
 function closeRegistroModal(){document.getElementById('reg-modal').style.display='none';}
 
@@ -2975,34 +3025,38 @@ async function submitRegistro(){
   regLimpiarErrores();
   let ok=true;
 
+  const isAdmin=session.rol==='administrador';
+  const chkQuick=document.getElementById('reg-quick-mode');
+  const quickMode=isAdmin&&chkQuick&&chkQuick.checked;
+
   const nombre=(document.getElementById('reg-nombre')?.value||'').trim();
   const celular=(document.getElementById('reg-celular')?.value||'').trim();
-  const dependencia=(document.getElementById('reg-dependencia')?.value||'').trim();
+  const dependencia=quickMode?'':(document.getElementById('reg-dependencia')?.value||'').trim();
   const codigo=(document.getElementById('reg-codigo')?.value||'').trim().toUpperCase();
-  const tipo=document.getElementById('reg-tipo')?.value||'';
+  const tipo=quickMode?'Titular':(document.getElementById('reg-tipo')?.value||'');
   const tipoPart='';
-  const comida=(document.getElementById('reg-comida')?.value||'').trim();
-  const bebida=(document.getElementById('reg-bebida')?.value||'').trim();
+  const comida=quickMode?'':(document.getElementById('reg-comida')?.value||'').trim();
+  const bebida=quickMode?'':(document.getElementById('reg-bebida')?.value||'').trim();
   const obs=(document.getElementById('reg-obs')?.value||'').trim();
 
   // Validaciones campo a campo
   if(!codigo){regMostrarErrorCampo('reg-codigo','Código de registro obligatorio.');ok=false;}
   else if(!/^[A-Z0-9]{4}$/.test(codigo)){regMostrarErrorCampo('reg-codigo','Debe tener exactamente 4 caracteres alfanuméricos.');ok=false;}
 
-  if(!tipo){regMostrarErrorCampo('reg-tipo','Selecciona el tipo de asistente.');ok=false;}
+  if(!quickMode&&!tipo){regMostrarErrorCampo('reg-tipo','Selecciona el tipo de asistente.');ok=false;}
   if(!nombre){regMostrarErrorCampo('reg-nombre','El nombre es obligatorio.');ok=false;}
-  if(!dependencia){regMostrarErrorCampo('reg-dependencia','Selecciona la dependencia.');ok=false;}
+  if(!quickMode&&!dependencia){regMostrarErrorCampo('reg-dependencia','Selecciona la dependencia.');ok=false;}
 
   if(!celular){regMostrarErrorCampo('reg-celular','El celular es obligatorio.');ok=false;}
   else if(!/^\d{9}$/.test(celular)){regMostrarErrorCampo('reg-celular','Debe tener 9 dígitos.');ok=false;}
   else if(!celular.startsWith('9')){regMostrarErrorCampo('reg-celular','El celular debe empezar con 9.');ok=false;}
 
-  if(!comida){regMostrarErrorCampo('reg-comida','Selecciona la comida.');ok=false;}
-  if(!bebida){regMostrarErrorCampo('reg-bebida','Selecciona la bebida.');ok=false;}
+  if(!quickMode&&!comida){regMostrarErrorCampo('reg-comida','Selecciona la comida.');ok=false;}
+  if(!quickMode&&!bebida){regMostrarErrorCampo('reg-bebida','Selecciona la bebida.');ok=false;}
 
-  // Disciplinas (solo para Titular y Padrino)
+  // Disciplinas (solo para Titular y Padrino, modo completo)
   let disciplina='';
-  if(tipo==='Titular'||tipo==='Padrino'){
+  if(!quickMode&&(tipo==='Titular'||tipo==='Padrino')){
     const checked=Array.from(document.querySelectorAll('.reg-disc-modal:checked')).map(c=>c.value);
     disciplina=checked.join(', ');
     if(!disciplina){
@@ -3015,14 +3069,16 @@ async function submitRegistro(){
 
   if(!ok){showMsg(msg,'err','Corrige los errores antes de guardar.');return;}
 
-  // Recoger acompañantes
+  // Recoger acompañantes (solo modo completo)
   const acompanantes=[];
-  const cantAcomp=parseInt(document.getElementById('reg-cant-acomp')?.value)||0;
-  for(let i=1;i<=cantAcomp;i++){
-    const nom=(document.getElementById(`acomp-nombre-${i}`)?.value||'').trim();
-    const com=(document.getElementById(`acomp-comida-${i}`)?.value||'').trim();
-    const beb=(document.getElementById(`acomp-bebida-${i}`)?.value||'').trim();
-    if(nom) acompanantes.push({nombre:nom,comida:com,bebida:beb});
+  if(!quickMode){
+    const cantAcomp=parseInt(document.getElementById('reg-cant-acomp')?.value)||0;
+    for(let i=1;i<=cantAcomp;i++){
+      const nom=(document.getElementById(`acomp-nombre-${i}`)?.value||'').trim();
+      const com=(document.getElementById(`acomp-comida-${i}`)?.value||'').trim();
+      const beb=(document.getElementById(`acomp-bebida-${i}`)?.value||'').trim();
+      if(nom) acompanantes.push({nombre:nom,comida:com,bebida:beb});
+    }
   }
 
   // Mapear tipo al servidor
