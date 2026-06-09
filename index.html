@@ -2,8 +2,17 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>🏆 XXIV Campeonato Regional del Sur · Eliana Amparo R. Molina del Carpio</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Campeonato">
+<meta name="theme-color" content="#07090f">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1457,7 +1466,7 @@ function startApp(){
 
   const app=document.getElementById('app');
   app.style.display='flex';
-  document.getElementById('user-display').textContent=session.usuario;
+  document.getElementById('user-display').textContent=_capitalizarPrimero(session.usuario||'');
   const rb=document.getElementById('role-badge');
   const rmap={administrador:['Administrador','role-admin'],delegado:['Delegado','role-delegado'],
     edecan:['Edecán','role-edecan'],
@@ -2426,7 +2435,7 @@ async function shareQRFull(){
     // primerNombre: primer token del campo "Nombres y Apellidos"
     const nombreCompletoTitular = (titularRow[C.Nombre] || '—').trim();
     const primerNombreCap = _capitalizarPrimero(nombreCompletoTitular.split(/\s+/)[0]);
-    const edecanNombre    = session.usuario || 'tu edecán';
+    const edecanNombre    = _capitalizarPrimero(session.usuario||'') || 'tu edecán';
     const dependencia     = session.dependencia || titularRow[C.Dependencia] || 'la dependencia';
     const comidaTitular   = titularRow[C.Comida] || '—';
     const bebidaTitular   = titularRow[C.Bebida] || '—';
@@ -3108,7 +3117,7 @@ function copyQRUrl(){
 
 // ── CHANGE PASSWORD (non-admin users) ─────────────────────────
 function openChangePass(){
-  document.getElementById('chpass-username').textContent=session.usuario;
+  document.getElementById('chpass-username').textContent=_capitalizarPrimero(session.usuario||'');
   document.getElementById('cp-current').value='';
   document.getElementById('cp-new1').value='';
   document.getElementById('cp-new2').value='';
@@ -5123,6 +5132,16 @@ function copiarMsg(){
 }
 
 function e(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+</script>
+<script>
+// ── Service Worker Registration (PWA) ──────────────────────────
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('SW registrado:', reg.scope))
+      .catch(err => console.warn('SW error:', err));
+  });
+}
 </script>
 </body>
 </html>
