@@ -3507,25 +3507,10 @@ async function enviarWASeleccionados(){
     // Generar mensaje con plantilla si existe
     let texto = '';
     if(pl && pl.tpl){
-      // primerNombre = primer token del campo "Nombres y Apellidos"
-      const primerNom = (r[C.Nombre]||'').trim().split(/\s+/)[0] || '';
-      const nombre    = primerNom.charAt(0).toUpperCase() + primerNom.slice(1).toLowerCase();
-      // qrUrl usa el QR_ID real almacenado en la BD — no regenera QR
-      const qrUrl = `${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}`;
-      const cel = r[C.Celular] || '';
-      const acomps = cel ? allRows.filter(x => (x[C.Celular]||'') === cel && esAcompananteRow(x)) : [];
-      texto = pl.tpl
-        .replace(/{{NOMBRE_INFORMAL}}/g, nombre)
-        .replace(/{{NOMBRE_FORMAL}}/g,   (r[C.Nombre]||'').trim())
-        .replace(/{{NOMBRE}}/g,          nombre)
-        .replace(/{{EDECAN}}/g,          session.usuario || 'tu edecán')
-        .replace(/{{DEPENDENCIA}}/g,     session.dependencia || r[C.Dependencia] || '—')
-        .replace(/{{COMIDA_TITULAR}}/g,  r[C.Comida] || '—')
-        .replace(/{{BEBIDA_TITULAR}}/g,  r[C.Bebida] || '—')
-        .replace(/{{QR_TITULAR}}/g,      qrUrl)
-        .replace(/{{LISTA_ACOMPANANTES}}/g, _construirListaAcompanantes(acomps))
-        .replace(/{{PLURAL_QR}}/g,          acomps.length > 0 ? 'estos QR' : 'este QR')
-        .replace(/{{PLURAL_NECESARIO}}/g,   acomps.length > 0 ? 'serán necesarios' : 'será necesario');
+      const cel2 = r[C.Celular] || '';
+      const acomps = cel2 ? allRows.filter(x => (x[C.Celular]||'') === cel2 && esAcompananteRow(x)) : [];
+      const data = _buildDataParaTitular(r, acomps, qrid);
+      texto = renderTemplate(pl.tpl, data);
     }
 
     const waUrl=`https://wa.me/51${cel}${texto?'?text='+encodeURIComponent(texto):''}`;
@@ -3580,19 +3565,19 @@ function renderUsersRows(users){
 // ══════════════════════════════════════════════════════════════
 const PLANTILLAS_MSG={
   bienvenida:{label:'🎉 Bienvenida con QR',
-    tpl:`Hola {{NOMBRE}} 😊\nMi nombre es {{EDECAN}}, edecán de la dependencia {{DEPENDENCIA}}, y estaré acompañándote durante el evento.\n\nTe comparto el detalle de tu registro para el evento del 28.06.2026:\n\n👤 Participante titular:\n📍 Plato elegido: {{COMIDA_TITULAR}}\n🎫 QR de acceso titular: {{QR_TITULAR}}\n\n{{LISTA_ACOMPANANTES}}Por favor, conserva {{PLURAL_QR}} ya que {{PLURAL_NECESARIO}} para tu ingreso.\n\nSi tienes alguna consulta, cambio o necesitas apoyo con algún detalle, puedes escribirme. 🙌`},
+    tpl:`Hola {{primer_nombre}} 😊\nMi nombre es {{edecan}}, edecán de la dependencia {{dependencia}}, y estaré acompañándote durante el evento.\n\nTe comparto el detalle de tu registro para el evento del 28.06.2026:\n\n👤 Participante titular:\n📍 Plato elegido: {{comida}}\n🎫 QR de acceso titular: {{qr_url}}\n\n{{lista_acompanantes}}Por favor, conserva {{plural_qr}} ya que {{plural_necesario}} para tu ingreso.\n\nSi tienes alguna consulta, cambio o necesitas apoyo con algún detalle, puedes escribirme. 🙌`},
   confirmacion:{label:'✅ Confirmación de asistencia',
-    tpl:`Hola {{NOMBRE}} 😊\nTe escribo de parte de la dependencia {{DEPENDENCIA}} para confirmar tu asistencia al evento del 28.06.2026.\n\n¿Confirmas tu participación? Respóndeme con un ✅ para tenerlo registrado.\n\nCualquier cambio o consulta puedes escribirme directamente. ¡Nos vemos pronto! 🎉`},
+    tpl:`Hola {{primer_nombre}} 😊\nTe escribo de parte de la dependencia {{dependencia}} para confirmar tu asistencia al evento del 28.06.2026.\n\n¿Confirmas tu participación? Respóndeme con un ✅ para tenerlo registrado.\n\nCualquier cambio o consulta puedes escribirme directamente. ¡Nos vemos pronto! 🎉`},
   recordatorio:{label:'⏰ Recordatorio previo al evento',
-    tpl:`Hola {{NOMBRE}} 👋\nTe recuerdo que el evento es el próximo 28.06.2026. Datos importantes:\n\n📍 Dependencia: {{DEPENDENCIA}}\n🍽️ Plato registrado: {{COMIDA_TITULAR}}\n🎫 Recuerda llevar tu QR de acceso.\n\nAnte cualquier duda estoy disponible. ¡Te esperamos! 🙌`},
+    tpl:`Hola {{primer_nombre}} 👋\nTe recuerdo que el evento es el próximo 28.06.2026. Datos importantes:\n\n📍 Dependencia: {{dependencia}}\n🍽️ Plato registrado: {{comida}}\n🎫 Recuerda llevar tu QR de acceso.\n\nAnte cualquier duda estoy disponible. ¡Te esperamos! 🙌`},
   cambio_horario:{label:'🕐 Cambio de horario / agenda',
-    tpl:`Hola {{NOMBRE}} 📢\nTe informo que ha habido un cambio en el cronograma del evento del 28.06.2026.\n\n[Detalla aquí el cambio]\n\nDisculpa los inconvenientes. Escríbeme ante cualquier consulta.\nSaludos, {{EDECAN}} — {{DEPENDENCIA}}`},
+    tpl:`Hola {{primer_nombre}} 📢\nTe informo que ha habido un cambio en el cronograma del evento del 28.06.2026.\n\n[Detalla aquí el cambio]\n\nDisculpa los inconvenientes. Escríbeme ante cualquier consulta.\nSaludos, {{edecan}} — {{dependencia}}`},
   invitacion:{label:'🎭 Invitación a evento especial',
-    tpl:`Hola {{NOMBRE}} 🌟\nEn nombre de la dependencia {{DEPENDENCIA}} tenemos el agrado de invitarte a un evento especial dentro del XXIV Campeonato Regional del Sur.\n\n[Detalla aquí el evento: obra de teatro, cena especial, etc.]\n\nConfírmame tu asistencia. ¡Será una velada especial! 🎉`},
+    tpl:`Hola {{primer_nombre}} 🌟\nEn nombre de la dependencia {{dependencia}} tenemos el agrado de invitarte a un evento especial dentro del XXIV Campeonato Regional del Sur.\n\n[Detalla aquí el evento: obra de teatro, cena especial, etc.]\n\nConfírmame tu asistencia. ¡Será una velada especial! 🎉`},
   agenda:{label:'📋 Información de agenda',
-    tpl:`Hola {{NOMBRE}} 📋\nTe compartimos la agenda del evento del 28.06.2026:\n\n[Pega aquí la agenda]\n\nTu dependencia: {{DEPENDENCIA}}\nCualquier consulta estoy a tu disposición. — {{EDECAN}}`},
+    tpl:`Hola {{primer_nombre}} 📋\nTe compartimos la agenda del evento del 28.06.2026:\n\n[Pega aquí la agenda]\n\nTu dependencia: {{dependencia}}\nCualquier consulta estoy a tu disposición. — {{edecan}}`},
   seguimiento:{label:'📞 Seguimiento',
-    tpl:`Hola {{NOMBRE}} 🙋\nTe escribo para hacer seguimiento de tu registro para el evento del 28.06.2026.\n\n¿Todo listo de tu parte? ¿Tienes alguna duda?\n\nQuedo atento/a. Saludos, {{EDECAN}} — {{DEPENDENCIA}}`},
+    tpl:`Hola {{primer_nombre}} 🙋\nTe escribo para hacer seguimiento de tu registro para el evento del 28.06.2026.\n\n¿Todo listo de tu parte? ¿Tienes alguna duda?\n\nQuedo atento/a. Saludos, {{edecan}} — {{dependencia}}`},
   libre:{label:'✏️ Mensaje libre',tpl:''}
 };
 
@@ -3609,26 +3594,251 @@ let _editorPlantillaKey = null; // key de la plantilla en edición (null = nueva
 // Claves de plantillas protegidas que no se pueden eliminar
 const PLANTILLAS_PROTEGIDAS = ['libre'];
 
-// Variables dinámicas del sistema — puede editarse nombre/etiqueta
-// Variables dinámicas disponibles en las plantillas de mensajería.
-// La lógica de reemplazo está en aplicarPlantilla() y actualizarPreview().
-// Semántica de nombres:
-//   NOMBRE_INFORMAL = primerNombre (primer token del campo "Nombres y Apellidos")
-//   NOMBRE_FORMAL   = nombreCompleto (campo completo tal como fue registrado)
-//   NOMBRE          = alias de NOMBRE_INFORMAL (compatibilidad)
+// ══════════════════════════════════════════════════════════════
+//  MOTOR DINÁMICO DE PLANTILLAS — tipo Word Mail Merge con lógica
+//  Variables base: {{primer_nombre}} y {{edecan}}
+//  Cualquier campo del objeto data se puede usar directamente:
+//    {{bebida}}, {{comida}}, {{dependencia}}, etc.
+//  Alias: ALIASES mapea nombres alternativos a campos reales.
+//  Fórmulas: upper(x), split(x," ")[0], concatenación con +
+//  Lógica: if(condicion, valor_true, valor_false)
+//    Condiciones: ==, !=, >, <, >=, <=
+// ══════════════════════════════════════════════════════════════
+
+// Variables base del sistema (solo estas dos están predefinidas)
 let VARS_DEFINIDAS = [
-  {key:'NOMBRE_INFORMAL', label:'Primer nombre del participante',           ejemplo:'María'},
-  {key:'NOMBRE_FORMAL',   label:'Nombre completo (Nombres y Apellidos)',    ejemplo:'María García López'},
-  {key:'NOMBRE',          label:'Primer nombre (alias de NOMBRE_INFORMAL)', ejemplo:'María'},
-  {key:'EDECAN',          label:'Usuario edecán actual',                    ejemplo:'Juan Pérez'},
-  {key:'DEPENDENCIA',     label:'Dependencia del registro',                 ejemplo:'Recursos Humanos'},
-  {key:'COMIDA_TITULAR',  label:'Plato del titular',                        ejemplo:'Pollo a la parrilla'},
-  {key:'BEBIDA_TITULAR',  label:'Bebida del titular',                       ejemplo:'Inka Kola'},
-  {key:'QR_TITULAR',      label:'Enlace QR del titular (QR_ID de la BD)',   ejemplo:'https://...'},
-  {key:'LISTA_ACOMPANANTES', label:'Lista de acompañantes con QR individual', ejemplo:'(listado)'},
-  {key:'PLURAL_QR',          label:'este QR / estos QR (plural automático)',  ejemplo:'este QR'},
-  {key:'PLURAL_NECESARIO',   label:'será / serán necesarios (plural auto)',   ejemplo:'será necesario'},
+  {key:'primer_nombre', label:'Primer nombre (capitalizado automáticamente)', ejemplo:'María'},
+  {key:'edecan',        label:'Usuario edecán actual (MAYÚSCULAS auto)',      ejemplo:'JUAN PÉREZ'},
 ];
+
+// Sistema de alias: permite equivalencias definidas por el usuario.
+// Ejemplo: ALIASES = { Bebida_titular:"bebida", Nombre:"primer_nombre" }
+// Resuelve {{Bebida_titular}} → valor de data.bebida
+const ALIASES = {
+  NOMBRE_INFORMAL:    'primer_nombre',
+  NOMBRE:             'primer_nombre',
+  NOMBRE_FORMAL:      'nombreCompleto',
+  EDECAN:             'edecan',
+  DEPENDENCIA:        'dependencia',
+  COMIDA_TITULAR:     'comida',
+  BEBIDA_TITULAR:     'bebida',
+  QR_TITULAR:         'qr_url',
+  LISTA_ACOMPANANTES: 'lista_acompanantes',
+  PLURAL_QR:          'plural_qr',
+  PLURAL_NECESARIO:   'plural_necesario',
+};
+
+/**
+ * renderTemplate(template, data)
+ * Motor principal de renderizado.
+ *  1. Resuelve alias
+ *  2. Evalúa expresiones (upper, split, concatenación con +)
+ *  3. Ejecuta lógica if(condicion, true, false)
+ *  4. Reemplaza variables directas
+ *  Si no existe → string vacío
+ */
+function renderTemplate(template, data){
+  if(!template) return '';
+  // Normalizar data: todas las claves en minúsculas también accesibles
+  const ctx = {};
+  if(data){
+    Object.entries(data).forEach(([k,v]) => {
+      ctx[k] = v == null ? '' : String(v);
+      ctx[k.toLowerCase()] = v == null ? '' : String(v);
+    });
+  }
+  // Aplicar alias como claves adicionales en ctx
+  Object.entries(ALIASES).forEach(([alias, target]) => {
+    if(!(alias in ctx)){
+      const val = ctx[target] ?? ctx[target.toLowerCase()] ?? '';
+      ctx[alias] = val;
+      ctx[alias.toLowerCase()] = val;
+    }
+  });
+
+  // Auto-capitalizar edecan (siempre MAYÚSCULAS)
+  if(ctx['edecan']) ctx['edecan'] = ctx['edecan'].toUpperCase();
+  if(ctx['EDECAN']) ctx['EDECAN'] = ctx['EDECAN'].toUpperCase();
+
+  // Reemplazar {{ ... }} con lógica completa
+  return template.replace(/\{\{\s*([\s\S]+?)\s*\}\}/g, (match, expr) => {
+    try {
+      return _evalExpr(expr.trim(), ctx);
+    } catch(ex){
+      return '';
+    }
+  });
+}
+
+/** Resuelve una expresión dentro de {{ }} */
+function _evalExpr(expr, ctx){
+  expr = expr.trim();
+
+  // ── if(condicion, valor_true, valor_false) ──────────────────
+  if(expr.startsWith('if(')){
+    const inner = expr.slice(3, -1); // quitar if( y )
+    // Separar los 3 argumentos respetando paréntesis anidados
+    const args = _splitArgs(inner, 3);
+    if(args.length < 2) return '';
+    const condResult = _evalCondicion(args[0].trim(), ctx);
+    return condResult
+      ? _evalExpr(args[1].trim(), ctx)
+      : (args[2] ? _evalExpr(args[2].trim(), ctx) : '');
+  }
+
+  // ── upper(x) ────────────────────────────────────────────────
+  if(expr.startsWith('upper(')){
+    const inner = expr.slice(6, -1);
+    return _evalExpr(inner, ctx).toUpperCase();
+  }
+
+  // ── lower(x) ────────────────────────────────────────────────
+  if(expr.startsWith('lower(')){
+    const inner = expr.slice(6, -1);
+    return _evalExpr(inner, ctx).toLowerCase();
+  }
+
+  // ── capitalize(x) ───────────────────────────────────────────
+  if(expr.startsWith('capitalize(')){
+    const inner = expr.slice(11, -1);
+    const s = _evalExpr(inner, ctx);
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  }
+
+  // ── split(x, sep)[index] ─────────────────────────────────────
+  const splitMatch = expr.match(/^split\((.+),\s*"([^"]*)"\)\[(\d+)\]$/);
+  if(splitMatch){
+    const val = _evalExpr(splitMatch[1].trim(), ctx);
+    const sep = splitMatch[2];
+    const idx = parseInt(splitMatch[3]);
+    const parts = val.split(sep);
+    return (parts[idx] !== undefined) ? parts[idx] : '';
+  }
+
+  // ── Concatenación con + ──────────────────────────────────────
+  if(expr.includes('+')){
+    // Separar por + que NO estén dentro de paréntesis ni comillas
+    const parts = _splitByPlus(expr);
+    if(parts.length > 1){
+      return parts.map(p => _evalExpr(p.trim(), ctx)).join('');
+    }
+  }
+
+  // ── String literal con comillas ──────────────────────────────
+  if((expr.startsWith('"') && expr.endsWith('"')) ||
+     (expr.startsWith("'") && expr.endsWith("'"))){
+    return expr.slice(1, -1);
+  }
+
+  // ── Número literal ───────────────────────────────────────────
+  if(/^\d+(\.\d+)?$/.test(expr)) return expr;
+
+  // ── Variable directa ─────────────────────────────────────────
+  // Buscar primero exacto, luego en minúsculas
+  if(expr in ctx) return ctx[expr];
+  const lower = expr.toLowerCase();
+  if(lower in ctx) return ctx[lower];
+  // Buscar vía aliases
+  if(expr in ALIASES){
+    const target = ALIASES[expr];
+    return ctx[target] ?? ctx[target.toLowerCase()] ?? '';
+  }
+  return '';
+}
+
+/** Evalúa una condición: ==, !=, >, <, >=, <= */
+function _evalCondicion(cond, ctx){
+  cond = cond.trim();
+  // Operadores de 2 chars primero
+  for(const op of ['>=','<=','!=','==']){
+    const idx = _findOperator(cond, op);
+    if(idx !== -1){
+      const left  = _evalExpr(cond.slice(0, idx).trim(), ctx);
+      const right = _evalExpr(cond.slice(idx + op.length).trim(), ctx);
+      const lNum = parseFloat(left), rNum = parseFloat(right);
+      const useNum = !isNaN(lNum) && !isNaN(rNum);
+      switch(op){
+        case '==': return useNum ? lNum === rNum : left === right;
+        case '!=': return useNum ? lNum !== rNum : left !== right;
+        case '>=': return useNum ? lNum >= rNum : left >= right;
+        case '<=': return useNum ? lNum <= rNum : left <= right;
+      }
+    }
+  }
+  // Operadores de 1 char
+  for(const op of ['>','<']){
+    const idx = _findOperator(cond, op);
+    if(idx !== -1){
+      const left  = parseFloat(_evalExpr(cond.slice(0, idx).trim(), ctx));
+      const right = parseFloat(_evalExpr(cond.slice(idx + 1).trim(), ctx));
+      return op === '>' ? left > right : left < right;
+    }
+  }
+  // Sin operador: truthy check
+  const val = _evalExpr(cond, ctx);
+  return !!(val && val !== '0' && val.toLowerCase() !== 'false');
+}
+
+/** Busca operador fuera de comillas y paréntesis */
+function _findOperator(str, op){
+  let depth = 0, inQ = false, qChar = '';
+  for(let i = 0; i < str.length; i++){
+    const c = str[i];
+    if(!inQ && (c === '"' || c === "'")){inQ = true; qChar = c; continue;}
+    if(inQ && c === qChar){inQ = false; continue;}
+    if(!inQ && c === '(') depth++;
+    if(!inQ && c === ')') depth--;
+    if(!inQ && depth === 0 && str.slice(i, i + op.length) === op){
+      // Para > y <, asegurarse de que no sea parte de >= o <=
+      if(op.length === 1){
+        const next = str[i+1];
+        if(next === '=') continue;
+      }
+      return i;
+    }
+  }
+  return -1;
+}
+
+/** Divide en N argumentos respetando paréntesis y comillas */
+function _splitArgs(str, maxParts){
+  const parts = [];
+  let depth = 0, inQ = false, qChar = '', current = '';
+  for(let i = 0; i < str.length; i++){
+    const c = str[i];
+    if(!inQ && (c === '"' || c === "'")){inQ = true; qChar = c; current += c; continue;}
+    if(inQ && c === qChar){inQ = false; current += c; continue;}
+    if(!inQ && c === '(') { depth++; current += c; continue; }
+    if(!inQ && c === ')') { depth--; current += c; continue; }
+    if(!inQ && depth === 0 && c === ',' && parts.length < maxParts - 1){
+      parts.push(current); current = '';
+    } else {
+      current += c;
+    }
+  }
+  if(current || parts.length > 0) parts.push(current);
+  return parts;
+}
+
+/** Divide por + fuera de comillas y paréntesis */
+function _splitByPlus(str){
+  const parts = [];
+  let depth = 0, inQ = false, qChar = '', current = '';
+  for(let i = 0; i < str.length; i++){
+    const c = str[i];
+    if(!inQ && (c === '"' || c === "'")){inQ = true; qChar = c; current += c; continue;}
+    if(inQ && c === qChar){inQ = false; current += c; continue;}
+    if(!inQ && c === '(') { depth++; current += c; continue; }
+    if(!inQ && c === ')') { depth--; current += c; continue; }
+    if(!inQ && depth === 0 && c === '+'){
+      parts.push(current); current = '';
+    } else {
+      current += c;
+    }
+  }
+  parts.push(current);
+  return parts;
+}
 
 // Estado de edición de variable
 let _editandoVarKey = null;
@@ -3649,9 +3859,26 @@ function renderEditorPlantillas(){
       </div>`;
   }).join('');
 
-  const varSelectOpts = VARS_DEFINIDAS.map(v=>
-    `<option value="{{${v.key}}}">${v.label} — {{${v.key}}}</option>`
-  ).join('');
+  const varSelectOpts = [
+    ...VARS_DEFINIDAS.map(v=>`<option value="{{${v.key}}}">${v.label} — {{${v.key}}}</option>`),
+    `<option value="{{dependencia}}">Dependencia — {{dependencia}}</option>`,
+    `<option value="{{comida}}">Comida del titular — {{comida}}</option>`,
+    `<option value="{{bebida}}">Bebida del titular — {{bebida}}</option>`,
+    `<option value="{{qr_url}}">Enlace QR titular — {{qr_url}}</option>`,
+    `<option value="{{nombreCompleto}}">Nombre completo — {{nombreCompleto}}</option>`,
+    `<option value="{{lista_acompanantes}}">Lista de acompañantes — {{lista_acompanantes}}</option>`,
+    `<option value="{{cantidad_acomp}}">Cantidad acompañantes — {{cantidad_acomp}}</option>`,
+    `<option value="{{plural_qr}}">Plural QR — {{plural_qr}}</option>`,
+    `<option value="{{plural_necesario}}">Plural necesario — {{plural_necesario}}</option>`,
+    `<optgroup label="── Fórmulas ──">`,
+    `<option value="{{upper(primer_nombre)}}">MAYÚSCULAS nombre — {{upper(primer_nombre)}}</option>`,
+    `<option value="{{upper(edecan)}}">MAYÚSCULAS edecán — {{upper(edecan)}}</option>`,
+    `</optgroup>`,
+    `<optgroup label="── Lógica ──">`,
+    `<option value='{{if(cantidad_acomp > 0, "Trae a tus acompañantes.", "Solo tú.")}}'>if acompañantes</option>`,
+    `<option value='{{if(bebida == "Coca Cola", "tu favorita", bebida)}}'>if bebida</option>`,
+    `</optgroup>`,
+  ].join('');
 
   container.innerHTML = `
     <div class="card" style="margin-bottom:16px;border-left:3px solid var(--gold);">
@@ -3740,7 +3967,16 @@ function renderEditorPlantillas(){
             <button class="btn btn-ghost btn-sm" onclick="insertarVarDesdeSelector()" style="min-height:36px;white-space:nowrap;">⬆ Insertar</button>
           </div>
           <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px;">
-            ${VARS_DEFINIDAS.slice(0,6).map(v=>`<span onclick="insertarVarEnEditor('{{${v.key}}}')" title="${e(v.label)}" style="cursor:pointer;display:inline-block;padding:3px 7px;border-radius:3px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25);font-family:monospace;font-size:11px;color:var(--gold);user-select:none;">{{${v.key}}}</span>`).join('')}
+            ${[
+              {key:'primer_nombre', label:'primer_nombre'},
+              {key:'edecan', label:'edecan'},
+              {key:'dependencia', label:'dependencia'},
+              {key:'comida', label:'comida'},
+              {key:'bebida', label:'bebida'},
+              {key:'qr_url', label:'qr_url'},
+            ].map(v=>`<span onclick="insertarVarEnEditor('{{${v.key}}}')" title="${e(v.label)}" style="cursor:pointer;display:inline-block;padding:3px 7px;border-radius:3px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25);font-family:monospace;font-size:11px;color:var(--gold);user-select:none;">{{${v.key}}}</span>`).join('')}
+            <span onclick="insertarVarEnEditor('{{if(cantidad_acomp > 0, \\"sí\\", \\"no\\")}}')" style="cursor:pointer;display:inline-block;padding:3px 7px;border-radius:3px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.25);font-family:monospace;font-size:11px;color:var(--mint);user-select:none;">{{if(...)}}</span>
+            <span onclick="insertarVarEnEditor('{{upper(primer_nombre)}}')" style="cursor:pointer;display:inline-block;padding:3px 7px;border-radius:3px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.25);font-family:monospace;font-size:11px;color:var(--mint);user-select:none;">{{upper(...)}}</span>
           </div>
         </div>
         <div style="margin-bottom:12px;">
@@ -3764,16 +4000,38 @@ function renderEditorPlantillas(){
 function renderVarsLista(){
   const el=document.getElementById('vars-lista');
   if(!el) return;
-  el.innerHTML=VARS_DEFINIDAS.map((v,i)=>{
-    const usadaEn=Object.entries(PLANTILLAS_MSG).filter(([,pl])=>pl.tpl&&pl.tpl.includes('{{'+v.key+'}}')).map(([,pl])=>pl.label);
+
+  const aliasItems = Object.entries(ALIASES).map(([alias, target]) => {
+    const usadaEn=Object.entries(PLANTILLAS_MSG).filter(([,pl])=>pl.tpl&&pl.tpl.includes('{{'+alias+'}}')).map(([,pl])=>pl.label);
     const usadaHtml=usadaEn.length?`<span style="font-size:10px;color:var(--mint)">✓ ${usadaEn.length} plantilla${usadaEn.length>1?'s':''}</span>`:'<span style="font-size:10px;color:var(--muted)">sin usar</span>';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:4px;background:var(--field);border:1px solid var(--border);margin-bottom:5px;flex-wrap:wrap;">
-      <code style="font-size:11px;color:var(--gold);background:rgba(255,215,0,.1);padding:2px 6px;border-radius:3px;flex-shrink:0;">{{${e(v.key)}}}</code>
-      <span style="flex:1;font-family:var(--font-h);font-size:12px;color:var(--text)">${e(v.label)}</span>
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:4px;background:rgba(0,102,204,.08);border:1px solid rgba(0,102,204,.2);margin-bottom:4px;flex-wrap:wrap;">
+      <code style="font-size:11px;color:#60a5fa;background:rgba(0,102,204,.15);padding:2px 6px;border-radius:3px;flex-shrink:0;">{{${e(alias)}}}</code>
+      <span style="flex:1;font-family:var(--font-h);font-size:11px;color:var(--muted)">→ <em style="color:var(--text)">${e(target)}</em></span>
       ${usadaHtml}
-      <button class="btn btn-ghost btn-sm" onclick="abrirEditarVar(${i})" style="min-height:32px;padding:4px 10px;">✏️</button>
     </div>`;
   }).join('');
+
+  el.innerHTML =
+    // Sección: variables base
+    `<div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin:0 0 6px;">Variables base</div>` +
+    VARS_DEFINIDAS.map(v=>{
+      const usadaEn=Object.entries(PLANTILLAS_MSG).filter(([,pl])=>pl.tpl&&(pl.tpl.includes('{{'+v.key+'}}'))).map(([,pl])=>pl.label);
+      const usadaHtml=usadaEn.length?`<span style="font-size:10px;color:var(--mint)">✓ ${usadaEn.length} plantilla${usadaEn.length>1?'s':''}</span>`:'<span style="font-size:10px;color:var(--muted)">sin usar</span>';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:4px;background:var(--field);border:1px solid var(--border);margin-bottom:5px;flex-wrap:wrap;">
+        <code style="font-size:11px;color:var(--gold);background:rgba(255,215,0,.1);padding:2px 6px;border-radius:3px;flex-shrink:0;">{{${e(v.key)}}}</code>
+        <span style="flex:1;font-family:var(--font-h);font-size:12px;color:var(--text)">${e(v.label)}</span>
+        ${usadaHtml}
+      </div>`;
+    }).join('') +
+    // Sección: sistema dinámico
+    `<div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--mint);text-transform:uppercase;letter-spacing:1.5px;margin:12px 0 6px;">Sistema dinámico</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;padding:8px 10px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.2);border-radius:4px;">
+      💡 Puedes usar <strong style="color:var(--text)">cualquier campo</strong> del registro directamente: <code style="color:var(--mint)">{{bebida}}</code>, <code style="color:var(--mint)">{{comida}}</code>, <code style="color:var(--mint)">{{dependencia}}</code>, etc. Si no existe → vacío.<br><br>
+      También puedes usar fórmulas: <code style="color:var(--gold)">{{upper(primer_nombre)}}</code>, <code style="color:var(--gold)">{{split(edecan, " ")[0]}}</code>, y lógica: <code style="color:var(--gold)">{{if(cantidad_acomp > 0, "Trae acompañantes", "Solo tú")}}</code>
+    </div>` +
+    // Sección: aliases
+    `<div style="font-family:var(--font-h);font-size:10px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:1.5px;margin:12px 0 6px;">Aliases del sistema (compatibilidad)</div>` +
+    aliasItems;
 }
 
 function switchEditorTab(tab){
@@ -3788,26 +4046,14 @@ function switchEditorTab(tab){
 }
 
 function abrirEditarVar(idx){
-  _editandoVarKey=idx;
-  const v=VARS_DEFINIDAS[idx];
-  if(!v) return;
-  const form=document.getElementById('var-edit-form');
-  const keyEl=document.getElementById('var-edit-key');
-  const labelEl=document.getElementById('var-edit-label');
-  if(keyEl) keyEl.value='{{'+v.key+'}}';
-  if(labelEl) labelEl.value=v.label;
-  if(form){form.style.display='';form.scrollIntoView({behavior:'smooth',block:'nearest'});}
+  // En el nuevo sistema, las variables base no se editan.
+  // Mostramos la info en un toast.
+  showToast('💡 Las variables base son fijas. Usa cualquier {{campo}} del registro directamente.');
 }
 
 function guardarVar(){
-  if(_editandoVarKey===null) return;
-  const labelEl=document.getElementById('var-edit-label');
-  const newLabel=(labelEl?.value||'').trim();
-  if(!newLabel){showToast('⚠️ La etiqueta no puede estar vacía');return;}
-  VARS_DEFINIDAS[_editandoVarKey].label=newLabel;
   cancelarEditarVar();
-  renderVarsLista();
-  showToast('✓ Variable actualizada');
+  showToast('✓ Sistema dinámico: escribe cualquier {{variable}} en tu plantilla');
 }
 
 function cancelarEditarVar(){
@@ -3826,36 +4072,29 @@ function actualizarPreview(){
   if(!pl||!pl.tpl){outEl.textContent='(Plantilla vacía o sin texto)';return;}
   const qrid=selReg?selReg.value:'';
   const r=qrid?allRows.find(x=>x[C.QR_ID]===qrid):null;
-  let tpl=pl.tpl;
   if(r){
     const cel=r[C.Celular]||'';
     const acomps=cel?allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)):[];
-    // Preview: misma lógica que aplicarPlantilla
-    const nombreFormal = (r[C.Nombre] || '').trim();
-    const primerNomPrev = nombreFormal.split(/\s+/)[0] || '';
-    const nombreInformal = primerNomPrev.charAt(0).toUpperCase() + primerNomPrev.slice(1).toLowerCase();
-    const nombre = nombreInformal; // alias para {{NOMBRE}}
-    const qrUrl=SCANNER_URL+'?qrid='+encodeURIComponent(r[C.QR_ID]||'');
-    // Construir lista de acompañantes con QR_IDs reales de la BD
-    const listaAcomp = _construirListaAcompanantes(acomps);
-    tpl=tpl
-      .replace(/{{NOMBRE_INFORMAL}}/g,nombreInformal)
-      .replace(/{{NOMBRE_FORMAL}}/g,nombreFormal)
-      .replace(/{{NOMBRE}}/g,nombre)
-      .replace(/{{EDECAN}}/g,session.usuario||'(edecán)')
-      .replace(/{{DEPENDENCIA}}/g,session.dependencia||r[C.Dependencia]||'(dependencia)')
-      .replace(/{{COMIDA_TITULAR}}/g,r[C.Comida]||'(sin comida)')
-      .replace(/{{BEBIDA_TITULAR}}/g,r[C.Bebida]||'(sin bebida)')
-      .replace(/{{QR_TITULAR}}/g,qrUrl)
-      .replace(/{{LISTA_ACOMPANANTES}}/g,listaAcomp)
-      .replace(/{{PLURAL_QR}}/g,acomps.length>0?'estos QR':'este QR')
-      .replace(/{{PLURAL_NECESARIO}}/g,acomps.length>0?'serán necesarios':'será necesario');
+    const data = _buildDataParaTitular(r, acomps, r[C.QR_ID]||'');
+    outEl.textContent = renderTemplate(pl.tpl, data);
   } else {
-    VARS_DEFINIDAS.forEach(v=>{
-      tpl=tpl.replace(new RegExp('{{'+v.key+'}}'.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'),'['+v.label+']');
-    });
+    // Sin registro: mostrar con placeholders descriptivos
+    const ph = {};
+    VARS_DEFINIDAS.forEach(v => { ph[v.key] = '['+v.label+']'; });
+    ph['primer_nombre']  = '[NOMBRE]';
+    ph['edecan']         = (session.usuario||'EDECAN').toUpperCase();
+    ph['nombreCompleto'] = '[NOMBRE COMPLETO]';
+    ph['dependencia']    = session.dependencia||'[DEPENDENCIA]';
+    ph['comida']         = '[COMIDA]'; ph['COMIDA_TITULAR'] = '[COMIDA]';
+    ph['bebida']         = '[BEBIDA]'; ph['BEBIDA_TITULAR'] = '[BEBIDA]';
+    ph['qr_url']         = '[QR_LINK]'; ph['QR_TITULAR'] = '[QR_LINK]';
+    ph['lista_acompanantes'] = ''; ph['LISTA_ACOMPANANTES'] = '';
+    ph['plural_qr']      = 'este QR'; ph['PLURAL_QR'] = 'este QR';
+    ph['plural_necesario']= 'será necesario'; ph['PLURAL_NECESARIO'] = 'será necesario';
+    ph['cantidad_acomp'] = '0';
+    ph['NOMBRE_INFORMAL'] = '[NOMBRE]'; ph['NOMBRE_FORMAL'] = '[NOMBRE COMPLETO]'; ph['NOMBRE'] = '[NOMBRE]';
+    outEl.textContent = renderTemplate(pl.tpl, ph);
   }
-  outEl.textContent=tpl;
 }
 
 function actualizarPreviewSiActivo(){
@@ -4466,6 +4705,46 @@ function _construirListaAcompanantes(acomps){
   return '👥 Acompañantes:\n' + items.join('\n') + '\n\n';
 }
 
+/**
+ * _buildDataParaTitular(r, acomps, qrid)
+ * Construye el objeto data completo para renderTemplate().
+ * Incluye TODOS los campos del row como variables dinámicas,
+ * más las variables base (primer_nombre, edecan, etc.).
+ */
+function _buildDataParaTitular(r, acomps, qrid){
+  // Exponer todos los campos del row como variables dinámicas
+  const data = {};
+  if(r){
+    Object.entries(r).forEach(([k, v]) => {
+      data[k] = v == null ? '' : String(v);
+      // También clave normalizada en minúsculas sin espacios
+      data[k.toLowerCase().replace(/\s+/g,'_')] = v == null ? '' : String(v);
+    });
+  }
+
+  const nombreCompleto = (r ? (r[C.Nombre] || '') : '').trim();
+  const primerNombre   = nombreCompleto.split(/\s+/)[0] || '';
+  const primerNomCap   = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
+  const cantidad_acomp = acomps ? acomps.length : 0;
+  const qrUrl          = qrid ? `${SCANNER_URL}?qrid=${encodeURIComponent(qrid)}` : '';
+  const listaAcomp     = _construirListaAcompanantes(acomps || []);
+
+  // Variables base del sistema
+  data['primer_nombre']        = primerNomCap;
+  data['edecan']               = (session.usuario || '').toUpperCase();
+  data['nombreCompleto']       = nombreCompleto;
+  data['dependencia']          = session.dependencia || (r ? r[C.Dependencia] || '' : '') || '';
+  data['comida']               = r ? r[C.Comida]  || '' : '';
+  data['bebida']               = r ? r[C.Bebida]  || '' : '';
+  data['qr_url']               = qrUrl;
+  data['lista_acompanantes']   = listaAcomp;
+  data['plural_qr']            = cantidad_acomp > 0 ? 'estos QR' : 'este QR';
+  data['plural_necesario']     = cantidad_acomp > 0 ? 'serán necesarios' : 'será necesario';
+  data['cantidad_acomp']       = String(cantidad_acomp);
+
+  return data;
+}
+
 function aplicarPlantilla(){
   const ta = document.getElementById('msg-texto');
   if(!ta) return;
@@ -4473,32 +4752,31 @@ function aplicarPlantilla(){
   const tipo = document.getElementById('msg-tipo')?.value || 'libre';
   const pl = PLANTILLAS_MSG[tipo];
 
-  // Sin titular seleccionado: solo aplicar si es libre (dejarlo vacío)
+  // Sin titular seleccionado
   if(!msgQrid){
     if(!pl || !pl.tpl){
       ta.value = '';
       ta.placeholder = 'Escribe tu mensaje aquí...';
     } else {
-      // Mostrar plantilla con placeholders sin reemplazar para que el usuario vea la estructura
-      ta.value = pl.tpl
-        .replace(/{{NOMBRE_INFORMAL}}/g,'[NOMBRE INFORMAL]')
-        .replace(/{{NOMBRE_FORMAL}}/g,'[NOMBRE FORMAL]')
-        .replace(/{{NOMBRE}}/g,'[NOMBRE]')
-        .replace(/{{EDECAN}}/g, session.usuario||'[EDECAN]')
-        .replace(/{{DEPENDENCIA}}/g, session.dependencia||'[DEPENDENCIA]')
-        .replace(/{{COMIDA_TITULAR}}/g,'[COMIDA]')
-        .replace(/{{BEBIDA_TITULAR}}/g,'[BEBIDA]')
-        .replace(/{{QR_TITULAR}}/g,'[QR_LINK]')
-        .replace(/{{LISTA_ACOMPANANTES}}/g,'')
-        .replace(/{{PLURAL_QR}}/g,'este QR')
-        .replace(/{{PLURAL_NECESARIO}}/g,'será necesario');
+      // Mostrar plantilla con datos de sesión y placeholders para campos del titular
+      const previewData = _buildDataParaTitular(null, [], '');
+      previewData['primer_nombre']  = '[NOMBRE]';
+      previewData['nombreCompleto'] = '[NOMBRE COMPLETO]';
+      previewData['comida']         = '[COMIDA]';
+      previewData['bebida']         = '[BEBIDA]';
+      previewData['qr_url']         = '[QR_LINK]';
+      previewData['lista_acompanantes'] = '';
+      // Actualizar aliases para que NOMBRE_INFORMAL etc. también usen los placeholders
+      previewData['NOMBRE_INFORMAL'] = '[NOMBRE]';
+      previewData['NOMBRE_FORMAL']   = '[NOMBRE COMPLETO]';
+      previewData['NOMBRE']          = '[NOMBRE]';
+      ta.value = renderTemplate(pl.tpl, previewData);
     }
     return;
   }
 
   // Con titular seleccionado
   if(!pl || !pl.tpl){
-    // Libre: mantener lo que hay o vaciar si está en blanco
     if(!ta.value) ta.value = '';
     ta.placeholder = 'Escribe tu mensaje personalizado...';
     return;
@@ -4507,40 +4785,11 @@ function aplicarPlantilla(){
   const r = allRows.find(x => x[C.QR_ID] === msgQrid);
   if(!r) return;
 
-  const cel = r[C.Celular]||'';
-  const acomps = cel ? allRows.filter(x=>(x[C.Celular]||'')===cel && esAcompananteRow(x)) : [];
+  const cel    = r[C.Celular] || '';
+  const acomps = cel ? allRows.filter(x => (x[C.Celular]||'') === cel && esAcompananteRow(x)) : [];
+  const data   = _buildDataParaTitular(r, acomps, msgQrid);
 
-  // nombreCompleto: campo "Nombres y Apellidos" exactamente como fue registrado
-  const nombreCompleto = (r[C.Nombre] || '').trim();
-
-  // primerNombre: primer token del nombre completo (ej: "María" en "María García López")
-  // El formulario recibe "Nombres y Apellidos" → no se invierte el orden
-  const primerNombre = nombreCompleto.split(/\s+/)[0] || '';
-  const nombreInformal = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
-
-  // Alias nombre = nombreInformal para compatibilidad con plantillas que usen {{NOMBRE}}
-  const nombre = nombreInformal;
-  // Alias formal = nombreCompleto para plantillas que usen {{NOMBRE_FORMAL}}
-  const nombreFormal = nombreCompleto;
-
-  // qrUrl usa el QR_ID almacenado en la BD — NO se genera un nuevo QR
-  const qrUrl = `${SCANNER_URL}?qrid=${encodeURIComponent(msgQrid)}`;  // QR existente en BD
-
-  // Construir lista de acompañantes con sus QR_IDs reales de la BD
-  const listaAcomp = _construirListaAcompanantes(acomps);
-
-  ta.value = pl.tpl
-    .replace(/{{NOMBRE_INFORMAL}}/g, nombreInformal)
-    .replace(/{{NOMBRE_FORMAL}}/g, nombreFormal)
-    .replace(/{{NOMBRE}}/g, nombre)
-    .replace(/{{EDECAN}}/g, session.usuario||'tu edecán')
-    .replace(/{{DEPENDENCIA}}/g, session.dependencia||r[C.Dependencia]||'—')
-    .replace(/{{COMIDA_TITULAR}}/g, r[C.Comida]||'—')
-    .replace(/{{BEBIDA_TITULAR}}/g, r[C.Bebida]||'—')
-    .replace(/{{QR_TITULAR}}/g, qrUrl)
-    .replace(/{{LISTA_ACOMPANANTES}}/g, listaAcomp)
-    .replace(/{{PLURAL_QR}}/g, acomps.length>0 ? 'estos QR' : 'este QR')
-    .replace(/{{PLURAL_NECESARIO}}/g, acomps.length>0 ? 'serán necesarios' : 'será necesario');
+  ta.value = renderTemplate(pl.tpl, data);
 }
 
 
