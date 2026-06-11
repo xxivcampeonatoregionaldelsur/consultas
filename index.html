@@ -912,6 +912,63 @@ html{scroll-behavior:smooth}
   ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
   ::-webkit-scrollbar-thumb:hover{background:var(--muted)}
 }
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD CONTACTABILIDAD — EDECAN
+══════════════════════════════════════════════════════════════ */
+.ctb-hero{background:linear-gradient(135deg,var(--s1) 0%,var(--s2) 100%);border:1px solid var(--border2);border-top:3px solid #a78bfa;border-radius:var(--r);padding:22px 24px 18px;margin-bottom:16px;position:relative;overflow:hidden;}
+.ctb-hero::after{content:'💬';position:absolute;right:20px;top:50%;transform:translateY(-50%);font-size:56px;opacity:.06;}
+.ctb-hero-lbl{font-family:var(--font-h);font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#a78bfa;margin-bottom:6px;}
+.ctb-hero-pct{font-family:var(--font-h);font-size:64px;font-weight:900;line-height:1;letter-spacing:-3px;color:#fff;margin-bottom:10px;}
+.ctb-hero-pct span{font-size:28px;letter-spacing:0;color:#a78bfa;}
+.ctb-track-wrap{height:12px;background:var(--field);border-radius:6px;overflow:hidden;margin-bottom:8px;}
+.ctb-track-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#7c3aed,#a78bfa);transition:width .7s cubic-bezier(.4,0,.2,1);}
+.ctb-hero-counts{display:flex;gap:18px;font-family:var(--font-h);font-size:12px;color:var(--muted);letter-spacing:.5px;flex-wrap:wrap;}
+.ctb-hero-counts strong{color:var(--text);}
+.ctb-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.ctb-stat{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 12px 10px;text-align:center;position:relative;overflow:hidden;}
+.ctb-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.ctb-stat.ok::before{background:linear-gradient(90deg,#00b050,var(--mint));}
+.ctb-stat.no::before{background:linear-gradient(90deg,#cc0022,var(--red));}
+.ctb-stat.pnd::before{background:linear-gradient(90deg,#b07800,var(--warn));}
+.ctb-stat-val{font-family:var(--font-h);font-size:36px;font-weight:900;line-height:1;color:#fff;letter-spacing:-1px;}
+.ctb-stat.ok .ctb-stat-val{color:var(--mint);}
+.ctb-stat.no .ctb-stat-val{color:#ff6b6b;}
+.ctb-stat.pnd .ctb-stat-val{color:var(--warn);}
+.ctb-stat-lbl{font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:4px;}
+.ctb-table-wrap{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.ctb-table-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.ctb-table-title{font-family:var(--font-h);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--muted);}
+.ctb-filter-wrap{display:flex;gap:6px;flex-wrap:wrap;}
+.ctb-filter-btn{padding:5px 12px;border-radius:3px;border:1px solid var(--border2);background:var(--s2);font-family:var(--font-h);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);cursor:pointer;transition:all var(--t-fast);min-height:30px;}
+.ctb-filter-btn:hover{border-color:var(--gold);color:var(--text);}
+.ctb-filter-btn.f-all{border-color:#a78bfa;color:#a78bfa;background:rgba(167,139,250,.1);}
+.ctb-filter-btn.f-ok{background:var(--ok-bg);border-color:var(--ok-border);color:var(--ok);}
+.ctb-filter-btn.f-no{background:var(--err-bg);border-color:var(--err-border);color:#ff6b6b;}
+.ctb-filter-btn.f-pnd{background:var(--warn-bg);border-color:rgba(255,165,0,.3);color:var(--warn);}
+.ctb-tbl{width:100%;border-collapse:collapse;min-width:300px;}
+.ctb-tbl thead tr{background:var(--field);border-bottom:2px solid #a78bfa;}
+.ctb-tbl th{padding:10px 14px;text-align:left;font-family:var(--font-h);font-size:10px;font-weight:800;color:#a78bfa;text-transform:uppercase;letter-spacing:2px;white-space:nowrap;}
+.ctb-tbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;font-size:13px;}
+.ctb-tbl tr:last-child td{border-bottom:none;}
+.ctb-tbl tr.row-ok td{opacity:.5;}
+.ctb-tbl tr:hover td{background:rgba(167,139,250,.03);}
+.ctb-name{font-family:var(--font-h);font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.ctb-dep-lbl{font-family:var(--font-h);font-size:11px;color:var(--muted);letter-spacing:.5px;}
+.ctb-bdg{display:inline-block;padding:3px 9px;border-radius:3px;font-family:var(--font-h);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;white-space:nowrap;}
+.ctb-bdg-ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-border);}
+.ctb-bdg-no{background:var(--err-bg);color:#ff6b6b;border:1px solid var(--err-border);}
+.ctb-bdg-pnd{background:var(--warn-bg);color:var(--warn);border:1px solid rgba(255,165,0,.3);}
+.ctb-alert{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--r);margin-bottom:16px;border:1px solid transparent;}
+.ctb-alert.a-great{background:rgba(167,139,250,.1);border-color:rgba(167,139,250,.3);}
+.ctb-alert.a-ok{background:var(--ok-bg);border-color:var(--ok-border);}
+.ctb-alert.a-warn{background:var(--warn-bg);border-color:rgba(255,165,0,.3);}
+.ctb-alert-icon{font-size:22px;flex-shrink:0;}
+.ctb-alert-text{font-family:var(--font-h);font-size:13px;font-weight:700;letter-spacing:.5px;}
+.ctb-alert.a-great .ctb-alert-text{color:#a78bfa;}
+.ctb-alert.a-ok .ctb-alert-text{color:var(--ok);}
+.ctb-alert.a-warn .ctb-alert-text{color:var(--warn);}
+@media(max-width:600px){.ctb-hero-pct{font-size:48px;}.ctb-stat-val{font-size:28px;}.ctb-tbl th:nth-child(2),.ctb-tbl td:nth-child(2){display:none;}}
 </style>
 </head>
 <body>
@@ -967,6 +1024,7 @@ html{scroll-behavior:smooth}
     <div class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
     <div class="nav-tab" data-tab="participantes" onclick="switchTab('participantes')">👥 Participantes</div>
     <div class="nav-tab admin-only" data-tab="deps-dashboard" onclick="switchTab('deps-dashboard');renderDepsDashboard()" id="tab-deps-dashboard" style="display:none!important;visibility:hidden;width:0;padding:0;overflow:hidden">🏛️ Por Dependencia</div>
+    <div class="nav-tab" id="tab-contactabilidad" data-tab="contactabilidad" onclick="switchTab('contactabilidad');renderContactabilidad()" style="display:none">📊 Mi Avance</div>
     <div class="nav-tab" id="tab-mensajeria" data-tab="mensajeria" onclick="switchTab('mensajeria');renderMensajeria()" style="display:none">💬 Mensajería</div>
     <div class="nav-tab admin-only" data-tab="usuarios" onclick="switchTab('usuarios')" id="tab-usuarios" style="display:none">🔑 Usuarios</div>
   </div>
@@ -987,6 +1045,10 @@ html{scroll-behavior:smooth}
       <div id="deps-inner"><div class="loader"><div class="spinner"></div><span>Cargando...</span></div></div>
     </div>
 
+    <!-- DASHBOARD CONTACTABILIDAD (edecan) -->
+    <div class="tab-pane" id="pane-contactabilidad">
+      <div id="contactabilidad-inner"><div class="loader"><div class="spinner"></div><span>Cargando avance...</span></div></div>
+    </div>
     <!-- MENSAJERÍA (admin + edecan) -->
     <div class="tab-pane" id="pane-mensajeria">
       <div id="mensajeria-inner"><div class="loader"><div class="spinner"></div><span>Cargando...</span></div></div>
@@ -1479,6 +1541,10 @@ function startApp(){
   if(session.rol==='administrador'||session.rol==='edecan'){
     const tm=document.getElementById('tab-mensajeria');
     if(tm) tm.style.display='';
+  }
+  if(session.rol==='edecan'){
+    const tc=document.getElementById('tab-contactabilidad');
+    if(tc) tc.style.display='';
   }
   // Solo usuarios no-admin ven el botón de cambiar contraseña propio
   if(session.rol!=='administrador') addChangePassBtn();
@@ -4245,6 +4311,123 @@ function _actualizarSelectorPlantillas(){
 // ── Estado de titular seleccionado en mensajería ──────────────
 // ID del participante activo en el panel de mensajería (titular o padrino seleccionado)
 let msgQrid = '';
+
+
+// ══════════════════════════════════════════════════════════════
+// DASHBOARD CONTACTABILIDAD — EDECAN
+// Usa allRows (ya cargado) y contactados (ya sincronizado)
+// Filtra por session.dependencia del edecan logueado
+// ══════════════════════════════════════════════════════════════
+window._ctbFiltro = 'all';
+
+function renderContactabilidad() {
+  const el = document.getElementById('contactabilidad-inner');
+  if (!el || !session) return;
+
+  // Filtrar registros de la dependencia del edecan — solo Titulares (no acompañantes)
+  const miDep = (session.dependencia || '').trim().toLowerCase();
+  let miLista = allRows.filter(r => {
+    const dep = (r[C.Dependencia] || '').trim().toLowerCase();
+    return (!miDep || dep === miDep) && !esAcompananteRow(r);
+  }).map(r => {
+    const qid = r[C.QR_ID] || '';
+    const est = contactados[qid] || 'PENDIENTE';
+    return {
+      nombre: r[C.Nombre] || '—',
+      dep: r[C.Dependencia] || '—',
+      tipo: r[C.TipoPersona] || '',
+      estado: est  // 'SI', 'NO', 'PENDIENTE'
+    };
+  });
+
+  const total = miLista.length;
+  const ok    = miLista.filter(p => p.estado === 'SI').length;
+  const no    = miLista.filter(p => p.estado === 'NO').length;
+  const pend  = total - ok - no;
+  const pct   = total > 0 ? Math.round((ok / total) * 100) : 0;
+
+  // Alerta motivacional
+  let alertHtml = '';
+  if (pct === 100) {
+    alertHtml = `<div class="ctb-alert a-great"><span class="ctb-alert-icon">🏆</span><span class="ctb-alert-text">¡Excelente! Contactaste al 100% de tus participantes.</span></div>`;
+  } else if (pct >= 75) {
+    alertHtml = `<div class="ctb-alert a-ok"><span class="ctb-alert-icon">🚀</span><span class="ctb-alert-text">¡Muy bien! Ya superaste el 75%. Solo faltan ${total - ok}.</span></div>`;
+  } else if (pct >= 40) {
+    alertHtml = `<div class="ctb-alert a-warn"><span class="ctb-alert-icon">⚡</span><span class="ctb-alert-text">Vas al ${pct}% — aún quedan ${total - ok} participantes por contactar.</span></div>`;
+  } else {
+    alertHtml = `<div class="ctb-alert a-warn"><span class="ctb-alert-icon">📋</span><span class="ctb-alert-text">Tienes ${pend + no} participantes pendientes de contactar. ¡Ánimo!</span></div>`;
+  }
+
+  // Filtro activo
+  const f = window._ctbFiltro || 'all';
+  let lista = miLista;
+  if (f === 'ok')  lista = miLista.filter(p => p.estado === 'SI');
+  if (f === 'no')  lista = miLista.filter(p => p.estado === 'NO');
+  if (f === 'pnd') lista = miLista.filter(p => p.estado === 'PENDIENTE');
+
+  const filas = lista.length === 0
+    ? `<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--muted);font-family:var(--font-h);letter-spacing:1px;text-transform:uppercase;font-size:12px">Sin registros en este filtro</td></tr>`
+    : lista.map(p => {
+        let bdg, rowCls = '';
+        if (p.estado === 'SI') {
+          bdg = '<span class="ctb-bdg ctb-bdg-ok">✓ Contactado</span>';
+          rowCls = 'row-ok';
+        } else if (p.estado === 'NO') {
+          bdg = '<span class="ctb-bdg ctb-bdg-no">✗ No contestó</span>';
+        } else {
+          bdg = '<span class="ctb-bdg ctb-bdg-pnd">— Pendiente</span>';
+        }
+        const tipoBdg = p.tipo ? `<span class="bdg ${p.tipo==='Titular'?'bdg-t':'bdg-a'}">${p.tipo}</span>` : '';
+        return `<tr class="${rowCls}">
+          <td><div class="ctb-name">${p.nombre}</div><div class="ctb-dep-lbl">${p.dep}</div></td>
+          <td>${tipoBdg}</td>
+          <td>${bdg}</td>
+        </tr>`;
+      }).join('');
+
+  const fc = (k) => f === k ? `f-${k}` : '';
+
+  el.innerHTML = `
+    ${alertHtml}
+    <div class="ctb-hero">
+      <div class="ctb-hero-lbl">📊 Mi Avance de Contactabilidad</div>
+      <div class="ctb-hero-pct">${pct}<span>%</span></div>
+      <div class="ctb-track-wrap"><div class="ctb-track-fill" style="width:${pct}%"></div></div>
+      <div class="ctb-hero-counts">
+        <span><strong>${ok}</strong> contactados</span>
+        <span><strong>${no}</strong> no contestaron</span>
+        <span><strong>${pend}</strong> pendientes</span>
+        <span style="margin-left:auto"><strong>${total}</strong> total asignados</span>
+      </div>
+    </div>
+    <div class="ctb-stats">
+      <div class="ctb-stat ok"><div class="ctb-stat-val">${ok}</div><div class="ctb-stat-lbl">Contactados</div></div>
+      <div class="ctb-stat no"><div class="ctb-stat-val">${no}</div><div class="ctb-stat-lbl">No contestó</div></div>
+      <div class="ctb-stat pnd"><div class="ctb-stat-val">${pend}</div><div class="ctb-stat-lbl">Pendientes</div></div>
+    </div>
+    <div class="ctb-table-wrap">
+      <div class="ctb-table-header">
+        <div class="ctb-table-title">${session.dependencia ? 'Dependencia: ' + session.dependencia : 'Todos mis asignados'}</div>
+        <div class="ctb-filter-wrap">
+          <button class="ctb-filter-btn ${f==='all'?'f-all':''}" onclick="ctbSetFiltro('all')">Todos (${total})</button>
+          <button class="ctb-filter-btn ${fc('ok')}" onclick="ctbSetFiltro('ok')">✓ SI (${ok})</button>
+          <button class="ctb-filter-btn ${fc('no')}" onclick="ctbSetFiltro('no')">✗ NO (${no})</button>
+          <button class="ctb-filter-btn ${fc('pnd')}" onclick="ctbSetFiltro('pnd')">— Pend. (${pend})</button>
+        </div>
+      </div>
+      <div style="overflow:auto">
+        <table class="ctb-tbl">
+          <thead><tr><th>Participante</th><th>Tipo</th><th>Estado</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function ctbSetFiltro(f) {
+  window._ctbFiltro = f;
+  renderContactabilidad();
+}
 
 function renderMensajeria(){
   const isAdmin=session.rol==='administrador';
