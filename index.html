@@ -160,6 +160,7 @@ header{
 .role-edecan{background:rgba(100,120,220,.2);color:#a78bfa}
 .role-vasistencia{background:rgba(0,230,118,.15);color:var(--mint)}
 .role-ventrega{background:rgba(232,0,45,.15);color:#ff6b6b}
+.role-vpartidos{background:rgba(240,165,0,.18);color:#FFC247}
 
 /* Botones header — mínimo 44px de altura táctil */
 #btn-refresh{
@@ -1070,6 +1071,7 @@ html{scroll-behavior:smooth}
             <option value="edecan">Edecán</option>
             <option value="verificadorasistencia">Verificador de Asistencia</option>
             <option value="verificadorentrega">Verificador de Entrega</option>
+            <option value="verificadordepartidos">Verificador de Partidos</option>
           </select>
         </div>
         <div class="form-group" id="dep-field-group" style="display:none">
@@ -1102,6 +1104,7 @@ html{scroll-behavior:smooth}
           <option value="delegado">Delegado</option>
           <option value="verificadorasistencia">Ver. Asistencia</option>
           <option value="verificadorentrega">Ver. Entrega</option>
+          <option value="verificadordepartidos">Ver. Partidos</option>
         </select>
       </div>
       <div class="tbl-wrap" id="users-table"><div class="loader"><div class="spinner"></div></div></div>
@@ -1525,13 +1528,33 @@ function startApp(){
     return;
   }
 
+  // ── VERIFICADOR DE PARTIDOS: redirige al panel de edición de resultados ──
+  if(session.rol==='verificadordepartidos'){
+    const vs=document.getElementById('verif-redirect-screen');
+    const vi=document.getElementById('verif-logo-img');
+    if(vi) vi.src=LOGO_SRC;
+    const sub=document.getElementById('verif-role-sub');
+    if(sub) sub.textContent='Verificador de Partidos · XXIV Campeonato Regional del Sur';
+    const badge=document.getElementById('verif-usuario-badge');
+    if(badge) badge.textContent='👤 '+session.usuario;
+    const btn=document.getElementById('verif-main-btn');
+    if(btn){
+      // Ajusta esta ruta según dónde publiques panel-verificador.html
+      btn.href='./panel-verificador.html';
+      btn.textContent='🏆 Abrir Panel de Resultados';
+    }
+    if(vs) vs.style.display='flex';
+    return;
+  }
+
   const app=document.getElementById('app');
   app.style.display='flex';
   document.getElementById('user-display').textContent=_capitalizarPrimero(session.usuario||'');
   const rb=document.getElementById('role-badge');
   const rmap={administrador:['Administrador','role-admin'],delegado:['Delegado','role-delegado'],
     edecan:['Edecán','role-edecan'],
-    verificadorasistencia:['Ver. Asistencia','role-vasistencia'],verificadorentrega:['Ver. Entrega','role-ventrega']};
+    verificadorasistencia:['Ver. Asistencia','role-vasistencia'],verificadorentrega:['Ver. Entrega','role-ventrega'],
+    verificadordepartidos:['Ver. Partidos','role-vpartidos']};
   const rm=rmap[session.rol]||[session.rol,'role-admin'];
   rb.textContent=rm[0];rb.className='role-badge '+rm[1];
   if(session.rol!=='administrador'){
@@ -3278,14 +3301,16 @@ async function createUser(){
   if(needsDep&&!d){showMsg(msg,'err','Selecciona una dependencia para este rol');return;}
   try{
     // El script sólo acepta roles: administrador|delegado|verificadorasistencia|verificadorentrega
-    // Para edecan: creamos primero como delegado, luego actualizamos el rol directamente en la hoja
-    // mediante updateUser que no valida el rol
-    const rolParaScript=(r==='edecan')?'delegado':r;
+    // Para edecan y verificadordepartidos: creamos primero como delegado, luego actualizamos
+    // el rol directamente en la hoja mediante updateUser (que no valida la lista de roles)
+    const ROLES_VIA_UPDATE = ['edecan','verificadordepartidos'];
+    const rolParaScript = ROLES_VIA_UPDATE.includes(r) ? 'delegado' : r;
     const res=await apiFetch('createUser',{usuario:u,password:p,rol:rolParaScript,dependencia:d});
     if(res.result==='ok'){
-      // Si es edecan, actualizamos el rol con updateUser (que no valida lista de roles)
-      if(r==='edecan'){
-        await apiFetch('updateUser',{usuario:u,rol:'edecan',dependencia:d,activo:true});
+      // Si es edecan o verificadordepartidos, actualizamos el rol con updateUser
+      // (que no valida lista de roles)
+      if(ROLES_VIA_UPDATE.includes(r)){
+        await apiFetch('updateUser',{usuario:u,rol:r,dependencia:d,activo:true});
       }
       showMsg(msg,'ok','Usuario creado correctamente');
       document.getElementById('nu-user').value='';document.getElementById('nu-pass').value='';
@@ -3616,8 +3641,8 @@ function filterUsersTable(){
 }
 
 function renderUsersRows(users){
-  const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega'};
-  const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega'};
+  const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega',verificadordepartidos:'role-vpartidos'};
+  const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega',verificadordepartidos:'Ver. Partidos'};
   const rows=users.map(u=>`
     <tr>
       <td><strong>${e(u.usuario)}</strong></td>
