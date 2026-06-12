@@ -1143,9 +1143,8 @@ html{scroll-behavior:smooth}
           <label class="reg-label-pub">Tipo de asistente *</label>
           <select id="reg-tipo" class="reg-input-pub" onchange="regModalOnTipoChange()">
             <option value="">— Seleccionar —</option>
-            <option value="Titular">🏅 Participante / Titular</option>
+            <option value="Participante">🏅 Participante</option>
             <option value="Padrino">👑 Padrino</option>
-            <option value="Invitado">👥 Acompañante / Invitado</option>
           </select>
         </div>
       </div>
@@ -2232,7 +2231,7 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   qrModal.qrUrl = url;
   // Padrino se determina por la columna Tipo del registro
   const esPadrino = (padrino||'').toLowerCase() === 'padrino';
-  const esTitular=tipo==='Titular'&&!esPadrino;
+  const esTitular=tipo==='Participante'&&!esPadrino;
 
   // Badge: Padrino > Titular > Acompañante
   const badge=document.getElementById('qr-tipo-badge');
@@ -2255,7 +2254,7 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   document.getElementById('qr-pill-comida').textContent=comida||'—';
   document.getElementById('qr-pill-bebida').textContent=bebida||'—';
   // Show correct tipo label in pill
-  const tipoLabel=esPadrino?'Padrino':esTitular?'Titular':'Acompañante';
+  const tipoLabel=esPadrino?'Padrino':esTitular?'Participante':'Acompañante';
   document.getElementById('qr-pill-tipo').textContent=tipoLabel;
   // Discipline pill: solo texto
   const dEl=document.getElementById('qr-pill-disciplina');
@@ -2440,8 +2439,8 @@ async function buildQRCanvas(){
   ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
 
   // Tipo (solo texto)
-  const tipoLabelCanvas = esPadrino ? 'PADRINO' : qrModal.tipo === 'Titular' ? 'TITULAR' : 'ACOMPAÑANTE';
-  ctx.fillStyle = esPadrino ? '#FFA500' : qrModal.tipo === 'Titular' ? '#FFD700' : '#00E676';
+  const tipoLabelCanvas = esPadrino ? 'PADRINO' : qrModal.tipo === 'Participante' ? 'TITULAR' : 'ACOMPAÑANTE';
+  ctx.fillStyle = esPadrino ? '#FFA500' : qrModal.tipo === 'Participante' ? '#FFD700' : '#00E676';
   ctx.font='bold 11px Arial';
   ctx.fillText(tipoLabelCanvas,W/2,BANNER_Y+71);
 
@@ -2643,7 +2642,7 @@ async function buildQRCanvasForRow(row){
   const disc=row[C.Disciplina]||'';
   const tipo=row[C.TipoPersona]||'';
   const esPadrino_=esPadrinoRow(row);
-  const tipoLabel=esPadrino_?'PADRINO':tipo==='Titular'?'TITULAR':'ACOMPAÑANTE';
+  const tipoLabel=esPadrino_?'PADRINO':tipo==='Participante'?'TITULAR':'ACOMPAÑANTE';
 
   // Crear div temporal para el QR
   const tmpDiv=document.createElement('div');
@@ -2705,7 +2704,7 @@ async function buildQRCanvasForRow(row){
   ctx.fillStyle='#ffffff';ctx.font='bold 13px Arial';
   const nm=nombre.length>34?nombre.slice(0,32)+'…':nombre;
   ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
-  ctx.fillStyle=esPadrino_?'#FFA500':tipo==='Titular'?'#FFD700':'#00E676';
+  ctx.fillStyle=esPadrino_?'#FFA500':tipo==='Participante'?'#FFD700':'#00E676';
   ctx.font='bold 11px Arial';
   ctx.fillText(tipoLabel,W/2,BANNER_Y+71);
   if(disc&&disc!=='—'){
@@ -2765,7 +2764,7 @@ function regModalDiscChange(el){
 function regModalOnTipoChange(){
   const tipo=document.getElementById('reg-tipo').value;
   const bloq=document.getElementById('reg-bloque-disciplinas');
-  if(bloq) bloq.style.display=(tipo==='Titular'||tipo==='Padrino')?'':'none';
+  if(bloq) bloq.style.display=(tipo==='Participante'||tipo==='Padrino')?'':'none';
   // Poblar dependencias dinámico
   const sel=document.getElementById('reg-dependencia');
   const curr=sel.value;
@@ -2795,9 +2794,9 @@ function regModalAcompChange(){
         <div class="reg-field-pub"><label class="reg-label-pub">Comida</label>
           <select id="acomp-comida-${i}" class="reg-input-pub">
             <option value="">— Seleccionar —</option>
-            <option value="Chuleta de chancho con arroz y ensalada">🥩 Chuleta de chancho</option>
-            <option value="Pollo a la parrilla con arroz y ensalada">🍗 Pollo a la parrilla</option>
-            <option value="Carne a la parrilla con arroz y ensalada">🔥 Carne a la parrilla</option>
+            <option value="Chuleta de chancho con arroz y ensalada">🥩 Chuleta de chancho con arroz y ensalada</option>
+            <option value="Pollo a la parrilla con arroz y ensalada">🍗 Pollo a la parrilla con arroz y ensalada</option>
+            <option value="Carne a la parrilla con arroz y ensalada">🔥 Carne a la parrilla con arroz y ensalada</option>
           </select>
         </div>
         <div class="reg-field-pub"><label class="reg-label-pub">Bebida</label>
@@ -2923,7 +2922,7 @@ function openEditModal(qrid){
 
   // Tipo
   const tipoSel = document.getElementById('edit-tipo');
-  const tipoVal = esPadrinoRow(r) ? 'Padrino' : esAcompananteRow(r) ? 'Invitado' : 'Titular';
+  const tipoVal = esPadrinoRow(r) ? 'Padrino' : esAcompananteRow(r) ? 'Invitado' : 'Participante';
   tipoSel.value = tipoVal;
 
   // Dependencia
@@ -2997,7 +2996,7 @@ function editModalDiscChange(el){
 function editModalOnTipoChange(){
   const tipo  = document.getElementById('edit-tipo').value;
   const bloq  = document.getElementById('edit-bloque-disciplinas');
-  if(bloq) bloq.style.display = (tipo === 'Titular' || tipo === 'Padrino') ? '' : 'none';
+  if(bloq) bloq.style.display = (tipo === 'Participante' || tipo === 'Titular' || tipo === 'Padrino') ? '' : 'none';
 }
 
 async function submitEdit(){
@@ -3011,7 +3010,7 @@ async function submitEdit(){
   const celular   = (document.getElementById('edit-celular')?.value   || '').trim();
   const dependencia=(document.getElementById('edit-dependencia')?.value|| '').trim();
   const codigo    = (document.getElementById('edit-codigo')?.value    || '').trim().toUpperCase();
-  const tipo      = document.getElementById('edit-tipo')?.value       || 'Titular';
+  const tipo      = document.getElementById('edit-tipo')?.value       || 'Participante';
   const comida    = (document.getElementById('edit-comida')?.value    || '').trim();
   const bebida    = (document.getElementById('edit-bebida')?.value    || '').trim();
   const obs       = (document.getElementById('edit-obs')?.value       || '').trim();
@@ -3030,7 +3029,7 @@ async function submitEdit(){
 
   // Disciplinas — solo obligatorias para edecán; admin puede omitir
   let disciplina = '';
-  if(tipo === 'Titular' || tipo === 'Padrino'){
+  if(tipo === 'Participante' || tipo === 'Titular' || tipo === 'Padrino'){
     const checked = Array.from(document.querySelectorAll('.edit-disc-modal:checked')).map(c => c.value);
     disciplina = checked.join(', ');
     if(!disciplina && !isAdmin){
@@ -3039,8 +3038,8 @@ async function submitEdit(){
   }
 
   // Mapear tipo al formato del servidor
-  const tipoServidor  = tipo === 'Titular' ? 'Titular' : tipo === 'Padrino' ? 'Padrino' : 'Invitado';
-  const tipoPersona   = tipo === 'Invitado' ? 'Acompañante' : 'Titular';
+  const tipoServidor  = (tipo === 'Titular' || tipo === 'Participante') ? 'Participante' : tipo === 'Padrino' ? 'Padrino' : 'Invitado';
+  const tipoPersona   = tipo === 'Invitado' ? 'Acompañante' : 'Participante';
   const padrinoFlag   = tipo === 'Padrino' ? 'SI' : 'NO';
 
   const btn = document.querySelector('#edit-modal .btn-gold');
@@ -3108,7 +3107,7 @@ async function submitRegistro(){
   const celular=(document.getElementById('reg-celular')?.value||'').trim();
   const dependencia=quickMode?'':(document.getElementById('reg-dependencia')?.value||'').trim();
   const codigo=(document.getElementById('reg-codigo')?.value||'').trim().toUpperCase();
-  const tipo=quickMode?'Titular':(document.getElementById('reg-tipo')?.value||'');
+  const tipo=quickMode?'Participante':(document.getElementById('reg-tipo')?.value||'');
   const tipoPart='';
   const comida=quickMode?'':(document.getElementById('reg-comida')?.value||'').trim();
   const bebida=quickMode?'':(document.getElementById('reg-bebida')?.value||'').trim();
@@ -3131,7 +3130,7 @@ async function submitRegistro(){
 
   // Disciplinas (solo para Titular y Padrino, modo completo)
   let disciplina='';
-  if(!quickMode&&(tipo==='Titular'||tipo==='Padrino')){
+  if(!quickMode&&(tipo==='Participante'||tipo==='Padrino')){
     const checked=Array.from(document.querySelectorAll('.reg-disc-modal:checked')).map(c=>c.value);
     disciplina=checked.join(', ');
     if(!disciplina){
@@ -3157,8 +3156,8 @@ async function submitRegistro(){
   }
 
   // Mapear tipo al servidor
-  const tipoServidor=tipo==='Titular'?'Titular':tipo==='Padrino'?'Padrino':'Invitado';
-  const tipoPersona=tipo==='Invitado'?'Acompañante':'Titular';
+  const tipoServidor=tipo==='Participante'?'Participante':tipo==='Padrino'?'Padrino':'Invitado';
+  const tipoPersona=tipo==='Invitado'?'Acompañante':'Participante';
 
   try{
     const res=await apiFetch('registro',{
@@ -3366,7 +3365,7 @@ function exportParticipantesExcel(){
         const cel=r[C.Celular]||'';const key=cel||r[C.QR_ID]||'';
         if(!seen.has(key)){seen.add(key);
           if(cel){
-            const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
+            const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Participante'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
             if(titular) rows.push(titular);
             allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>rows.push(x));
             allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>rows.push(x));
@@ -3379,7 +3378,7 @@ function exportParticipantesExcel(){
       const qid=r[C.QR_ID]||'';
       const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
       const isPadrino=esPadrinoRow(r);const isAcomp=esAcompananteRow(r);
-      const isTitular=r[C.TipoPersona]==='Titular'&&!isPadrino&&!isAcomp;
+      const isTitular=r[C.TipoPersona]==='Participante'&&!isPadrino&&!isAcomp;
       return currentFilter==='todos'||
         (currentFilter==='titulares'&&isTitular)||
         (currentFilter==='acompanantes'&&isAcomp)||
