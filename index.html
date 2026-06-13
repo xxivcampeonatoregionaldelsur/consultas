@@ -1070,6 +1070,8 @@ html{scroll-behavior:smooth}
             <option value="edecan">Edecán</option>
             <option value="verificadorasistencia">Verificador de Asistencia</option>
             <option value="verificadorentrega">Verificador de Entrega</option>
+            <option value="verificadorsouvenir">Verificador de Souvenir</option>
+            <option value="verificadoraperitivo">Verificador de Aperitivo</option>
           </select>
         </div>
         <div class="form-group" id="dep-field-group" style="display:none">
@@ -1102,6 +1104,8 @@ html{scroll-behavior:smooth}
           <option value="delegado">Delegado</option>
           <option value="verificadorasistencia">Ver. Asistencia</option>
           <option value="verificadorentrega">Ver. Entrega</option>
+          <option value="verificadorsouvenir">Ver. Souvenir</option>
+          <option value="verificadoraperitivo">Ver. Aperitivo</option>
         </select>
       </div>
       <div class="tbl-wrap" id="users-table"><div class="loader"><div class="spinner"></div></div></div>
@@ -1518,11 +1522,11 @@ function startApp(){
   _loadContactados();
 
   // ── VERIFICADORES: solo van al scanner, no a la app ───────────
-  if(session.rol==='verificadorasistencia'||session.rol==='verificadorentrega'){
+  if(session.rol==='verificadorasistencia'||session.rol==='verificadorentrega'||session.rol==='verificadorsouvenir'||session.rol==='verificadoraperitivo'){
     const vs=document.getElementById('verif-redirect-screen');
     const vi=document.getElementById('verif-logo-img');
     if(vi) vi.src=LOGO_SRC;
-    const rolLbl=session.rol==='verificadorasistencia'?'Verificador de Asistencia':'Verificador de Entrega';
+    const rolLbl=session.rol==='verificadorasistencia'?'Verificador de Asistencia':session.rol==='verificadorentrega'?'Verificador de Entrega':session.rol==='verificadorsouvenir'?'Verificador de Souvenir':'Verificador de Aperitivo';
     const sub=document.getElementById('verif-role-sub');
     if(sub) sub.textContent=rolLbl+' · XXIV Campeonato Regional del Sur';
     const badge=document.getElementById('verif-usuario-badge');
@@ -1542,7 +1546,8 @@ function startApp(){
   const rb=document.getElementById('role-badge');
   const rmap={administrador:['Administrador','role-admin'],delegado:['Delegado','role-delegado'],
     edecan:['Edecán','role-edecan'],
-    verificadorasistencia:['Ver. Asistencia','role-vasistencia'],verificadorentrega:['Ver. Entrega','role-ventrega']};
+    verificadorasistencia:['Ver. Asistencia','role-vasistencia'],verificadorentrega:['Ver. Entrega','role-ventrega'],
+    verificadorsouvenir:['Ver. Souvenir','role-ventrega'],verificadoraperitivo:['Ver. Aperitivo','role-ventrega']};
   const rm=rmap[session.rol]||[session.rol,'role-admin'];
   rb.textContent=rm[0];rb.className='role-badge '+rm[1];
   if(session.rol!=='administrador'){
@@ -3323,7 +3328,7 @@ async function createUser(){
   if(p.length<6){showMsg(msg,'err','La contraseña debe tener al menos 6 caracteres');return;}
   if(needsDep&&!d){showMsg(msg,'err','Selecciona una dependencia para este rol');return;}
   try{
-    // El script sólo acepta roles: administrador|delegado|verificadorasistencia|verificadorentrega
+    // El script acepta roles: administrador|delegado|edecan|verificadorasistencia|verificadorentrega|verificadorsouvenir|verificadoraperitivo
     // Para edecan: creamos primero como delegado, luego actualizamos el rol directamente en la hoja
     // mediante updateUser que no valida el rol
     const rolParaScript=(r==='edecan')?'delegado':r;
@@ -3662,8 +3667,8 @@ function filterUsersTable(){
 }
 
 function renderUsersRows(users){
-  const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega'};
-  const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega'};
+  const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega',verificadorsouvenir:'role-ventrega',verificadoraperitivo:'role-ventrega'};
+  const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega',verificadorsouvenir:'Ver. Souvenir',verificadoraperitivo:'Ver. Aperitivo'};
   const rows=users.map(u=>`
     <tr>
       <td><strong>${e(u.usuario)}</strong></td>
