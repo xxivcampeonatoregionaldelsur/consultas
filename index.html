@@ -1390,6 +1390,16 @@ html{scroll-behavior:smooth}
         <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🍽️ Comida/Entrega</div>
         <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-entrega-val">—</div>
       </div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div style="flex:1;text-align:center;border-radius:4px;padding:8px 6px;" id="qr-status-souvenir">
+        <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🎁 Souvenir</div>
+        <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-souvenir-val">—</div>
+      </div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div style="flex:1;text-align:center;border-radius:4px;padding:8px 6px;" id="qr-status-aperitivo">
+        <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🍢 Aperitivo</div>
+        <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-aperitivo-val">—</div>
+      </div>
     </div>
     <div style="padding:6px 20px 2px;text-align:center">
       <span style="font-family:var(--font-h);font-size:10px;color:var(--muted);letter-spacing:1px">♻️ QR REUTILIZABLE · válido para ingreso y comida</span>
@@ -2283,10 +2293,16 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   const qrCheckins=checkins[qrid]||{};
   const hasIngreso=!!(qrCheckins.ingreso);
   const hasEntrega=!!(qrCheckins.entrega);
+  const hasSouvenir=!!(qrCheckins.souvenir);
+  const hasAperitivo=!!(qrCheckins.aperitivo);
   const ingresoEl=document.getElementById('qr-status-ingreso-val');
   const entregaEl=document.getElementById('qr-status-entrega-val');
+  const souvenirEl=document.getElementById('qr-status-souvenir-val');
+  const aperitivoEl=document.getElementById('qr-status-aperitivo-val');
   const ingresoBox=document.getElementById('qr-status-ingreso');
   const entregaBox=document.getElementById('qr-status-entrega');
+  const souvenirBox=document.getElementById('qr-status-souvenir');
+  const aperitivoBox=document.getElementById('qr-status-aperitivo');
   if(ingresoEl){
     ingresoEl.textContent=hasIngreso?('✓ '+formatHora(qrCheckins.ingreso)):'Pendiente';
     ingresoEl.style.color=hasIngreso?'var(--mint)':'var(--muted)';
@@ -2296,6 +2312,18 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
     entregaEl.textContent=hasEntrega?('✓ '+formatHora(qrCheckins.entrega)):'Pendiente';
     entregaEl.style.color=hasEntrega?'var(--mint)':'var(--muted)';
     if(entregaBox) entregaBox.style.background=hasEntrega?'rgba(0,230,118,.07)':'transparent';
+  }
+  // Souvenir y aperitivo solo aplican a Titulares (no Acompañantes)
+  const esAcompQR = tipo === 'Acompañante';
+  if(souvenirEl){
+    souvenirEl.textContent=esAcompQR?'N/A':hasSouvenir?('✓ '+formatHora(qrCheckins.souvenir)):'Pendiente';
+    souvenirEl.style.color=esAcompQR?'var(--muted)':hasSouvenir?'var(--mint)':'var(--muted)';
+    if(souvenirBox) souvenirBox.style.background=hasSouvenir&&!esAcompQR?'rgba(0,230,118,.07)':'transparent';
+  }
+  if(aperitivoEl){
+    aperitivoEl.textContent=esAcompQR?'N/A':hasAperitivo?('✓ '+formatHora(qrCheckins.aperitivo)):'Pendiente';
+    aperitivoEl.style.color=esAcompQR?'var(--muted)':hasAperitivo?'var(--mint)':'var(--muted)';
+    if(aperitivoBox) aperitivoBox.style.background=hasAperitivo&&!esAcompQR?'rgba(0,230,118,.07)':'transparent';
   }
 
   // FIX: Botón compartir eliminado — no se usa navigator.share en ningún punto
