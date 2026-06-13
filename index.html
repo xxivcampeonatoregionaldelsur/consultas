@@ -1393,6 +1393,17 @@ html{scroll-behavior:smooth}
         <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-entrega-val">—</div>
       </div>
     </div>
+    <div id="qr-status-row2" style="display:flex;gap:8px;padding:10px 20px;border-bottom:1px solid var(--border);background:var(--field)">
+      <div style="flex:1;text-align:center;border-radius:4px;padding:8px 6px;" id="qr-status-souvenir">
+        <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🎁 Souvenir</div>
+        <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-souvenir-val">—</div>
+      </div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div style="flex:1;text-align:center;border-radius:4px;padding:8px 6px;" id="qr-status-aperitivo">
+        <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🍢 Aperitivo</div>
+        <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-aperitivo-val">—</div>
+      </div>
+    </div>
     <div style="padding:6px 20px 2px;text-align:center">
       <span style="font-family:var(--font-h);font-size:10px;color:var(--muted);letter-spacing:1px">♻️ QR REUTILIZABLE · válido para ingreso y comida</span>
     </div>
@@ -1689,6 +1700,8 @@ function renderDashboard(){
   const padrinos=allRows.filter(r=>esPadrinoRow(r));
   const countIngresos=Object.values(checkins).filter(c=>c.ingreso).length;
   const countEntregas=Object.values(checkins).filter(c=>c.entrega).length;
+  const countSouvenirs=Object.values(checkins).filter(c=>c.souvenir).length;
+  const countAperitivos=Object.values(checkins).filter(c=>c.aperitivo).length;
   const total=allRows.length;
 
   // Disciplinas: split por coma para contar individualmente
@@ -1816,7 +1829,7 @@ function renderDashboard(){
     ${lastOpHtml}
     <div class="alerts-section">
       <div class="flow-title">Estado del evento en tiempo real</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:14px;">
         <div class="flow-step ${sinIngreso>0?'pending':'active'}">
           <div class="flow-step-num" style="color:#fff">${sinIngreso}</div>
           <div class="flow-step-lbl">Sin ingreso</div>
@@ -1828,6 +1841,14 @@ function renderDashboard(){
         <div class="flow-step active">
           <div class="flow-step-num" style="color:#fff">${completados}</div>
           <div class="flow-step-lbl">Completos</div>
+        </div>
+        <div class="flow-step ${countSouvenirs>0?'active':'pending'}">
+          <div class="flow-step-num" style="color:#fff">${countSouvenirs}</div>
+          <div class="flow-step-lbl">Souvenirs</div>
+        </div>
+        <div class="flow-step ${countAperitivos>0?'active':'pending'}">
+          <div class="flow-step-num" style="color:#fff">${countAperitivos}</div>
+          <div class="flow-step-lbl">Aperitivos</div>
         </div>
       </div>
       ${alertasHtml||''}
@@ -1881,6 +1902,8 @@ function renderDashboard(){
       <div class="stat g"><div class="stat-lbl">Padrinos</div><div class="stat-val">${padrinos.length}</div><div class="stat-icon">👑</div></div>
       <div class="stat l"><div class="stat-lbl">Ingresos ✓</div><div class="stat-val">${countIngresos}</div><div class="stat-icon">🎫</div></div>
       <div class="stat g"><div class="stat-lbl">Entregas</div><div class="stat-val">${countEntregas}</div><div class="stat-icon">🍽️</div></div>
+      <div class="stat m"><div class="stat-lbl">Souvenirs</div><div class="stat-val">${countSouvenirs}</div><div class="stat-icon">🎁</div></div>
+      <div class="stat c"><div class="stat-lbl">Aperitivos</div><div class="stat-val">${countAperitivos}</div><div class="stat-icon">🍢</div></div>
     </div>
     <div class="charts">
       <div class="card"><div class="card-title">🍽️ Platos solicitados</div>${bars(comidas,'bf-gold',maxC)}</div>
@@ -2037,17 +2060,17 @@ function discIcon(disc){
 }
 
 // ── TIPO HELPERS ───────────────────────────────────────────────
-// Reglas de tipo (columna Tipo es la fuente principal):
-//   Tipo === "Invitado"  → Acompañante
+// Reglas de tipo:
+//   TipoPersona === "Acompañante" → Acompañante
 //   Tipo === "Padrino"   → Padrino (aunque TipoPersona sea Titular)
-//   TipoPersona === "Titular" → Participante/Titular
+//   TipoPersona === "Titular" → Titular
 function esPadrinoRow(row){
   const tipo=(row[C.Tipo]||'').trim();
   return tipo.toLowerCase()==='padrino';
 }
 function esAcompananteRow(row){
-  const tipo=(row[C.Tipo]||'').trim();
-  return tipo.toLowerCase()==='invitado';
+  const tipoPersona=(row[C.TipoPersona]||'').trim();
+  return tipoPersona==='Acompañante';
 }
 function getTipoDisplay(row){
   if(esPadrinoRow(row)) return {label:'Padrino',cls:'bdg-p',icon:'👑'};
@@ -2142,7 +2165,7 @@ function renderParticipants(s,f){
         <thead><tr>
           ${canMultiSelect?`<th style="width:34px;text-align:center"><input type="checkbox" id="chk-all-part" title="Seleccionar todos" onchange="toggleSeleccionTodos(this.checked)" style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer"></th>`:''}
           <th>Reg.</th><th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
-          <th>Ingreso</th><th>Entrega</th><th>Contactado</th><th>Acciones</th>
+          <th>Ingreso</th><th>Entrega</th><th>Souvenir</th><th>Aperitivo</th><th>Contactado</th><th>Acciones</th>
         </tr></thead>
         <tbody id="part-tbody"></tbody>
       </table>
@@ -2163,11 +2186,13 @@ function renderParticipants(s,f){
 
   if(!rows.length){
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td colspan="${canMultiSelect?12:11}"><div class="empty">Sin resultados</div></td>`;
+    tr.innerHTML=`<td colspan="${canMultiSelect?14:13}"><div class="empty">Sin resultados</div></td>`;
     frag.appendChild(tr);
   } else {
     rows.forEach(r=>{
       const qid=r[C.QR_ID]||'',hasI=checkins[qid]&&checkins[qid].ingreso,hasE=checkins[qid]&&checkins[qid].entrega;
+      const hasS=checkins[qid]&&checkins[qid].souvenir,hasAp=checkins[qid]&&checkins[qid].aperitivo;
+      const esAcomp=esAcompananteRow(r);
       const padrino=r[C.Padrino]||'';
       const isPadrino=esPadrinoRow(r);
       const tipoInfo=getTipoDisplay(r);
@@ -2198,6 +2223,8 @@ function renderParticipants(s,f){
         <td style="font-size:13px;color:var(--text)">${e(r[C.Bebida]||'—')}</td>
         <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
         <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
+        <td>${esAcomp?'<span style="color:var(--muted);font-size:11px">—</span>':`<span class="bdg ${hasS?'bdg-chk':'bdg-no'}">${hasS?'✓ '+formatHora(checkins[qid].souvenir):'Pendiente'}</span>`}</td>
+        <td>${esAcomp?'<span style="color:var(--muted);font-size:11px">—</span>':`<span class="bdg ${hasAp?'bdg-chk':'bdg-no'}">${hasAp?'✓ '+formatHora(checkins[qid].aperitivo):'Pendiente'}</span>`}</td>
         <td>
           <!-- FIX 3: data-qrid para actualización sin re-render; onchange ahora llama a saveContactadoServer -->
           <select data-qrid="${e(qid)}"
@@ -2254,7 +2281,8 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   qrModal.qrUrl = url;
   // Padrino se determina por la columna Tipo del registro
   const esPadrino = (padrino||'').toLowerCase() === 'padrino';
-  const esTitular=tipo==='Participante'&&!esPadrino;
+  const esTitular=tipo==='Titular'&&!esPadrino;
+  const esAcompanante=!esPadrino&&(tipo==='Acompañante');
 
   // Badge: Padrino > Titular > Acompañante
   const badge=document.getElementById('qr-tipo-badge');
@@ -2301,6 +2329,37 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
     entregaEl.textContent=hasEntrega?('✓ '+formatHora(qrCheckins.entrega)):'Pendiente';
     entregaEl.style.color=hasEntrega?'var(--mint)':'var(--muted)';
     if(entregaBox) entregaBox.style.background=hasEntrega?'rgba(0,230,118,.07)':'transparent';
+  }
+
+  // ── Estado de uso del QR (souvenir y aperitivo) ──────────────
+  const hasSouvenir=!!(qrCheckins.souvenir);
+  const hasAperitivo=!!(qrCheckins.aperitivo);
+  const souvenirEl=document.getElementById('qr-status-souvenir-val');
+  const aperitivoEl=document.getElementById('qr-status-aperitivo-val');
+  const souvenirBox=document.getElementById('qr-status-souvenir');
+  const aperitivoBox=document.getElementById('qr-status-aperitivo');
+  const aplicaSouvenirAperitivo=!esAcompanante;
+  if(souvenirEl){
+    if(!aplicaSouvenirAperitivo){
+      souvenirEl.textContent='No aplica';
+      souvenirEl.style.color='var(--muted)';
+      if(souvenirBox) souvenirBox.style.background='transparent';
+    } else {
+      souvenirEl.textContent=hasSouvenir?('✓ '+formatHora(qrCheckins.souvenir)):'Pendiente';
+      souvenirEl.style.color=hasSouvenir?'var(--mint)':'var(--muted)';
+      if(souvenirBox) souvenirBox.style.background=hasSouvenir?'rgba(0,230,118,.07)':'transparent';
+    }
+  }
+  if(aperitivoEl){
+    if(!aplicaSouvenirAperitivo){
+      aperitivoEl.textContent='No aplica';
+      aperitivoEl.style.color='var(--muted)';
+      if(aperitivoBox) aperitivoBox.style.background='transparent';
+    } else {
+      aperitivoEl.textContent=hasAperitivo?('✓ '+formatHora(qrCheckins.aperitivo)):'Pendiente';
+      aperitivoEl.style.color=hasAperitivo?'var(--mint)':'var(--muted)';
+      if(aperitivoBox) aperitivoBox.style.background=hasAperitivo?'rgba(0,230,118,.07)':'transparent';
+    }
   }
 
   // FIX: Botón compartir eliminado — no se usa navigator.share en ningún punto
@@ -3413,17 +3472,19 @@ function exportParticipantesExcel(){
     });
   }
   // Build CSV
-  const headers=['Registro','Nombre','Tipo','Dependencia','Celular','Tipo Participacion','Disciplina','Comida','Bebida','Ingreso','Entrega','Observaciones','QR_ID'];
+  const headers=['Registro','Nombre','Tipo','Dependencia','Celular','Tipo Participacion','Disciplina','Comida','Bebida','Ingreso','Entrega','Souvenir','Aperitivo','Observaciones','QR_ID'];
   const csvRows=[headers.join(',')];
   rows.forEach(r=>{
     const qid=r[C.QR_ID]||'';
     const tipoInfo=getTipoDisplay(r);
     const ingreso=checkins[qid]&&checkins[qid].ingreso?checkins[qid].ingreso:'';
     const entrega=checkins[qid]&&checkins[qid].entrega?checkins[qid].entrega:'';
+    const souvenir=checkins[qid]&&checkins[qid].souvenir?checkins[qid].souvenir:'';
+    const aperitivo=checkins[qid]&&checkins[qid].aperitivo?checkins[qid].aperitivo:'';
     const vals=[
       r[C.Registro]||'',r[C.Nombre]||'',tipoInfo.label,r[C.Dependencia]||'',
       r[C.Celular]||'',r[C.TipoParticipacion]||'',r[C.Disciplina]||'',
-      r[C.Comida]||'',r[C.Bebida]||'',ingreso,entrega,
+      r[C.Comida]||'',r[C.Bebida]||'',ingreso,entrega,souvenir,aperitivo,
       r[C.Observaciones]||'',qid
     ].map(v=>`"${String(v).replace(/"/g,'""')}"`);
     csvRows.push(vals.join(','));
