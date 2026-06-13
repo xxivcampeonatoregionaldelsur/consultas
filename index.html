@@ -160,7 +160,6 @@ header{
 .role-edecan{background:rgba(100,120,220,.2);color:#a78bfa}
 .role-vasistencia{background:rgba(0,230,118,.15);color:var(--mint)}
 .role-ventrega{background:rgba(232,0,45,.15);color:#ff6b6b}
-.role-vpartidos{background:rgba(240,165,0,.18);color:#FFC247}
 
 /* Botones header — mínimo 44px de altura táctil */
 #btn-refresh{
@@ -1071,7 +1070,6 @@ html{scroll-behavior:smooth}
             <option value="edecan">Edecán</option>
             <option value="verificadorasistencia">Verificador de Asistencia</option>
             <option value="verificadorentrega">Verificador de Entrega</option>
-            <option value="verificadordepartidos">Verificador de Partidos</option>
           </select>
         </div>
         <div class="form-group" id="dep-field-group" style="display:none">
@@ -1104,7 +1102,6 @@ html{scroll-behavior:smooth}
           <option value="delegado">Delegado</option>
           <option value="verificadorasistencia">Ver. Asistencia</option>
           <option value="verificadorentrega">Ver. Entrega</option>
-          <option value="verificadordepartidos">Ver. Partidos</option>
         </select>
       </div>
       <div class="tbl-wrap" id="users-table"><div class="loader"><div class="spinner"></div></div></div>
@@ -1146,8 +1143,9 @@ html{scroll-behavior:smooth}
           <label class="reg-label-pub">Tipo de asistente *</label>
           <select id="reg-tipo" class="reg-input-pub" onchange="regModalOnTipoChange()">
             <option value="">— Seleccionar —</option>
-            <option value="Participante">🏅 Participante</option>
+            <option value="Titular">🏅 Participante / Titular</option>
             <option value="Padrino">👑 Padrino</option>
+            <option value="Invitado">👥 Acompañante / Invitado</option>
           </select>
         </div>
       </div>
@@ -1393,17 +1391,6 @@ html{scroll-behavior:smooth}
         <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-entrega-val">—</div>
       </div>
     </div>
-    <div id="qr-status-row2" style="display:flex;gap:8px;padding:10px 20px;border-bottom:1px solid var(--border);background:var(--field)">
-      <div style="flex:1;text-align:center;border-radius:4px;padding:8px 6px;" id="qr-status-souvenir">
-        <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🎁 Souvenir</div>
-        <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-souvenir-val">—</div>
-      </div>
-      <div style="width:1px;background:var(--border)"></div>
-      <div style="flex:1;text-align:center;border-radius:4px;padding:8px 6px;" id="qr-status-aperitivo">
-        <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🍢 Aperitivo</div>
-        <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-aperitivo-val">—</div>
-      </div>
-    </div>
     <div style="padding:6px 20px 2px;text-align:center">
       <span style="font-family:var(--font-h);font-size:10px;color:var(--muted);letter-spacing:1px">♻️ QR REUTILIZABLE · válido para ingreso y comida</span>
     </div>
@@ -1450,7 +1437,7 @@ html{scroll-behavior:smooth}
    ═══════════════════════════════════════════════════════════════ */
 
 // ── CONFIG ─────────────────────────────────────────────────────
-const SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbyFDxh4WpufofWVZR96CcMgv_NQsOhMOZNLJtzZQS21pc92Z2pvNUH5_K_v7toeYdAqBA/exec';
+const SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbwKnRuR8rA8b2w_aHQRKuHQv3I4kQgE5ouroCKIsSakhUkU_7_CuvGWBHzWbnGsF3AARg/exec';
 const SCANNER_URL = 'https://xxivcampeonatoregionaldelsur.github.io/scanner/';
 
 const C = {FechaHora:0,Tipo:1,Nombre:2,Dependencia:3,Celular:4,Padrino:5,TipoPersona:6,TipoParticipacion:7,Disciplina:8,Comida:9,Bebida:10,Observaciones:11,Registro:12,QR_ID:13};
@@ -1539,33 +1526,13 @@ function startApp(){
     return;
   }
 
-  // ── VERIFICADOR DE PARTIDOS: redirige al panel de edición de resultados ──
-  if(session.rol==='verificadordepartidos'){
-    const vs=document.getElementById('verif-redirect-screen');
-    const vi=document.getElementById('verif-logo-img');
-    if(vi) vi.src=LOGO_SRC;
-    const sub=document.getElementById('verif-role-sub');
-    if(sub) sub.textContent='Verificador de Partidos · XXIV Campeonato Regional del Sur';
-    const badge=document.getElementById('verif-usuario-badge');
-    if(badge) badge.textContent='👤 '+session.usuario;
-    const btn=document.getElementById('verif-main-btn');
-    if(btn){
-      // Ajusta esta ruta según dónde publiques panel-verificador.html
-      btn.href='./panel-verificador.html';
-      btn.textContent='🏆 Abrir Panel de Resultados';
-    }
-    if(vs) vs.style.display='flex';
-    return;
-  }
-
   const app=document.getElementById('app');
   app.style.display='flex';
   document.getElementById('user-display').textContent=_capitalizarPrimero(session.usuario||'');
   const rb=document.getElementById('role-badge');
   const rmap={administrador:['Administrador','role-admin'],delegado:['Delegado','role-delegado'],
     edecan:['Edecán','role-edecan'],
-    verificadorasistencia:['Ver. Asistencia','role-vasistencia'],verificadorentrega:['Ver. Entrega','role-ventrega'],
-    verificadordepartidos:['Ver. Partidos','role-vpartidos']};
+    verificadorasistencia:['Ver. Asistencia','role-vasistencia'],verificadorentrega:['Ver. Entrega','role-ventrega']};
   const rm=rmap[session.rol]||[session.rol,'role-admin'];
   rb.textContent=rm[0];rb.className='role-badge '+rm[1];
   if(session.rol!=='administrador'){
@@ -1803,6 +1770,14 @@ function renderDashboard(){
       const sinEntrega=countIngresos-countEntregas;
       alertas.push({type:'info',icon:'🍽️',title:'Entregas pendientes',text:`${sinEntrega} participante${sinEntrega!==1?'s':''} ingresaron pero no han recibido su comida`});
     }
+    if(countSouvenirs<titulares.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].ingreso;}).length){
+      const sinSouv=titulares.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].ingreso&&!checkins[q].souvenir;}).length;
+      if(sinSouv>0) alertas.push({type:'info',icon:'🎁',title:'Souvenirs pendientes',text:`${sinSouv} titular${sinSouv!==1?'es':''} ingresaron pero no han recibido su souvenir`});
+    }
+    if(countAperitivos<titulares.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].ingreso;}).length){
+      const sinAper=titulares.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].ingreso&&!checkins[q].aperitivo;}).length;
+      if(sinAper>0) alertas.push({type:'info',icon:'🍢',title:'Aperitivos pendientes',text:`${sinAper} titular${sinAper!==1?'es':''} ingresaron pero no han recibido su aperitivo`});
+    }
     if(pct>=80&&countEntregas>=countIngresos*0.8){
       alertas.push({type:'ok',icon:'✅',title:'Operación en buen estado',text:`${pct}% de ingresos procesados · ${Math.round(countEntregas/Math.max(total,1)*100)}% de entregas completadas`});
     }
@@ -1829,7 +1804,7 @@ function renderDashboard(){
     ${lastOpHtml}
     <div class="alerts-section">
       <div class="flow-title">Estado del evento en tiempo real</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
         <div class="flow-step ${sinIngreso>0?'pending':'active'}">
           <div class="flow-step-num" style="color:#fff">${sinIngreso}</div>
           <div class="flow-step-lbl">Sin ingreso</div>
@@ -1842,7 +1817,7 @@ function renderDashboard(){
           <div class="flow-step-num" style="color:#fff">${completados}</div>
           <div class="flow-step-lbl">Completos</div>
         </div>
-    </div>
+      </div>
       ${alertasHtml||''}
     </div>
     <div class="sec-title" style="font-size:11px;margin-bottom:10px">⚡ Acciones rápidas</div>
@@ -2052,17 +2027,17 @@ function discIcon(disc){
 }
 
 // ── TIPO HELPERS ───────────────────────────────────────────────
-// Reglas de tipo:
-//   TipoPersona === "Acompañante" → Acompañante
+// Reglas de tipo (columna Tipo es la fuente principal):
+//   Tipo === "Invitado"  → Acompañante
 //   Tipo === "Padrino"   → Padrino (aunque TipoPersona sea Titular)
-//   TipoPersona === "Titular" → Titular
+//   TipoPersona === "Titular" → Participante/Titular
 function esPadrinoRow(row){
   const tipo=(row[C.Tipo]||'').trim();
   return tipo.toLowerCase()==='padrino';
 }
 function esAcompananteRow(row){
-  const tipoPersona=(row[C.TipoPersona]||'').trim();
-  return tipoPersona==='Acompañante';
+  const tipo=(row[C.Tipo]||'').trim();
+  return tipo.toLowerCase()==='invitado';
 }
 function getTipoDisplay(row){
   if(esPadrinoRow(row)) return {label:'Padrino',cls:'bdg-p',icon:'👑'};
@@ -2183,8 +2158,7 @@ function renderParticipants(s,f){
   } else {
     rows.forEach(r=>{
       const qid=r[C.QR_ID]||'',hasI=checkins[qid]&&checkins[qid].ingreso,hasE=checkins[qid]&&checkins[qid].entrega;
-      const hasS=checkins[qid]&&checkins[qid].souvenir,hasAp=checkins[qid]&&checkins[qid].aperitivo;
-      const esAcomp=esAcompananteRow(r);
+      const hasS=checkins[qid]&&checkins[qid].souvenir,hasA=checkins[qid]&&checkins[qid].aperitivo;
       const padrino=r[C.Padrino]||'';
       const isPadrino=esPadrinoRow(r);
       const tipoInfo=getTipoDisplay(r);
@@ -2195,6 +2169,8 @@ function renderParticipants(s,f){
       const contactado=contactados[qid]||'PENDIENTE';
       const cColor=contactado==='SI'?'var(--mint)':contactado==='NO'?'var(--err)':'var(--warn)';
       const sel=_seleccionados.has(qid);
+      // Solo titulares (no acompañantes) reciben souvenir y aperitivo
+      const isAcompTipo=esAcompananteRow(r);
       const tr=document.createElement('tr');
       tr.setAttribute('data-qrid',qid);
       if(hasI&&hasE) tr.className='attended';
@@ -2215,8 +2191,8 @@ function renderParticipants(s,f){
         <td style="font-size:13px;color:var(--text)">${e(r[C.Bebida]||'—')}</td>
         <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
         <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
-        <td>${esAcomp?'<span style="color:var(--muted);font-size:11px">—</span>':`<span class="bdg ${hasS?'bdg-chk':'bdg-no'}">${hasS?'✓ '+formatHora(checkins[qid].souvenir):'Pendiente'}</span>`}</td>
-        <td>${esAcomp?'<span style="color:var(--muted);font-size:11px">—</span>':`<span class="bdg ${hasAp?'bdg-chk':'bdg-no'}">${hasAp?'✓ '+formatHora(checkins[qid].aperitivo):'Pendiente'}</span>`}</td>
+        <td>${isAcompTipo?'<span style="color:var(--muted);font-size:11px">N/A</span>':`<span class="bdg ${hasS?'bdg-chk':'bdg-no'}">${hasS?'✓ '+formatHora(checkins[qid].souvenir):'Pendiente'}</span>`}</td>
+        <td>${isAcompTipo?'<span style="color:var(--muted);font-size:11px">N/A</span>':`<span class="bdg ${hasA?'bdg-chk':'bdg-no'}">${hasA?'✓ '+formatHora(checkins[qid].aperitivo):'Pendiente'}</span>`}</td>
         <td>
           <!-- FIX 3: data-qrid para actualización sin re-render; onchange ahora llama a saveContactadoServer -->
           <select data-qrid="${e(qid)}"
@@ -2274,7 +2250,6 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   // Padrino se determina por la columna Tipo del registro
   const esPadrino = (padrino||'').toLowerCase() === 'padrino';
   const esTitular=tipo==='Titular'&&!esPadrino;
-  const esAcompanante=!esPadrino&&(tipo==='Acompañante');
 
   // Badge: Padrino > Titular > Acompañante
   const badge=document.getElementById('qr-tipo-badge');
@@ -2297,7 +2272,7 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   document.getElementById('qr-pill-comida').textContent=comida||'—';
   document.getElementById('qr-pill-bebida').textContent=bebida||'—';
   // Show correct tipo label in pill
-  const tipoLabel=esPadrino?'Padrino':esTitular?'Participante':'Acompañante';
+  const tipoLabel=esPadrino?'Padrino':esTitular?'Titular':'Acompañante';
   document.getElementById('qr-pill-tipo').textContent=tipoLabel;
   // Discipline pill: solo texto
   const dEl=document.getElementById('qr-pill-disciplina');
@@ -2321,37 +2296,6 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
     entregaEl.textContent=hasEntrega?('✓ '+formatHora(qrCheckins.entrega)):'Pendiente';
     entregaEl.style.color=hasEntrega?'var(--mint)':'var(--muted)';
     if(entregaBox) entregaBox.style.background=hasEntrega?'rgba(0,230,118,.07)':'transparent';
-  }
-
-  // ── Estado de uso del QR (souvenir y aperitivo) ──────────────
-  const hasSouvenir=!!(qrCheckins.souvenir);
-  const hasAperitivo=!!(qrCheckins.aperitivo);
-  const souvenirEl=document.getElementById('qr-status-souvenir-val');
-  const aperitivoEl=document.getElementById('qr-status-aperitivo-val');
-  const souvenirBox=document.getElementById('qr-status-souvenir');
-  const aperitivoBox=document.getElementById('qr-status-aperitivo');
-  const aplicaSouvenirAperitivo=!esAcompanante;
-  if(souvenirEl){
-    if(!aplicaSouvenirAperitivo){
-      souvenirEl.textContent='No aplica';
-      souvenirEl.style.color='var(--muted)';
-      if(souvenirBox) souvenirBox.style.background='transparent';
-    } else {
-      souvenirEl.textContent=hasSouvenir?('✓ '+formatHora(qrCheckins.souvenir)):'Pendiente';
-      souvenirEl.style.color=hasSouvenir?'var(--mint)':'var(--muted)';
-      if(souvenirBox) souvenirBox.style.background=hasSouvenir?'rgba(0,230,118,.07)':'transparent';
-    }
-  }
-  if(aperitivoEl){
-    if(!aplicaSouvenirAperitivo){
-      aperitivoEl.textContent='No aplica';
-      aperitivoEl.style.color='var(--muted)';
-      if(aperitivoBox) aperitivoBox.style.background='transparent';
-    } else {
-      aperitivoEl.textContent=hasAperitivo?('✓ '+formatHora(qrCheckins.aperitivo)):'Pendiente';
-      aperitivoEl.style.color=hasAperitivo?'var(--mint)':'var(--muted)';
-      if(aperitivoBox) aperitivoBox.style.background=hasAperitivo?'rgba(0,230,118,.07)':'transparent';
-    }
   }
 
   // FIX: Botón compartir eliminado — no se usa navigator.share en ningún punto
@@ -2513,8 +2457,8 @@ async function buildQRCanvas(){
   ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
 
   // Tipo (solo texto)
-  const tipoLabelCanvas = esPadrino ? 'PADRINO' : qrModal.tipo === 'Participante' ? 'TITULAR' : 'ACOMPAÑANTE';
-  ctx.fillStyle = esPadrino ? '#FFA500' : qrModal.tipo === 'Participante' ? '#FFD700' : '#00E676';
+  const tipoLabelCanvas = esPadrino ? 'PADRINO' : qrModal.tipo === 'Titular' ? 'TITULAR' : 'ACOMPAÑANTE';
+  ctx.fillStyle = esPadrino ? '#FFA500' : qrModal.tipo === 'Titular' ? '#FFD700' : '#00E676';
   ctx.font='bold 11px Arial';
   ctx.fillText(tipoLabelCanvas,W/2,BANNER_Y+71);
 
@@ -2716,7 +2660,7 @@ async function buildQRCanvasForRow(row){
   const disc=row[C.Disciplina]||'';
   const tipo=row[C.TipoPersona]||'';
   const esPadrino_=esPadrinoRow(row);
-  const tipoLabel=esPadrino_?'PADRINO':tipo==='Participante'?'TITULAR':'ACOMPAÑANTE';
+  const tipoLabel=esPadrino_?'PADRINO':tipo==='Titular'?'TITULAR':'ACOMPAÑANTE';
 
   // Crear div temporal para el QR
   const tmpDiv=document.createElement('div');
@@ -2778,7 +2722,7 @@ async function buildQRCanvasForRow(row){
   ctx.fillStyle='#ffffff';ctx.font='bold 13px Arial';
   const nm=nombre.length>34?nombre.slice(0,32)+'…':nombre;
   ctx.fillText(nm.toUpperCase(),W/2,BANNER_Y+54);
-  ctx.fillStyle=esPadrino_?'#FFA500':tipo==='Participante'?'#FFD700':'#00E676';
+  ctx.fillStyle=esPadrino_?'#FFA500':tipo==='Titular'?'#FFD700':'#00E676';
   ctx.font='bold 11px Arial';
   ctx.fillText(tipoLabel,W/2,BANNER_Y+71);
   if(disc&&disc!=='—'){
@@ -2838,7 +2782,7 @@ function regModalDiscChange(el){
 function regModalOnTipoChange(){
   const tipo=document.getElementById('reg-tipo').value;
   const bloq=document.getElementById('reg-bloque-disciplinas');
-  if(bloq) bloq.style.display=(tipo==='Participante'||tipo==='Padrino')?'':'none';
+  if(bloq) bloq.style.display=(tipo==='Titular'||tipo==='Padrino')?'':'none';
   // Poblar dependencias dinámico
   const sel=document.getElementById('reg-dependencia');
   const curr=sel.value;
@@ -2868,9 +2812,9 @@ function regModalAcompChange(){
         <div class="reg-field-pub"><label class="reg-label-pub">Comida</label>
           <select id="acomp-comida-${i}" class="reg-input-pub">
             <option value="">— Seleccionar —</option>
-            <option value="Chuleta de chancho con arroz y ensalada">🥩 Chuleta de chancho con arroz y ensalada</option>
-            <option value="Pollo a la parrilla con arroz y ensalada">🍗 Pollo a la parrilla con arroz y ensalada</option>
-            <option value="Carne a la parrilla con arroz y ensalada">🔥 Carne a la parrilla con arroz y ensalada</option>
+            <option value="Chuleta de chancho con arroz y ensalada">🥩 Chuleta de chancho</option>
+            <option value="Pollo a la parrilla con arroz y ensalada">🍗 Pollo a la parrilla</option>
+            <option value="Carne a la parrilla con arroz y ensalada">🔥 Carne a la parrilla</option>
           </select>
         </div>
         <div class="reg-field-pub"><label class="reg-label-pub">Bebida</label>
@@ -2996,7 +2940,7 @@ function openEditModal(qrid){
 
   // Tipo
   const tipoSel = document.getElementById('edit-tipo');
-  const tipoVal = esPadrinoRow(r) ? 'Padrino' : esAcompananteRow(r) ? 'Invitado' : 'Participante';
+  const tipoVal = esPadrinoRow(r) ? 'Padrino' : esAcompananteRow(r) ? 'Invitado' : 'Titular';
   tipoSel.value = tipoVal;
 
   // Dependencia
@@ -3070,7 +3014,7 @@ function editModalDiscChange(el){
 function editModalOnTipoChange(){
   const tipo  = document.getElementById('edit-tipo').value;
   const bloq  = document.getElementById('edit-bloque-disciplinas');
-  if(bloq) bloq.style.display = (tipo === 'Participante' || tipo === 'Titular' || tipo === 'Padrino') ? '' : 'none';
+  if(bloq) bloq.style.display = (tipo === 'Titular' || tipo === 'Padrino') ? '' : 'none';
 }
 
 async function submitEdit(){
@@ -3084,7 +3028,7 @@ async function submitEdit(){
   const celular   = (document.getElementById('edit-celular')?.value   || '').trim();
   const dependencia=(document.getElementById('edit-dependencia')?.value|| '').trim();
   const codigo    = (document.getElementById('edit-codigo')?.value    || '').trim().toUpperCase();
-  const tipo      = document.getElementById('edit-tipo')?.value       || 'Participante';
+  const tipo      = document.getElementById('edit-tipo')?.value       || 'Titular';
   const comida    = (document.getElementById('edit-comida')?.value    || '').trim();
   const bebida    = (document.getElementById('edit-bebida')?.value    || '').trim();
   const obs       = (document.getElementById('edit-obs')?.value       || '').trim();
@@ -3103,7 +3047,7 @@ async function submitEdit(){
 
   // Disciplinas — solo obligatorias para edecán; admin puede omitir
   let disciplina = '';
-  if(tipo === 'Participante' || tipo === 'Titular' || tipo === 'Padrino'){
+  if(tipo === 'Titular' || tipo === 'Padrino'){
     const checked = Array.from(document.querySelectorAll('.edit-disc-modal:checked')).map(c => c.value);
     disciplina = checked.join(', ');
     if(!disciplina && !isAdmin){
@@ -3112,8 +3056,8 @@ async function submitEdit(){
   }
 
   // Mapear tipo al formato del servidor
-  const tipoServidor  = (tipo === 'Titular' || tipo === 'Participante') ? 'Participante' : tipo === 'Padrino' ? 'Padrino' : 'Invitado';
-  const tipoPersona   = tipo === 'Invitado' ? 'Acompañante' : 'Participante';
+  const tipoServidor  = tipo === 'Titular' ? 'Titular' : tipo === 'Padrino' ? 'Padrino' : 'Invitado';
+  const tipoPersona   = tipo === 'Invitado' ? 'Acompañante' : 'Titular';
   const padrinoFlag   = tipo === 'Padrino' ? 'SI' : 'NO';
 
   const btn = document.querySelector('#edit-modal .btn-gold');
@@ -3181,7 +3125,7 @@ async function submitRegistro(){
   const celular=(document.getElementById('reg-celular')?.value||'').trim();
   const dependencia=quickMode?'':(document.getElementById('reg-dependencia')?.value||'').trim();
   const codigo=(document.getElementById('reg-codigo')?.value||'').trim().toUpperCase();
-  const tipo=quickMode?'Participante':(document.getElementById('reg-tipo')?.value||'');
+  const tipo=quickMode?'Titular':(document.getElementById('reg-tipo')?.value||'');
   const tipoPart='';
   const comida=quickMode?'':(document.getElementById('reg-comida')?.value||'').trim();
   const bebida=quickMode?'':(document.getElementById('reg-bebida')?.value||'').trim();
@@ -3204,7 +3148,7 @@ async function submitRegistro(){
 
   // Disciplinas (solo para Titular y Padrino, modo completo)
   let disciplina='';
-  if(!quickMode&&(tipo==='Participante'||tipo==='Padrino')){
+  if(!quickMode&&(tipo==='Titular'||tipo==='Padrino')){
     const checked=Array.from(document.querySelectorAll('.reg-disc-modal:checked')).map(c=>c.value);
     disciplina=checked.join(', ');
     if(!disciplina){
@@ -3230,8 +3174,8 @@ async function submitRegistro(){
   }
 
   // Mapear tipo al servidor
-  const tipoServidor=tipo==='Participante'?'Participante':tipo==='Padrino'?'Padrino':'Invitado';
-  const tipoPersona=tipo==='Invitado'?'Acompañante':'Participante';
+  const tipoServidor=tipo==='Titular'?'Titular':tipo==='Padrino'?'Padrino':'Invitado';
+  const tipoPersona=tipo==='Invitado'?'Acompañante':'Titular';
 
   try{
     const res=await apiFetch('registro',{
@@ -3352,16 +3296,14 @@ async function createUser(){
   if(needsDep&&!d){showMsg(msg,'err','Selecciona una dependencia para este rol');return;}
   try{
     // El script sólo acepta roles: administrador|delegado|verificadorasistencia|verificadorentrega
-    // Para edecan y verificadordepartidos: creamos primero como delegado, luego actualizamos
-    // el rol directamente en la hoja mediante updateUser (que no valida la lista de roles)
-    const ROLES_VIA_UPDATE = ['edecan','verificadordepartidos'];
-    const rolParaScript = ROLES_VIA_UPDATE.includes(r) ? 'delegado' : r;
+    // Para edecan: creamos primero como delegado, luego actualizamos el rol directamente en la hoja
+    // mediante updateUser que no valida el rol
+    const rolParaScript=(r==='edecan')?'delegado':r;
     const res=await apiFetch('createUser',{usuario:u,password:p,rol:rolParaScript,dependencia:d});
     if(res.result==='ok'){
-      // Si es edecan o verificadordepartidos, actualizamos el rol con updateUser
-      // (que no valida lista de roles)
-      if(ROLES_VIA_UPDATE.includes(r)){
-        await apiFetch('updateUser',{usuario:u,rol:r,dependencia:d,activo:true});
+      // Si es edecan, actualizamos el rol con updateUser (que no valida lista de roles)
+      if(r==='edecan'){
+        await apiFetch('updateUser',{usuario:u,rol:'edecan',dependencia:d,activo:true});
       }
       showMsg(msg,'ok','Usuario creado correctamente');
       document.getElementById('nu-user').value='';document.getElementById('nu-pass').value='';
@@ -3441,7 +3383,7 @@ function exportParticipantesExcel(){
         const cel=r[C.Celular]||'';const key=cel||r[C.QR_ID]||'';
         if(!seen.has(key)){seen.add(key);
           if(cel){
-            const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Participante'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
+            const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
             if(titular) rows.push(titular);
             allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>rows.push(x));
             allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>rows.push(x));
@@ -3454,7 +3396,7 @@ function exportParticipantesExcel(){
       const qid=r[C.QR_ID]||'';
       const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
       const isPadrino=esPadrinoRow(r);const isAcomp=esAcompananteRow(r);
-      const isTitular=r[C.TipoPersona]==='Participante'&&!isPadrino&&!isAcomp;
+      const isTitular=r[C.TipoPersona]==='Titular'&&!isPadrino&&!isAcomp;
       return currentFilter==='todos'||
         (currentFilter==='titulares'&&isTitular)||
         (currentFilter==='acompanantes'&&isAcomp)||
@@ -3464,19 +3406,17 @@ function exportParticipantesExcel(){
     });
   }
   // Build CSV
-  const headers=['Registro','Nombre','Tipo','Dependencia','Celular','Tipo Participacion','Disciplina','Comida','Bebida','Ingreso','Entrega','Souvenir','Aperitivo','Observaciones','QR_ID'];
+  const headers=['Registro','Nombre','Tipo','Dependencia','Celular','Tipo Participacion','Disciplina','Comida','Bebida','Ingreso','Entrega','Observaciones','QR_ID'];
   const csvRows=[headers.join(',')];
   rows.forEach(r=>{
     const qid=r[C.QR_ID]||'';
     const tipoInfo=getTipoDisplay(r);
     const ingreso=checkins[qid]&&checkins[qid].ingreso?checkins[qid].ingreso:'';
     const entrega=checkins[qid]&&checkins[qid].entrega?checkins[qid].entrega:'';
-    const souvenir=checkins[qid]&&checkins[qid].souvenir?checkins[qid].souvenir:'';
-    const aperitivo=checkins[qid]&&checkins[qid].aperitivo?checkins[qid].aperitivo:'';
     const vals=[
       r[C.Registro]||'',r[C.Nombre]||'',tipoInfo.label,r[C.Dependencia]||'',
       r[C.Celular]||'',r[C.TipoParticipacion]||'',r[C.Disciplina]||'',
-      r[C.Comida]||'',r[C.Bebida]||'',ingreso,entrega,souvenir,aperitivo,
+      r[C.Comida]||'',r[C.Bebida]||'',ingreso,entrega,
       r[C.Observaciones]||'',qid
     ].map(v=>`"${String(v).replace(/"/g,'""')}"`);
     csvRows.push(vals.join(','));
@@ -3694,8 +3634,8 @@ function filterUsersTable(){
 }
 
 function renderUsersRows(users){
-  const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega',verificadordepartidos:'role-vpartidos'};
-  const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega',verificadordepartidos:'Ver. Partidos'};
+  const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega'};
+  const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega'};
   const rows=users.map(u=>`
     <tr>
       <td><strong>${e(u.usuario)}</strong></td>
@@ -5177,23 +5117,10 @@ async function _generarPDFQRs(titularRow, acompRows){
       doc.line(MARGIN, 22, PW - MARGIN, 22);
 
       // ── Etiqueta tipo participante ──────────────────────────
-      
-    const tp = (row[C.TipoPersona] || '').toUpperCase();
-    const t  = (row[C.Tipo] || '').toUpperCase();
-
-    const tipoLabel =
-        tp === 'ACOMPAÑANTE'
-        ? 'ACOMPAÑANTE'
-        : (t === 'PADRINO'
-        ? 'PADRINO'
-        : 'TITULAR');
-
-    const tipoColor =
-        tp === 'ACOMPAÑANTE'
-        ? [0,230,118]
-        : (t === 'PADRINO'
-        ? [255,165,0]
-        : [255,215,0]);
+      const esPad = esPadrinoRow(row);
+      const esAcomp = esAcompananteRow(row);
+      const tipoLabel = esPad ? 'PADRINO' : esAcomp ? 'ACOMPAÑANTE' : 'TITULAR';
+      const tipoColor = esPad ? [255,165,0] : esAcomp ? [0,230,118] : [255,215,0];
 
       // Píldora de tipo
       doc.setFillColor(20, 25, 45);
