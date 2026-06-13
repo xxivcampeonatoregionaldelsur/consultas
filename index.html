@@ -1842,15 +1842,7 @@ function renderDashboard(){
           <div class="flow-step-num" style="color:#fff">${completados}</div>
           <div class="flow-step-lbl">Completos</div>
         </div>
-        <div class="flow-step ${countSouvenirs>0?'active':'pending'}">
-          <div class="flow-step-num" style="color:#fff">${countSouvenirs}</div>
-          <div class="flow-step-lbl">Souvenirs</div>
-        </div>
-        <div class="flow-step ${countAperitivos>0?'active':'pending'}">
-          <div class="flow-step-num" style="color:#fff">${countAperitivos}</div>
-          <div class="flow-step-lbl">Aperitivos</div>
-        </div>
-      </div>
+    </div>
       ${alertasHtml||''}
     </div>
     <div class="sec-title" style="font-size:11px;margin-bottom:10px">⚡ Acciones rápidas</div>
@@ -5185,10 +5177,23 @@ async function _generarPDFQRs(titularRow, acompRows){
       doc.line(MARGIN, 22, PW - MARGIN, 22);
 
       // ── Etiqueta tipo participante ──────────────────────────
-      const esPad = esPadrinoRow(row);
-      const esAcomp = esAcompananteRow(row);
-      const tipoLabel = esPad ? 'PADRINO' : esAcomp ? 'ACOMPAÑANTE' : 'TITULAR';
-      const tipoColor = esPad ? [255,165,0] : esAcomp ? [0,230,118] : [255,215,0];
+      
+    const tp = (row[C.TipoPersona] || '').toUpperCase();
+    const t  = (row[C.Tipo] || '').toUpperCase();
+
+    const tipoLabel =
+        tp === 'ACOMPAÑANTE'
+        ? 'ACOMPAÑANTE'
+        : (t === 'PADRINO'
+        ? 'PADRINO'
+        : 'TITULAR');
+
+    const tipoColor =
+        tp === 'ACOMPAÑANTE'
+        ? [0,230,118]
+        : (t === 'PADRINO'
+        ? [255,165,0]
+        : [255,215,0]);
 
       // Píldora de tipo
       doc.setFillColor(20, 25, 45);
