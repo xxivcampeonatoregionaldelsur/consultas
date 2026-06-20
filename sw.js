@@ -1,5 +1,5 @@
 // ── Service Worker · XXIV Campeonato Regional del Sur ──────────
-const CACHE_NAME = 'campeonato-v1';
+const CACHE_NAME = 'Consultas';
 const OFFLINE_URLS = [
   './index.html',
   './manifest.json',
