@@ -1817,8 +1817,15 @@ function renderDashboard(){
 
     // ── FLUJO DE ESTADOS ──────────────────────────────────────────
     const sinIngreso=total-countIngresos;
-    const conIngresoSinEntrega=countIngresos-countEntregas;
-    const completados=countEntregas;
+    // Completos = ingresaron + entrega + souvenir + aperitivo (titulares); acompañantes solo necesitan ingreso+entrega
+    const completados=allRows.filter(r=>{
+      const q=r[C.QR_ID];const ck=checkins[q]||{};
+      const esTitular=(r[C.TipoPersona]||'')!=='Acompañante';
+      if(!ck.ingreso||!ck.entrega) return false;
+      if(esTitular&&(!ck.souvenir||!ck.aperitivo)) return false;
+      return true;
+    }).length;
+    const enProceso=countIngresos-completados;
 
     lastOpHtml = `
     ${lastOpHtml}
@@ -1829,9 +1836,9 @@ function renderDashboard(){
           <div class="flow-step-num" style="color:#fff">${sinIngreso}</div>
           <div class="flow-step-lbl">Sin ingreso</div>
         </div>
-        <div class="flow-step ${conIngresoSinEntrega>0?'pending':'active'}">
-          <div class="flow-step-num" style="color:#fff">${conIngresoSinEntrega}</div>
-          <div class="flow-step-lbl">Ingresaron</div>
+        <div class="flow-step ${enProceso>0?'pending':'active'}">
+          <div class="flow-step-num" style="color:#fff">${enProceso}</div>
+          <div class="flow-step-lbl">En proceso</div>
         </div>
         <div class="flow-step active">
           <div class="flow-step-num" style="color:#fff">${completados}</div>
