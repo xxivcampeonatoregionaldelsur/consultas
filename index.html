@@ -1917,19 +1917,40 @@ function renderDepsDashboard(){
   const colors=['bf-gold','bf-coral','bf-mint','bf-lav','bf-purple'];
   const padrinosByDep=count(allRows.filter(r=>esPadrinoRow(r)).map(r=>r[C.Dependencia]).filter(v=>v&&v!=='—'));
 
-  // Compute per-dep: ingresos, entregas, comidas, bebidas breakdown
-  const ingByDep={},entByDep={},comByDep={},bebByDepDash={};
+  // Compute per-dep: ingresos, entregas, souvenir, aperitivo, comidas, bebidas breakdown
+  // souvenir y aperitivo solo aplican a Titular y Padrino (no Invitado/Acompañante)
+  const ingByDep={},entByDep={},souByDep={},aprByDep={};
+  const totalIngDep={},totalEntDep={},totalSouDep={},totalAprDep={};
+  const comByDep={},bebByDepDash={};
   allRows.forEach(r=>{
     const dep=r[C.Dependencia]||'—';
     const qid=r[C.QR_ID]||'';
     const com=r[C.Comida]||'—';
     const beb=r[C.Bebida]||'';
+    const esTitularOPadrino=!esAcompananteRow(r); // Titular y Padrino → controlan todo
     if(!ingByDep[dep]) ingByDep[dep]=0;
     if(!entByDep[dep]) entByDep[dep]=0;
+    if(!souByDep[dep]) souByDep[dep]=0;
+    if(!aprByDep[dep]) aprByDep[dep]=0;
+    if(!totalIngDep[dep]) totalIngDep[dep]=0;
+    if(!totalEntDep[dep]) totalEntDep[dep]=0;
+    if(!totalSouDep[dep]) totalSouDep[dep]=0;
+    if(!totalAprDep[dep]) totalAprDep[dep]=0;
     if(!comByDep[dep]) comByDep[dep]={};
     if(!bebByDepDash[dep]) bebByDepDash[dep]={};
-    if(checkins[qid]&&checkins[qid].ingreso) ingByDep[dep]++;
-    if(checkins[qid]&&checkins[qid].entrega) entByDep[dep]++;
+    // Ingreso y entrega: todos
+    totalIngDep[dep]++;
+    totalEntDep[dep]++;
+    const ck=checkins[qid]||{};
+    if(ck.ingreso===true||ck.ingreso==='SI') ingByDep[dep]++;
+    if(ck.entrega===true||ck.entrega==='SI') entByDep[dep]++;
+    // Souvenir y aperitivo: solo Titular y Padrino
+    if(esTitularOPadrino){
+      totalSouDep[dep]++;
+      totalAprDep[dep]++;
+      if(ck.souvenir===true||ck.souvenir==='SI') souByDep[dep]++;
+      if(ck.aperitivo===true||ck.aperitivo==='SI') aprByDep[dep]++;
+    }
     if(com&&com!=='—') comByDep[dep][com]=(comByDep[dep][com]||0)+1;
     if(beb&&beb!=='—') bebByDepDash[dep][beb]=(bebByDepDash[dep][beb]||0)+1;
   });
@@ -1939,7 +1960,17 @@ function renderDepsDashboard(){
     const padCount=padrinosByDep[dep]||0;
     const ing=ingByDep[dep]||0;
     const ent=entByDep[dep]||0;
-    const pendIng=cnt-ing;
+    const sou=souByDep[dep]||0;
+    const apr=aprByDep[dep]||0;
+    const totIng=totalIngDep[dep]||cnt;
+    const totEnt=totalEntDep[dep]||cnt;
+    const totSou=totalSouDep[dep]||0;
+    const totApr=totalAprDep[dep]||0;
+    const pctIng=totIng>0?Math.round(ing/totIng*100):0;
+    const pctEnt=totEnt>0?Math.round(ent/totEnt*100):0;
+    const pctSou=totSou>0?Math.round(sou/totSou*100):0;
+    const pctApr=totApr>0?Math.round(apr/totApr*100):0;
+    const pendIng=totIng-ing;
     const pendEnt=ing-ent;
     const coms=comByDep[dep]||{};
     // Build food breakdown - each food with a mini progress bar
@@ -1959,17 +1990,30 @@ function renderDepsDashboard(){
         </div>
       </div>`;
     }).join('');
+    // Helper mini barra de progreso con clase de color existente
+    const miniBar=(val,tot,cls,label)=>{
+      const p=tot>0?Math.round(val/tot*100):0;
+      return `<div style="margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span style="font-family:var(--font-h);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">${label}</span>
+          <span style="font-family:var(--font-h);font-size:12px;font-weight:900;color:var(--text)">${val}<span style="color:var(--muted);font-weight:400">/${tot}</span> <span style="color:var(--muted);font-size:10px">${p}%</span></span>
+        </div>
+        <div style="height:5px;background:var(--field);border-radius:3px;overflow:hidden">
+          <div class="bar-fill ${cls}" style="width:${p}%;height:100%;border-radius:3px;transition:width .4s"></div>
+        </div>
+      </div>`;
+    };
+    const souLabel=totSou>0?miniBar(sou,totSou,'bf-purple','Souvenir'):'<div style="margin-bottom:6px"><span style="font-size:10px;color:var(--muted);font-family:var(--font-h)">SOUVENIR — sin titulares</span></div>';
+    const aprLabel=totApr>0?miniBar(apr,totApr,'bf-coral','Aperitivo'):'<div style="margin-bottom:6px"><span style="font-size:10px;color:var(--muted);font-family:var(--font-h)">APERITIVO — sin titulares</span></div>';
     return `
     <tr>
       <td><strong style="font-family:var(--font-h);font-size:14px;text-transform:uppercase">${e(dep)}</strong></td>
       <td style="text-align:center"><span style="font-family:var(--font-h);font-size:18px;font-weight:900;color:#fff">${cnt}</span></td>
-      <td style="text-align:center">
-        <span style="font-family:var(--font-h);font-size:14px;font-weight:800;color:var(--ok)">${ing}</span>
-        <span style="color:var(--muted);font-size:11px"> / ${pendIng} pend.</span>
-      </td>
-      <td style="text-align:center">
-        <span style="font-family:var(--font-h);font-size:14px;font-weight:800;color:var(--gold)">${ent}</span>
-        <span style="color:var(--muted);font-size:11px"> / ${pendEnt} pend.</span>
+      <td style="min-width:180px;padding:8px 14px">
+        ${miniBar(ing,totIng,'bf-lav','Ingreso')}
+        ${miniBar(ent,totEnt,'bf-mint','Entrega comida')}
+        ${souLabel}
+        ${aprLabel}
       </td>
       <td style="min-width:160px">
         <div class="bar-track" style="height:18px">
@@ -1982,6 +2026,10 @@ function renderDepsDashboard(){
 
   const totalIng=Object.values(ingByDep).reduce((a,b)=>a+b,0);
   const totalEnt=Object.values(entByDep).reduce((a,b)=>a+b,0);
+  const totalSou=Object.values(souByDep).reduce((a,b)=>a+b,0);
+  const totalApr=Object.values(aprByDep).reduce((a,b)=>a+b,0);
+  const grandTotSou=Object.values(totalSouDep).reduce((a,b)=>a+b,0);
+  const grandTotApr=Object.values(totalAprDep).reduce((a,b)=>a+b,0);
 
   // Bebidas por dependencia para el panel
   const bebColors=['#FFD700','#00E676','#60a5fa','#FFA500','#a78bfa','#ff6b6b'];
@@ -2006,21 +2054,22 @@ function renderDepsDashboard(){
 
   document.getElementById('deps-inner').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-      <div class="sec-title" style="flex:1;margin:0">Por Dependencia — Estado de Comidas</div>
+      <div class="sec-title" style="flex:1;margin:0">Por Dependencia — Estado de Avance</div>
     </div>
     <div class="stats" style="margin-bottom:16px">
       <div class="stat g"><div class="stat-lbl">Dependencias</div><div class="stat-val">${sorted.length}</div><div class="stat-icon">🏛️</div></div>
       <div class="stat l"><div class="stat-lbl">Ingresos</div><div class="stat-val">${totalIng}</div><div class="stat-icon">🎫</div></div>
       <div class="stat m"><div class="stat-lbl">Entregas</div><div class="stat-val">${totalEnt}</div><div class="stat-icon">🍽️</div></div>
-      <div class="stat c"><div class="stat-lbl">Pendientes</div><div class="stat-val">${total-totalEnt}</div><div class="stat-icon">⏳</div></div>
+      <div class="stat c"><div class="stat-lbl">Souvenir</div><div class="stat-val">${totalSou}<span style="font-size:11px;color:var(--muted)">/${grandTotSou}</span></div><div class="stat-icon">🎁</div></div>
+      <div class="stat" style="background:rgba(255,70,85,.10);border-color:rgba(255,70,85,.22)"><div class="stat-lbl">Aperitivo</div><div class="stat-val">${totalApr}<span style="font-size:11px;color:var(--muted)">/${grandTotApr}</span></div><div class="stat-icon">🥂</div></div>
     </div>
     <div class="deps-card">
       <div class="tbl-wrap">
         <table style="min-width:700px">
           <thead><tr>
-            <th>Dependencia</th><th style="text-align:center">Total</th><th style="text-align:center">Ingresos</th><th style="text-align:center">Entregas</th><th>Proporción</th><th>Comidas</th>
+            <th>Dependencia</th><th style="text-align:center">Total</th><th style="min-width:180px">Avance (Ingreso · Entrega · Souvenir · Aperitivo)</th><th>Proporción</th><th>Comidas</th>
           </tr></thead>
-          <tbody>${rows||'<tr><td colspan="6"><div class="empty">Sin datos</div></td></tr>'}</tbody>
+          <tbody>${rows||'<tr><td colspan="5"><div class="empty">Sin datos</div></td></tr>'}</tbody>
         </table>
       </div>
     </div>
