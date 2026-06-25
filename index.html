@@ -1906,6 +1906,22 @@ function renderDashboard(){
     </div>`;
 }
 
+// ── HELPER: detección robusta de checkin "asistido" ────────────
+// Los valores de checkins[] pasan SIEMPRE por cellStr() (ver normalizeCheckins),
+// por lo que nunca llegan como boolean true ni como literal 'SI': llegan como
+// string vacío '' (sin checkin) o como timestamp/string no vacío (checkin OK).
+// Esta función es tolerante a distintos formatos que el backend pudiera enviar
+// (timestamp, 'SI'/'NO', 'true'/'false', boolean) para evitar que un cambio
+// futuro en el Apps Script vuelva a romper el conteo.
+function isCheckedIn(val){
+  if(val===true) return true;
+  if(val===false||val===null||val===undefined) return false;
+  const s=String(val).trim().toLowerCase();
+  if(s==='') return false;
+  if(['false','no','0','pendiente','--','—'].includes(s)) return false;
+  return true; // cualquier otro valor no vacío (timestamp, 'si', 'true', etc.) = asistió
+}
+
 // ── DASHBOARD POR DEPENDENCIA (admin only) ─────────────────────
 function renderDepsDashboard(){
   if(session.rol!=='administrador') return;
@@ -1917,6 +1933,11 @@ function renderDepsDashboard(){
   const colors=['bf-gold','bf-coral','bf-mint','bf-lav','bf-purple'];
   const padrinosByDep=count(allRows.filter(r=>esPadrinoRow(r)).map(r=>r[C.Dependencia]).filter(v=>v&&v!=='—'));
 
+  // Normalizamos las llaves de checkins UNA sola vez (evita fallos de cruce
+  // por espacios en blanco accidentales en el QR_ID que vienen de Sheets)
+  const checkinsByQid={};
+  Object.keys(checkins||{}).forEach(k=>{checkinsByQid[String(k).trim()]=checkins[k];});
+
   // Compute per-dep: ingresos, entregas, souvenir, aperitivo, comidas, bebidas breakdown
   // souvenir y aperitivo solo aplican a Titular y Padrino (no Invitado/Acompañante)
   const ingByDep={},entByDep={},souByDep={},aprByDep={};
@@ -1924,7 +1945,7 @@ function renderDepsDashboard(){
   const comByDep={},bebByDepDash={};
   allRows.forEach(r=>{
     const dep=r[C.Dependencia]||'—';
-    const qid=r[C.QR_ID]||'';
+    const qid=(r[C.QR_ID]||'').trim(); // FIX: cruce robusto, sin espacios
     const com=r[C.Comida]||'—';
     const beb=r[C.Bebida]||'';
     const esTitularOPadrino=!esAcompananteRow(r); // Titular y Padrino → controlan todo
@@ -1941,15 +1962,19 @@ function renderDepsDashboard(){
     // Ingreso y entrega: todos
     totalIngDep[dep]++;
     totalEntDep[dep]++;
-    const ck=checkins[qid]||{};
-    if(ck.ingreso===true||ck.ingreso==='SI') ingByDep[dep]++;
-    if(ck.entrega===true||ck.entrega==='SI') entByDep[dep]++;
+    // FIX PRINCIPAL: si no hay QR_ID no existe checkin posible → {} (no rompe)
+    const ck=qid?(checkinsByQid[qid]||{}):{};
+    // FIX: antes se comparaba con ===true / ==='SI', valores que normalizeCheckins
+    // NUNCA produce (todo pasa por cellStr → string). Por eso ingByDep/entByDep
+    // quedaban siempre en 0 y el "pendientes" nunca se descontaba.
+    if(isCheckedIn(ck.ingreso)) ingByDep[dep]++;
+    if(isCheckedIn(ck.entrega)) entByDep[dep]++;
     // Souvenir y aperitivo: solo Titular y Padrino
     if(esTitularOPadrino){
       totalSouDep[dep]++;
       totalAprDep[dep]++;
-      if(ck.souvenir===true||ck.souvenir==='SI') souByDep[dep]++;
-      if(ck.aperitivo===true||ck.aperitivo==='SI') aprByDep[dep]++;
+      if(isCheckedIn(ck.souvenir)) souByDep[dep]++;
+      if(isCheckedIn(ck.aperitivo)) aprByDep[dep]++;
     }
     if(com&&com!=='—') comByDep[dep][com]=(comByDep[dep][com]||0)+1;
     if(beb&&beb!=='—') bebByDepDash[dep][beb]=(bebByDepDash[dep][beb]||0)+1;
@@ -2009,6 +2034,10 @@ function renderDepsDashboard(){
     <tr>
       <td><strong style="font-family:var(--font-h);font-size:14px;text-transform:uppercase">${e(dep)}</strong></td>
       <td style="text-align:center"><span style="font-family:var(--font-h);font-size:18px;font-weight:900;color:#fff">${cnt}</span></td>
+      <td style="text-align:center">
+        <span style="font-family:var(--font-h);font-size:18px;font-weight:900;color:${pendIng>0?'var(--coral)':'var(--mint)'}">${pendIng}</span>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">de ingreso</div>
+      </td>
       <td style="min-width:180px;padding:8px 14px">
         ${miniBar(ing,totIng,'bf-lav','Ingreso')}
         ${miniBar(ent,totEnt,'bf-mint','Entrega comida')}
@@ -2059,17 +2088,18 @@ function renderDepsDashboard(){
     <div class="stats" style="margin-bottom:16px">
       <div class="stat g"><div class="stat-lbl">Dependencias</div><div class="stat-val">${sorted.length}</div><div class="stat-icon">🏛️</div></div>
       <div class="stat l"><div class="stat-lbl">Ingresos</div><div class="stat-val">${totalIng}</div><div class="stat-icon">🎫</div></div>
+      <div class="stat" style="background:rgba(255,70,85,.10);border-color:rgba(255,70,85,.22)"><div class="stat-lbl">Pendientes ingreso</div><div class="stat-val">${total-totalIng}</div><div class="stat-icon">⏳</div></div>
       <div class="stat m"><div class="stat-lbl">Entregas</div><div class="stat-val">${totalEnt}</div><div class="stat-icon">🍽️</div></div>
       <div class="stat c"><div class="stat-lbl">Souvenir</div><div class="stat-val">${totalSou}<span style="font-size:11px;color:var(--muted)">/${grandTotSou}</span></div><div class="stat-icon">🎁</div></div>
       <div class="stat" style="background:rgba(255,70,85,.10);border-color:rgba(255,70,85,.22)"><div class="stat-lbl">Aperitivo</div><div class="stat-val">${totalApr}<span style="font-size:11px;color:var(--muted)">/${grandTotApr}</span></div><div class="stat-icon">🥂</div></div>
     </div>
     <div class="deps-card">
       <div class="tbl-wrap">
-        <table style="min-width:700px">
+        <table style="min-width:760px">
           <thead><tr>
-            <th>Dependencia</th><th style="text-align:center">Total</th><th style="min-width:180px">Avance (Ingreso · Entrega · Souvenir · Aperitivo)</th><th>Proporción</th><th>Comidas</th>
+            <th>Dependencia</th><th style="text-align:center">Total</th><th style="text-align:center">Pendientes</th><th style="min-width:180px">Avance (Ingreso · Entrega · Souvenir · Aperitivo)</th><th>Proporción</th><th>Comidas</th>
           </tr></thead>
-          <tbody>${rows||'<tr><td colspan="5"><div class="empty">Sin datos</div></td></tr>'}</tbody>
+          <tbody>${rows||'<tr><td colspan="6"><div class="empty">Sin datos</div></td></tr>'}</tbody>
         </table>
       </div>
     </div>
