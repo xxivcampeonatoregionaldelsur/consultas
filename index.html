@@ -160,6 +160,7 @@ header{
 .role-edecan{background:rgba(100,120,220,.2);color:#a78bfa}
 .role-vasistencia{background:rgba(0,230,118,.15);color:var(--mint)}
 .role-ventrega{background:rgba(232,0,45,.15);color:#ff6b6b}
+.role-vfiesta{background:rgba(167,139,250,.2);color:#c084fc}
 
 /* Botones header — mínimo 44px de altura táctil */
 #btn-refresh{
@@ -1078,6 +1079,7 @@ html{scroll-behavior:smooth}
             <option value="verificadorsouvenir">Verificador de Souvenir</option>
             <option value="verificadoraperitivo">Verificador de Aperitivo</option>
             <option value="verificadordepartidos">Verificador de Partidos</option>
+            <option value="verificadorfiesta">Verificador de Fiesta</option>
           </select>
         </div>
         <div class="form-group" id="dep-field-group" style="display:none">
@@ -1113,6 +1115,7 @@ html{scroll-behavior:smooth}
           <option value="verificadorsouvenir">Ver. Souvenir</option>
           <option value="verificadoraperitivo">Ver. Aperitivo</option>
           <option value="verificadordepartidos">Ver. Partidos</option>
+          <option value="verificadorfiesta">Ver. Fiesta</option>
         </select>
       </div>
       <div class="tbl-wrap" id="users-table"><div class="loader"><div class="spinner"></div></div></div>
@@ -1536,11 +1539,11 @@ function startApp(){
   _loadContactados();
 
   // ── VERIFICADORES: solo van al scanner, no a la app ───────────
-  if(session.rol==='verificadorasistencia'||session.rol==='verificadorentrega'||session.rol==='verificadorsouvenir'||session.rol==='verificadoraperitivo'||session.rol==='verificadordepartidos'){
+  if(session.rol==='verificadorasistencia'||session.rol==='verificadorentrega'||session.rol==='verificadorsouvenir'||session.rol==='verificadoraperitivo'||session.rol==='verificadordepartidos'||session.rol==='verificadorfiesta'){
     const vs=document.getElementById('verif-redirect-screen');
     const vi=document.getElementById('verif-logo-img');
     if(vi) vi.src=LOGO_SRC;
-    const rolLbl=session.rol==='verificadorasistencia'?'Verificador de Asistencia':session.rol==='verificadorentrega'?'Verificador de Entrega':session.rol==='verificadorsouvenir'?'Verificador de Souvenir':session.rol==='verificadoraperitivo'?'Verificador de Aperitivo':'Verificador de Partidos';
+    const rolLbl=session.rol==='verificadorasistencia'?'Verificador de Asistencia':session.rol==='verificadorentrega'?'Verificador de Entrega':session.rol==='verificadorsouvenir'?'Verificador de Souvenir':session.rol==='verificadoraperitivo'?'Verificador de Aperitivo':session.rol==='verificadorfiesta'?'Verificador de Fiesta':'Verificador de Partidos';
     const sub=document.getElementById('verif-role-sub');
     if(sub) sub.textContent=rolLbl+' · XXIV Campeonato Regional del Sur';
     const badge=document.getElementById('verif-usuario-badge');
@@ -1562,7 +1565,7 @@ function startApp(){
     edecan:['Edecán','role-edecan'],
     verificadorasistencia:['Ver. Asistencia','role-vasistencia'],verificadorentrega:['Ver. Entrega','role-ventrega'],
     verificadorsouvenir:['Ver. Souvenir','role-ventrega'],verificadoraperitivo:['Ver. Aperitivo','role-ventrega'],
-    verificadordepartidos:['Ver. Partidos','role-ventrega']};
+    verificadordepartidos:['Ver. Partidos','role-ventrega'],verificadorfiesta:['Ver. Fiesta','role-vfiesta']};
   const rm=rmap[session.rol]||[session.rol,'role-admin'];
   rb.textContent=rm[0];rb.className='role-badge '+rm[1];
   if(session.rol!=='administrador'){
@@ -3796,8 +3799,8 @@ function filterUsersTable(){
 }
 
 function renderUsersRows(users){
-  const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega',verificadorsouvenir:'role-ventrega',verificadoraperitivo:'role-ventrega',verificadordepartidos:'role-ventrega'};
-  const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega',verificadorsouvenir:'Ver. Souvenir',verificadoraperitivo:'Ver. Aperitivo',verificadordepartidos:'Ver. Partidos'};
+  const rmap={administrador:'role-admin',delegado:'role-delegado',edecan:'role-edecan',verificadorasistencia:'role-vasistencia',verificadorentrega:'role-ventrega',verificadorsouvenir:'role-ventrega',verificadoraperitivo:'role-ventrega',verificadordepartidos:'role-ventrega',verificadorfiesta:'role-vfiesta'};
+  const rlbl={administrador:'Administrador',delegado:'Delegado',edecan:'Edecán',verificadorasistencia:'Ver. Asistencia',verificadorentrega:'Ver. Entrega',verificadorsouvenir:'Ver. Souvenir',verificadoraperitivo:'Ver. Aperitivo',verificadordepartidos:'Ver. Partidos',verificadorfiesta:'Ver. Fiesta'};
   const rows=users.map(u=>`
     <tr>
       <td><strong>${e(u.usuario)}</strong></td>
