@@ -545,6 +545,88 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
 #pane-participantes{overflow:visible;}
 #part-inner .tbl-wrap{max-height:65vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
+/* ══════════════════════════════════════════════════════════════
+   TOOLBAR AVANZADO — Búsqueda + Filtros Participantes
+   Sistema optimizado: debounce · normalización · sin DOM search
+   ══════════════════════════════════════════════════════════════ */
+.part-toolbar{
+  display:flex;flex-direction:column;gap:8px;
+  background:var(--s1);border:1px solid var(--border);border-radius:var(--r);
+  padding:12px 14px;margin-bottom:12px;
+}
+.part-toolbar-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.part-search-wrap{
+  flex:1;min-width:220px;position:relative;
+}
+.part-search-icon{
+  position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  color:var(--muted);font-size:14px;pointer-events:none;
+}
+.part-search-input{
+  width:100%;min-height:var(--touch-min);
+  background:var(--s2);border:1.5px solid var(--border2);border-radius:4px;
+  padding:12px 36px 12px 36px;color:var(--text);font-family:var(--font-b);
+  font-size:14px;outline:none;transition:border-color var(--t-fast),box-shadow var(--t-fast);
+}
+.part-search-input:focus{
+  border-color:var(--gold);background:#0c1020;
+  box-shadow:0 0 0 3px rgba(255,215,0,.08);
+}
+.part-search-input::placeholder{color:var(--muted);}
+.part-search-clear{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:16px;line-height:1;padding:4px 6px;border-radius:3px;
+  display:none;transition:color var(--t-fast);
+}
+.part-search-clear:hover{color:var(--text);}
+.part-search-clear.visible{display:block;}
+.part-filter-row{
+  display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+}
+.part-filter-sel{
+  background:var(--s2);border:1px solid var(--border2);border-radius:4px;
+  padding:8px 10px;min-height:40px;color:var(--text);
+  font-family:var(--font-h);font-size:12px;letter-spacing:.5px;
+  outline:none;cursor:pointer;text-transform:uppercase;flex:1;min-width:130px;
+  transition:border-color var(--t-fast);
+}
+.part-filter-sel:focus{border-color:var(--gold);}
+.part-filter-sel.has-value{
+  border-color:rgba(255,215,0,.5);color:var(--gold);
+}
+.part-filter-clear-btn{
+  background:var(--s2);border:1px solid var(--border2);border-radius:4px;
+  padding:8px 12px;min-height:40px;color:var(--muted);
+  font-family:var(--font-h);font-size:11px;letter-spacing:.5px;
+  cursor:pointer;text-transform:uppercase;white-space:nowrap;
+  transition:all var(--t-fast);flex-shrink:0;
+}
+.part-filter-clear-btn:hover{border-color:var(--gold);color:var(--gold);}
+.part-results-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-top:8px;border-top:1px solid var(--border);
+  font-family:var(--font-h);font-size:11px;color:var(--muted);
+  letter-spacing:.5px;flex-wrap:wrap;gap:6px;
+}
+.part-results-count{font-weight:700;color:var(--text);}
+.part-results-count em{color:var(--gold);font-style:normal;}
+.part-active-filters{
+  display:flex;gap:5px;flex-wrap:wrap;
+}
+.part-filter-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 8px;border-radius:10px;
+  background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.25);
+  font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--gold);
+  letter-spacing:.5px;text-transform:uppercase;
+}
+@media(max-width:768px){
+  .part-filter-sel{min-width:100%;font-size:16px;min-height:48px;}
+  .part-search-input{font-size:16px;min-height:52px;}
+  .part-filter-clear-btn{min-height:48px;}
+}
+
 /* ── SECTION TITLE ───────────────────────────────────────────── */
 .sec-title{
   font-family:var(--font-h);font-size:13px;font-weight:800;color:var(--text);
@@ -1482,6 +1564,18 @@ const MEDAL_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' 
 let session = JSON.parse(localStorage.getItem('ev_session')||'null');
 let allRows=[], checkins={};
 let currentSearch='', currentFilter='todos';
+
+// ── ESTADO DE FILTROS AVANZADOS (Participantes) ────────────────
+// Separados de currentSearch/currentFilter para no romper lógica existente
+const partFilters = {
+  texto:    '',   // texto libre del buscador
+  tipo:     '',   // 'Titular' | 'Padrino' | 'Invitado' | ''
+  dep:      '',   // nombre de dependencia exacto | ''
+  estado:   '',   // 'ingreso' | 'entrega' | 'souvenir' | 'pendientes' | ''
+};
+let _partDebounceTimer = null;
+// Cache de dependencias únicas para el filtro (se llena al renderizar)
+let _partDepsCache = [];
 // Estado del modal QR — objeto global para compartir entre funciones
 let qrModal = {qrId:'', nombreCompleto:'', tipo:'', padrino:'', disciplina:'', qrUrl:''};
 
@@ -2133,18 +2227,286 @@ function renderDepsDashboard(){
     <div class="card" style="margin-top:16px"><div class="card-title">🥤 Bebidas por Dependencia</div>${bebByDepHtmlDash}</div>`;
 }
 
-// ── DEBOUNCE ──────────────────────────────────────────────────
-let _searchDebounceTimer=null;
-function debouncedSearch(val){
-  if(_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
-  const trimmed=val.trim();
-  const isAdmin=session&&session.rol==='administrador';
-  // Admin: busca desde 1 carácter. Resto: espera 2+ caracteres
-  if(!isAdmin && trimmed.length>0 && trimmed.length<2) return;
-  _searchDebounceTimer=setTimeout(()=>{
-    requestAnimationFrame(()=>renderParticipants(val));
-  },300);
+// ══════════════════════════════════════════════════════════════
+//  SISTEMA DE BÚSQUEDA Y FILTROS OPTIMIZADO — Participantes
+//  Arquitectura: normalizar → filtrar → renderizar (sin DOM search)
+// ══════════════════════════════════════════════════════════════
+
+// ── 1. NORMALIZACIÓN ──────────────────────────────────────────
+// Convierte texto a forma canónica: minúsculas, sin acentos, sin espacios extra
+function _normText(str){
+  if(!str) return '';
+  return String(str)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')  // eliminar diacríticos
+    .replace(/\s+/g,' ')             // colapsar espacios
+    .trim();
 }
+
+// ── 2. DEBOUNCE para el input de búsqueda ────────────────────
+function debouncedSearch(val){
+  partFilters.texto = val;
+  // Actualiza botón clear
+  const clearBtn = document.getElementById('part-search-clear');
+  if(clearBtn) clearBtn.classList.toggle('visible', val.length > 0);
+  if(_partDebounceTimer) clearTimeout(_partDebounceTimer);
+  _partDebounceTimer = setTimeout(()=>{
+    requestAnimationFrame(_applyPartFilters);
+  }, 350);
+}
+
+// Limpia solo el texto del buscador
+function clearPartSearch(){
+  partFilters.texto = '';
+  const inp = document.getElementById('part-search-input');
+  if(inp){ inp.value=''; inp.focus(); }
+  const clearBtn = document.getElementById('part-search-clear');
+  if(clearBtn) clearBtn.classList.remove('visible');
+  requestAnimationFrame(_applyPartFilters);
+}
+
+// Limpia todos los filtros avanzados
+function clearAllPartFilters(){
+  partFilters.texto = '';
+  partFilters.tipo  = '';
+  partFilters.dep   = '';
+  partFilters.estado= '';
+  const inp = document.getElementById('part-search-input');
+  if(inp) inp.value = '';
+  const clearBtn = document.getElementById('part-search-clear');
+  if(clearBtn) clearBtn.classList.remove('visible');
+  _setPartFilterUI();
+  requestAnimationFrame(_applyPartFilters);
+}
+
+// Actualiza selects de filtros en UI al valor del estado
+function _setPartFilterUI(){
+  const s = (id, val) => { const el=document.getElementById(id); if(el){ el.value=val; el.classList.toggle('has-value', !!val); }};
+  s('part-filter-tipo',  partFilters.tipo);
+  s('part-filter-dep',   partFilters.dep);
+  s('part-filter-estado',partFilters.estado);
+}
+
+// Listener para cambios en selects de filtro
+function onPartFilterChange(field, val){
+  partFilters[field] = val;
+  const el = document.getElementById('part-filter-' + field);
+  if(el) el.classList.toggle('has-value', !!val);
+  // Filtros de selects: sin debounce, respuesta inmediata
+  requestAnimationFrame(_applyPartFilters);
+}
+
+// ── 3. FUNCIÓN DE FILTRADO ────────────────────────────────────
+// Opera sobre allRows (fuente de verdad), devuelve array filtrado
+// No toca el DOM en ningún momento
+function _computePartRows(){
+  const needle = _normText(partFilters.texto);
+  const fTipo  = partFilters.tipo;
+  const fDep   = partFilters.dep;
+  const fEstado= partFilters.estado;
+  const isAdmin= session && session.rol === 'administrador';
+
+  // Determinar si algún filtro está activo
+  const hasText  = needle.length > 0;
+  const hasFilters = fTipo || fDep || fEstado;
+
+  if(!hasText && !hasFilters){
+    // Sin filtros: mostrar todo (respetando la vista por rol como antes)
+    return allRows.slice();
+  }
+
+  return allRows.filter(r => {
+    // ── Filtros de select (rápidos, sin normalización) ──────
+    if(fTipo){
+      const tipoCol = (r[C.Tipo] || '').trim();
+      if(fTipo === 'Titular'){
+        // Titular = TipoPersona Titular AND no Padrino AND no Invitado
+        if(esPadrinoRow(r) || esAcompananteRow(r)) return false;
+        if(r[C.TipoPersona] !== 'Titular') return false;
+      } else if(fTipo === 'Padrino'){
+        if(!esPadrinoRow(r)) return false;
+      } else if(fTipo === 'Invitado'){
+        if(!esAcompananteRow(r)) return false;
+      }
+    }
+
+    if(fDep){
+      if((r[C.Dependencia] || '') !== fDep) return false;
+    }
+
+    if(fEstado){
+      const qid = (r[C.QR_ID] || '').trim();
+      const ck  = checkins[qid] || {};
+      const hasI = isCheckedIn(ck.ingreso);
+      const hasE = isCheckedIn(ck.entrega);
+      const hasS = isCheckedIn(ck.souvenir);
+      const hasA = isCheckedIn(ck.aperitivo);
+      const hasF = isCheckedIn(ck.fiesta);
+      if(fEstado === 'ingreso'    && !hasI) return false;
+      if(fEstado === 'entrega'    && !hasE) return false;
+      if(fEstado === 'souvenir'   && !hasS) return false;
+      if(fEstado === 'aperitivo'  && !hasA) return false;
+      if(fEstado === 'fiesta'     && !hasF) return false;
+      if(fEstado === 'pendientes' && (hasI || hasE)) return false;
+    }
+
+    // ── Búsqueda de texto libre ──────────────────────────────
+    if(hasText){
+      // Campos indexados: nombre, dependencia, registro, celular
+      const fields = [
+        r[C.Nombre]      || '',
+        r[C.Dependencia] || '',
+        r[C.Registro]    || '',
+        r[C.Celular]     || '',
+      ];
+      // Admin: también tipo y disciplina
+      if(isAdmin){
+        fields.push(r[C.Disciplina] || '');
+        fields.push(getTipoDisplay(r).label);
+        fields.push(r[C.Tipo] || '');
+      }
+      const hayMatch = fields.some(f => _normText(f).includes(needle));
+      if(!hayMatch) return false;
+    }
+
+    return true;
+  });
+}
+
+// ── 4. FUNCIÓN DE RENDERIZADO PARCIAL ────────────────────────
+// Solo reescribe el tbody y el bloque de resultados; no destruye el toolbar
+function _applyPartFilters(){
+  // Sync estado global para que exportParticipantesExcel funcione igual
+  currentSearch = partFilters.texto.trim().toLowerCase();
+  // currentFilter no se usa si hay filtros avanzados activos
+
+  const rows = _computePartRows();
+  _renderPartTbody(rows);
+  _updatePartResultsBar(rows);
+}
+
+// Renderiza solo el tbody usando DocumentFragment (no re-render completo)
+function _renderPartTbody(rows){
+  const tbody = document.getElementById('part-tbody');
+  if(!tbody) return;
+
+  const isAdmin    = session.rol === 'administrador';
+  const canMultiSelect = isAdmin || session.rol === 'edecan';
+  const frag = document.createDocumentFragment();
+
+  if(!rows.length){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="${canMultiSelect?15:14}"><div class="empty">Sin resultados para los filtros aplicados</div></td>`;
+    frag.appendChild(tr);
+  } else {
+    rows.forEach(r => {
+      const qid = r[C.QR_ID] || '';
+      const ck  = checkins[qid] || {};
+      const hasI = isCheckedIn(ck.ingreso);
+      const hasE = isCheckedIn(ck.entrega);
+      const hasS = isCheckedIn(ck.souvenir);
+      const hasA = isCheckedIn(ck.aperitivo);
+      const hasF = isCheckedIn(ck.fiesta);
+      const dep  = r[C.Dependencia] || '';
+      const isEdecan = session.rol === 'edecan';
+      const canDelete = isAdmin || (isEdecan && (!session.dependencia || dep === session.dependencia));
+      const tipoInfo  = getTipoDisplay(r);
+      const contactado= contactados[qid] || 'PENDIENTE';
+      const cColor    = contactado==='SI'?'var(--mint)':contactado==='NO'?'var(--err)':'var(--warn)';
+      const sel = _seleccionados.has(qid);
+      const isAcompTipo = esAcompananteRow(r);
+      const esCompleto  = isAcompTipo
+        ? (hasI && hasE && hasF)
+        : (hasI && hasE && hasF && hasS && hasA);
+
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-qrid', qid);
+      if(sel) tr.style.background = 'rgba(255,215,0,.07)';
+      if(esCompleto) tr.className = 'attended';
+
+      tr.innerHTML = `
+        ${canMultiSelect?`<td style="text-align:center;padding:6px 8px">
+          <input type="checkbox" class="chk-part-row" data-qrid="${e(qid)}"
+            ${sel?'checked':''} onchange="onRowCheckChange(this)"
+            style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer">
+        </td>`:''}
+        <td><span style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--text);letter-spacing:.5px">${e(r[C.Registro]||'—')}</span></td>
+        <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${esPadrinoRow(r)?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">Padrino</span>':''}</td>
+        <td><span class="bdg ${tipoInfo.cls}">${e(tipoInfo.label)}</span></td>
+        <td style="color:var(--muted);font-size:12px">${e(dep||'—')}</td>
+        <td style="font-size:13px">${e(r[C.Disciplina]||'—')}</td>
+        <td style="font-size:13px;color:var(--text)">${e(r[C.Comida]||'—')}</td>
+        <td style="font-size:13px;color:var(--text)">${e(r[C.Bebida]||'—')}</td>
+        <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(ck.ingreso):'Pendiente'}</span></td>
+        <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(ck.entrega):'Pendiente'}</span></td>
+        <td>${isAcompTipo?'<span style="color:var(--muted);font-size:11px">N/A</span>':`<span class="bdg ${hasS?'bdg-chk':'bdg-no'}">${hasS?'✓ '+formatHora(ck.souvenir):'Pendiente'}</span>`}</td>
+        <td>${isAcompTipo?'<span style="color:var(--muted);font-size:11px">N/A</span>':`<span class="bdg ${hasA?'bdg-chk':'bdg-no'}">${hasA?'✓ '+formatHora(ck.aperitivo):'Pendiente'}</span>`}</td>
+        <td><span class="bdg ${hasF?'bdg-chk':'bdg-no'}">${hasF?'✓ '+formatHora(ck.fiesta):'Pendiente'}</span></td>
+        <td>
+          <select data-qrid="${e(qid)}"
+            style="background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:4px 6px;color:${cColor};font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;min-height:32px"
+            onchange="setContactado('${e(qid)}',this.value)">
+            <option value="PENDIENTE"${contactado==='PENDIENTE'?' selected':''}>⏳ Pend.</option>
+            <option value="SI"${contactado==='SI'?' selected':''}>✅ Sí</option>
+            <option value="NO"${contactado==='NO'?' selected':''}>❌ No</option>
+          </select>
+        </td>
+        <td style="white-space:nowrap">
+          ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(r[C.TipoPersona]||'')}','${e(r[C.Dependencia]||'')}','${e(r[C.Tipo]||'')}','${e(r[C.Disciplina]||'')}')">🔲 QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
+          ${(isAdmin||(isEdecan&&(!session.dependencia||dep===session.dependencia)))?`<button class="btn btn-blue btn-sm" onclick="openEditModal('${e(qid)}')">✏️</button>`:''}
+          ${canDelete?`<button class="btn btn-danger btn-sm" onclick="deleteRegistro('${e(qid)}','${e(r[C.Nombre]||'')}','${e(dep)}')">🗑</button>`:''}
+        </td>`;
+      frag.appendChild(tr);
+    });
+  }
+
+  // Swap tbody content en una sola operación (mínimo reflow)
+  tbody.innerHTML = '';
+  tbody.appendChild(frag);
+}
+
+// Actualiza el contador de resultados y los chips de filtros activos
+function _updatePartResultsBar(rows){
+  const countEl = document.getElementById('part-results-count');
+  const chipsEl = document.getElementById('part-active-chips');
+  const clearBtn= document.getElementById('part-clear-all-btn');
+  if(!countEl) return;
+
+  const total = rows.length;
+  const withI = rows.filter(r=>{ const q=(r[C.QR_ID]||'').trim(); return isCheckedIn((checkins[q]||{}).ingreso); }).length;
+  const withE = rows.filter(r=>{ const q=(r[C.QR_ID]||'').trim(); return isCheckedIn((checkins[q]||{}).entrega); }).length;
+
+  countEl.innerHTML = `<em>${total}</em> resultado${total!==1?'s':''} &nbsp;·&nbsp; Ingresos: <strong>${withI}/${total}</strong> &nbsp;·&nbsp; Entregas: <strong>${withE}/${total}</strong>`;
+
+  // Chips de filtros activos
+  const chips = [];
+  if(partFilters.texto)  chips.push(`🔍 "${partFilters.texto}"`);
+  if(partFilters.tipo)   chips.push(`Tipo: ${partFilters.tipo}`);
+  if(partFilters.dep)    chips.push(`Dep: ${partFilters.dep.slice(0,18)}${partFilters.dep.length>18?'…':''}`);
+  if(partFilters.estado) chips.push(`Estado: ${partFilters.estado}`);
+
+  if(chipsEl){
+    chipsEl.innerHTML = chips.map(c=>`<span class="part-filter-chip">${e(c)}</span>`).join('');
+  }
+  if(clearBtn){
+    clearBtn.style.display = chips.length ? '' : 'none';
+  }
+
+  // Barra de progreso (si existe)
+  const pw = document.getElementById('part-prog-wrap');
+  if(pw && total > 0){
+    const pctI = Math.round(withI/total*100);
+    const pctE = Math.round(withE/total*100);
+    pw.innerHTML = `
+      <div class="prog-lbl">Ingresos: <strong>${withI}/${total}</strong></div>
+      <div class="prog-track"><div class="prog-fill" style="width:${pctI}%"></div></div>
+      <div class="prog-lbl">Entregas: <strong>${withE}/${total}</strong></div>`;
+  }
+}
+
+// ── DEBOUNCE LEGACY (compat con debouncedSearch en toolbar antiguo) ──
+// La función debouncedSearch ya está definida arriba como parte del nuevo sistema
 
 // ── DISCIPLINE ICON MAP ────────────────────────────────────────
 const DISC_ICON={
@@ -2180,176 +2542,105 @@ function getTipoDisplay(row){
   return {label:tipoPersona||'—',cls:'bdg-no',icon:''};
 }
 
-// ── PARTICIPANTS ───────────────────────────────────────────────
+// ── PARTICIPANTS — render inicial del shell (toolbar + tabla) ──
 function renderParticipants(s,f){
-  if(s!==undefined) currentSearch=s.toLowerCase().trim();
-  if(f!==undefined) currentFilter=f;
+  // Compat: si se llama con parámetros heredados, actualiza filtros
+  if(s !== undefined){ partFilters.texto = String(s).toLowerCase().trim(); currentSearch = partFilters.texto; }
+  if(f !== undefined){ currentFilter = f; }
 
-  // Sin búsqueda: mostrar todos según filtro
-  // Con búsqueda: buscar SOLO por número de registro y mostrar titular + sus acompañantes
-  let rows=[];
-  const isAdmin=session.rol==='administrador';
-  if(currentSearch){
-    const searchLower=currentSearch.toLowerCase();
-    if(isAdmin){
-      // Admin: busca en Registro, Nombre, Tipo, Dependencia, Disciplina
-      rows=allRows.filter(r=>{
-        return (r[C.Registro]||'').toLowerCase().includes(searchLower)||
-               (r[C.Nombre]||'').toLowerCase().includes(searchLower)||
-               (r[C.Tipo]||'').toLowerCase().includes(searchLower)||
-               (r[C.Dependencia]||'').toLowerCase().includes(searchLower)||
-               (r[C.Disciplina]||'').toLowerCase().includes(searchLower)||
-               getTipoDisplay(r).label.toLowerCase().includes(searchLower);
-      });
-    } else {
-      // Otros roles: busca por Registro O Nombre (4+ chars) y agrupa con acompañantes
-      const matched=allRows.filter(r=>
-        (r[C.Registro]||'').toLowerCase().includes(searchLower)||
-        (r[C.Nombre]||'').toLowerCase().includes(searchLower)
-      );
-      const seen=new Set();
-      matched.forEach(r=>{
-        const cel=r[C.Celular]||'';
-        const key=cel||r[C.QR_ID]||'';
-        if(!seen.has(key)){
-          seen.add(key);
-          if(cel){
-            const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
-            if(titular) rows.push(titular);
-            allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>rows.push(x));
-            allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>rows.push(x));
-          } else { rows.push(r); }
-        }
-      });
-    }
-  } else {
-    rows=allRows.filter(r=>{
-      const qid=r[C.QR_ID]||'';
-      const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
-      const isPadrino=esPadrinoRow(r);
-      const isAcomp=esAcompananteRow(r);
-      const isTitular=r[C.TipoPersona]==='Titular'&&!isPadrino&&!isAcomp;
-      return currentFilter==='todos'||
-        (currentFilter==='titulares'&&isTitular)||
-        (currentFilter==='acompanantes'&&isAcomp)||
-        (currentFilter==='padrinos'&&isPadrino)||
-        (currentFilter==='ingreso'&&hasIngreso)||(currentFilter==='entrega'&&hasEntrega)||
-        (currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
-    });
-  }
-  const total=rows.length;
-  const withIngreso=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].ingreso}).length;
-  const withEntrega=rows.filter(r=>{const q=r[C.QR_ID];return checkins[q]&&checkins[q].entrega}).length;
+  const isAdmin        = session.rol === 'administrador';
+  const canAddRecord   = isAdmin || session.rol === 'edecan';
+  const canMultiSelect = isAdmin || session.rol === 'edecan';
 
-  const searchPlaceholder=isAdmin
-    ?'🔍 Buscar por nombre, tipo, dependencia, registro...'
-    :'🔍 Buscar por nombre o código de registro...';
+  // Construir lista de dependencias únicas para el filtro
+  const depsSet = new Set();
+  allRows.forEach(r => { const d = r[C.Dependencia]; if(d && d !== '—') depsSet.add(d); });
+  _partDepsCache = Array.from(depsSet).sort((a,b) => a.localeCompare(b,'es'));
+  const depsOptions = _partDepsCache.map(d => `<option value="${e(d)}">${e(d)}</option>`).join('');
 
-  const canAddRecord=isAdmin||(session.rol==='edecan');
-  // PERMISO 5: Selección múltiple y envío masivo WA solo para Admin y Edecán
-  const canMultiSelect=isAdmin||(session.rol==='edecan');
-  const headerHtml=`
-    <div class="prog-wrap">
-      <div class="prog-lbl">Ingresos: <strong>${withIngreso}/${total}</strong></div>
-      <div class="prog-track"><div class="prog-fill" style="width:${total>0?Math.round(withIngreso/total*100):0}%"></div></div>
-      <div class="prog-lbl">Entregas: <strong>${withEntrega}/${total}</strong></div>
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+  const toolbarHtml = `
+  <div class="part-toolbar" id="part-toolbar">
+    <div class="part-toolbar-row">
+      <div class="part-search-wrap">
+        <span class="part-search-icon">🔍</span>
+        <input
+          id="part-search-input"
+          class="part-search-input"
+          type="search"
+          inputmode="search"
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+          placeholder="Buscar por nombre, dependencia, registro, celular…"
+          value="${e(partFilters.texto)}"
+          oninput="debouncedSearch(this.value)"
+          onkeydown="if(event.key==='Escape')clearPartSearch()"
+        >
+        <button id="part-search-clear" class="part-search-clear${partFilters.texto?' visible':''}"
+          onclick="clearPartSearch()" title="Limpiar búsqueda" aria-label="Limpiar búsqueda">✕</button>
+      </div>
+      ${canAddRecord?`<button class="btn btn-gold btn-sm" onclick="openRegistroModal()" style="white-space:nowrap;flex-shrink:0">➕ Registrar</button>`:''}
+      ${!isMobile?`<button class="btn btn-ghost btn-sm" onclick="exportParticipantesExcel()" style="white-space:nowrap;flex-shrink:0">⬇ Excel</button>`:''}
     </div>
-    <div class="toolbar">
-      <input class="search" type="text" placeholder="${searchPlaceholder}" value="${e(currentSearch)}" oninput="debouncedSearch(this.value)">
-      ${canAddRecord?`<button class="btn btn-gold btn-sm" onclick="openRegistroModal()" style="white-space:nowrap">➕ Registrar</button>`:''}
-      <button class="btn btn-ghost btn-sm" onclick="exportParticipantesExcel()" style="white-space:nowrap;${/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.innerWidth<768?'display:none':''}">⬇ Excel</button>
-      <span style="color:var(--muted);font-size:12px">${total} resultado${total!==1?'s':''}</span>
+    <div class="part-filter-row">
+      <select id="part-filter-tipo" class="part-filter-sel${partFilters.tipo?' has-value':''}"
+        onchange="onPartFilterChange('tipo',this.value)" aria-label="Filtrar por tipo">
+        <option value="">— Tipo —</option>
+        <option value="Titular">🥇 Titular</option>
+        <option value="Padrino">👑 Padrino</option>
+        <option value="Invitado">👥 Acompañante</option>
+      </select>
+      <select id="part-filter-dep" class="part-filter-sel${partFilters.dep?' has-value':''}"
+        onchange="onPartFilterChange('dep',this.value)" aria-label="Filtrar por dependencia">
+        <option value="">— Dependencia —</option>
+        ${depsOptions}
+      </select>
+      <select id="part-filter-estado" class="part-filter-sel${partFilters.estado?' has-value':''}"
+        onchange="onPartFilterChange('estado',this.value)" aria-label="Filtrar por estado">
+        <option value="">— Estado —</option>
+        <option value="ingreso">✅ Con ingreso</option>
+        <option value="entrega">🍽️ Con entrega</option>
+        <option value="souvenir">🎁 Con souvenir</option>
+        <option value="aperitivo">🥂 Con aperitivo</option>
+        <option value="fiesta">🎉 Con fiesta</option>
+        <option value="pendientes">⏳ Pendientes (sin ingreso)</option>
+      </select>
+      <button id="part-clear-all-btn" class="part-filter-clear-btn"
+        onclick="clearAllPartFilters()"
+        style="${(partFilters.tipo||partFilters.dep||partFilters.estado)?'':'display:none'}"
+        title="Limpiar todos los filtros">✕ Limpiar filtros</button>
     </div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr>
-          ${canMultiSelect?`<th style="width:34px;text-align:center"><input type="checkbox" id="chk-all-part" title="Seleccionar todos" onchange="toggleSeleccionTodos(this.checked)" style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer"></th>`:''}
-          <th>Reg.</th><th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
-          <th>Ingreso</th><th>Entrega</th><th>Souvenir</th><th>Aperitivo</th><th>Fiesta</th><th>Contactado</th><th>Acciones</th>
-        </tr></thead>
-        <tbody id="part-tbody"></tbody>
-      </table>
+    <div class="part-results-bar">
+      <span id="part-results-count" class="part-results-count">Cargando…</span>
+      <div id="part-active-chips" class="part-active-filters"></div>
     </div>
-    ${canMultiSelect?`<!-- FIX 2: Barra de acciones para selección múltiple -->
-    <div id="part-sel-bar" style="display:none;background:var(--s2);border:1px solid var(--gold);border-radius:4px;padding:10px 14px;margin-top:8px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
-      <span id="part-sel-count" style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--gold)">0 seleccionados</span>
-      <button class="btn btn-gold btn-sm" onclick="enviarWASeleccionados()" style="white-space:nowrap">📱 WhatsApp a seleccionados</button>
-      <button class="btn btn-ghost btn-sm" onclick="marcarContactadosSeleccionados('SI')" style="white-space:nowrap">✅ Marcar contactados</button>
-      <button class="btn btn-ghost btn-sm" onclick="marcarContactadosSeleccionados('PENDIENTE')" style="white-space:nowrap">⏳ Limpiar estado</button>
-      <button class="btn btn-ghost btn-sm" onclick="limpiarSeleccion()" style="margin-left:auto">✕ Limpiar selección</button>
-    </div>`:''}`;
+  </div>
+  <div class="prog-wrap" id="part-prog-wrap" style="margin-bottom:10px"></div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        ${canMultiSelect?`<th style="width:34px;text-align:center"><input type="checkbox" id="chk-all-part" title="Seleccionar todos" onchange="toggleSeleccionTodos(this.checked)" style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer"></th>`:''}
+        <th>Reg.</th><th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
+        <th>Ingreso</th><th>Entrega</th><th>Souvenir</th><th>Aperitivo</th><th>Fiesta</th><th>Contactado</th><th>Acciones</th>
+      </tr></thead>
+      <tbody id="part-tbody"></tbody>
+    </table>
+  </div>
+  ${canMultiSelect?`<div id="part-sel-bar" style="display:none;background:var(--s2);border:1px solid var(--gold);border-radius:4px;padding:10px 14px;margin-top:8px;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span id="part-sel-count" style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--gold)">0 seleccionados</span>
+    <button class="btn btn-gold btn-sm" onclick="enviarWASeleccionados()" style="white-space:nowrap">📱 WhatsApp a seleccionados</button>
+    <button class="btn btn-ghost btn-sm" onclick="marcarContactadosSeleccionados('SI')" style="white-space:nowrap">✅ Marcar contactados</button>
+    <button class="btn btn-ghost btn-sm" onclick="marcarContactadosSeleccionados('PENDIENTE')" style="white-space:nowrap">⏳ Limpiar estado</button>
+    <button class="btn btn-ghost btn-sm" onclick="limpiarSeleccion()" style="margin-left:auto">✕ Limpiar selección</button>
+  </div>`:''}`;
 
-  document.getElementById('part-inner').innerHTML=headerHtml;
-
-  const tbody=document.getElementById('part-tbody');
-  const frag=document.createDocumentFragment();
-
-  if(!rows.length){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td colspan="${canMultiSelect?15:14}"><div class="empty">Sin resultados</div></td>`;
-    frag.appendChild(tr);
-  } else {
-    rows.forEach(r=>{
-      const qid=r[C.QR_ID]||'',hasI=checkins[qid]&&isCheckedIn(checkins[qid].ingreso),hasE=checkins[qid]&&isCheckedIn(checkins[qid].entrega);
-      const hasS=checkins[qid]&&isCheckedIn(checkins[qid].souvenir),hasA=checkins[qid]&&isCheckedIn(checkins[qid].aperitivo);
-      const hasF=checkins[qid]&&isCheckedIn(checkins[qid].fiesta);
-      const padrino=r[C.Padrino]||'';
-      const isPadrino=esPadrinoRow(r);
-      const tipoInfo=getTipoDisplay(r);
-      const disc=r[C.Disciplina]||'—';
-      const dep=r[C.Dependencia]||'';
-      const isEdecan=session.rol==='edecan';
-      const canDelete=isAdmin||(isEdecan&&(!session.dependencia||dep===session.dependencia));
-      const contactado=contactados[qid]||'PENDIENTE';
-      const cColor=contactado==='SI'?'var(--mint)':contactado==='NO'?'var(--err)':'var(--warn)';
-      const sel=_seleccionados.has(qid);
-      const tr=document.createElement('tr');
-      tr.setAttribute('data-qrid',qid);
-      if(sel) tr.style.background='rgba(255,215,0,.07)';
-      // "Completo" visual: Titular/Padrino → 5 eventos; Acompañante → 3 (ingreso+entrega+fiesta)
-      const isAcompTipo=esAcompananteRow(r);
-      const esCompleto=isAcompTipo
-        ?(hasI&&hasE&&hasF)
-        :(hasI&&hasE&&hasF&&hasS&&hasA);
-      if(esCompleto) tr.className='attended';
-      tr.innerHTML=`
-        ${canMultiSelect?`<!-- FIX 2: Checkbox de selección por fila -->
-        <td style="text-align:center;padding:6px 8px">
-          <input type="checkbox" class="chk-part-row" data-qrid="${e(qid)}"
-            ${sel?'checked':''} onchange="onRowCheckChange(this)"
-            style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer">
-        </td>`:''}
-        <td><span style="font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--text);letter-spacing:.5px">${e(r[C.Registro]||'—')}</span></td>
-        <td><span class="pname">${e(r[C.Nombre]||'—')}</span>${esPadrinoRow(r)?'<span class="bdg bdg-p" style="font-size:9px;margin-left:4px">Padrino</span>':''}</td>
-        <td><span class="bdg ${tipoInfo.cls}">${e(tipoInfo.label)}</span></td>
-        <td style="color:var(--muted);font-size:12px">${e(dep||'—')}</td>
-        <td style="font-size:13px">${e(disc)}</td>
-        <td style="font-size:13px;color:var(--text)">${e(r[C.Comida]||'—')}</td>
-        <td style="font-size:13px;color:var(--text)">${e(r[C.Bebida]||'—')}</td>
-        <td><span class="bdg ${hasI?'bdg-chk':'bdg-no'}">${hasI?'✓ '+formatHora(checkins[qid].ingreso):'Pendiente'}</span></td>
-        <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
-        <td>${isAcompTipo?'<span style="color:var(--muted);font-size:11px">N/A</span>':`<span class="bdg ${hasS?'bdg-chk':'bdg-no'}">${hasS?'✓ '+formatHora(checkins[qid].souvenir):'Pendiente'}</span>`}</td>
-        <td>${isAcompTipo?'<span style="color:var(--muted);font-size:11px">N/A</span>':`<span class="bdg ${hasA?'bdg-chk':'bdg-no'}">${hasA?'✓ '+formatHora(checkins[qid].aperitivo):'Pendiente'}</span>`}</td>
-        <td><span class="bdg ${hasF?'bdg-chk':'bdg-no'}">${hasF?'✓ '+formatHora(checkins[qid].fiesta):'Pendiente'}</span></td>
-        <td>
-          <!-- FIX 3: data-qrid para actualización sin re-render; onchange ahora llama a saveContactadoServer -->
-          <select data-qrid="${e(qid)}"
-            style="background:var(--s2);border:1px solid var(--border2);border-radius:3px;padding:4px 6px;color:${cColor};font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;min-height:32px"
-            onchange="setContactado('${e(qid)}',this.value)">
-            <option value="PENDIENTE"${contactado==='PENDIENTE'?' selected':''}>⏳ Pend.</option>
-            <option value="SI"${contactado==='SI'?' selected':''}>✅ Sí</option>
-            <option value="NO"${contactado==='NO'?' selected':''}>❌ No</option>
-          </select>
-        </td>
-        <td style="white-space:nowrap">
-          ${qid?`<button class="btn btn-ghost btn-sm" onclick="showQR('${e(qid)}','${e(r[C.Nombre]||'')}','${e(r[C.Comida]||'')}','${e(r[C.Bebida]||'')}','${e(r[C.TipoPersona]||'')}','${e(r[C.Dependencia]||'')}','${e(r[C.Tipo]||'')}','${e(r[C.Disciplina]||'')}')">🔲 QR</button>`:'<span style="color:var(--muted);font-size:11px">Sin QR</span>'}
-          ${(isAdmin||(isEdecan&&(!session.dependencia||dep===session.dependencia)))?`<button class="btn btn-blue btn-sm" onclick="openEditModal('${e(qid)}')">✏️</button>`:''}
-          ${canDelete?`<button class="btn btn-danger btn-sm" onclick="deleteRegistro('${e(qid)}','${e(r[C.Nombre]||'')}','${e(dep)}')">🗑</button>`:''}
-        </td>`;
-      frag.appendChild(tr);
-    });
-  }
-  tbody.appendChild(frag);
+  document.getElementById('part-inner').innerHTML = toolbarHtml;
+  _setPartFilterUI();
+  const rows = _computePartRows();
+  _renderPartTbody(rows);
+  _updatePartResultsBar(rows);
 }
 function formatHora(str){
   if(!str) return '';const parts=String(str).split(' ');return parts[1]||parts[0]||'';
@@ -3527,49 +3818,8 @@ function exportParticipantesExcel(){
     showToast('⚠️ Descarga Excel no disponible en móvil. Usa un computador.');
     return;
   }
-  // Get current filtered rows from allRows using current filter/search
-  let rows=[];
-  const isAdmin=session.rol==='administrador';
-  if(currentSearch){
-    const searchLower=currentSearch.toLowerCase();
-    if(isAdmin){
-      rows=allRows.filter(r=>{
-        return (r[C.Registro]||'').toLowerCase().includes(searchLower)||
-               (r[C.Nombre]||'').toLowerCase().includes(searchLower)||
-               (r[C.Tipo]||'').toLowerCase().includes(searchLower)||
-               (r[C.Dependencia]||'').toLowerCase().includes(searchLower)||
-               (r[C.Disciplina]||'').toLowerCase().includes(searchLower)||
-               getTipoDisplay(r).label.toLowerCase().includes(searchLower);
-      });
-    } else {
-      const matched=allRows.filter(r=>(r[C.Registro]||'').toLowerCase().includes(searchLower));
-      const seen=new Set();
-      matched.forEach(r=>{
-        const cel=r[C.Celular]||'';const key=cel||r[C.QR_ID]||'';
-        if(!seen.has(key)){seen.add(key);
-          if(cel){
-            const titular=allRows.find(x=>(x[C.Celular]||'')===cel&&x[C.TipoPersona]==='Titular'&&!esPadrinoRow(x)&&!esAcompananteRow(x));
-            if(titular) rows.push(titular);
-            allRows.filter(x=>(x[C.Celular]||'')===cel&&esPadrinoRow(x)).forEach(x=>rows.push(x));
-            allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)).forEach(x=>rows.push(x));
-          } else { rows.push(r); }
-        }
-      });
-    }
-  } else {
-    rows=allRows.filter(r=>{
-      const qid=r[C.QR_ID]||'';
-      const hasIngreso=checkins[qid]&&checkins[qid].ingreso,hasEntrega=checkins[qid]&&checkins[qid].entrega;
-      const isPadrino=esPadrinoRow(r);const isAcomp=esAcompananteRow(r);
-      const isTitular=r[C.TipoPersona]==='Titular'&&!isPadrino&&!isAcomp;
-      return currentFilter==='todos'||
-        (currentFilter==='titulares'&&isTitular)||
-        (currentFilter==='acompanantes'&&isAcomp)||
-        (currentFilter==='padrinos'&&isPadrino)||
-        (currentFilter==='ingreso'&&hasIngreso)||(currentFilter==='entrega'&&hasEntrega)||
-        (currentFilter==='pendientes'&&!hasIngreso&&!hasEntrega);
-    });
-  }
+  // Reutiliza el mismo motor de filtrado del nuevo sistema
+  const rows = _computePartRows();
   // Build CSV
   const headers=['Registro','Nombre','Tipo','Dependencia','Celular','Tipo Participacion','Disciplina','Comida','Bebida','Ingreso','Entrega','Observaciones','QR_ID'];
   const csvRows=[headers.join(',')];
