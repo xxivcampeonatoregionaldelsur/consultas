@@ -309,6 +309,7 @@ select.filter:focus{border-color:var(--gold)}
 .tbl-wrap{
   background:var(--s1);border:1px solid var(--border);
   border-radius:var(--r);overflow:auto;
+  max-height:70vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
 }
 table{width:100%;border-collapse:collapse;min-width:700px}
 thead tr{background:var(--field);border-bottom:2px solid var(--gold);}
@@ -538,6 +539,10 @@ tr:not(.attended):hover td{background:rgba(255,215,0,.02)}
   padding:44px;text-align:center;color:var(--muted);
   font-family:var(--font-h);font-size:13px;letter-spacing:2px;text-transform:uppercase;
 }
+
+/* ── PARTICIPANTES — scroll fix ──────────────────────────────── */
+#pane-participantes{overflow:visible;}
+#part-inner .tbl-wrap{max-height:65vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 
 /* ── SECTION TITLE ───────────────────────────────────────────── */
 .sec-title{
@@ -1752,29 +1757,32 @@ function renderDashboard(){
   // ── Determinar última operación desde checkins ────────────────
   let lastOpHtml='';
   if(isAdmin){
-    // Buscar el checkin más reciente
-    let latestOp=null, latestTime=0;
+    // Buscar el checkin más reciente entre TODOS los tipos de evento
+    // Prioridad de desempate (misma hora): Ingreso > Souvenir > Entrega > Fiesta > Aperitivo
+    // En la práctica cada uno tiene su propio timestamp, así que comparamos por string de hora.
+    const EVENTOS=[
+      {campo:'ingreso',  tipo:'INGRESO',  color:'var(--mint)',  icon:'🎫'},
+      {campo:'souvenir', tipo:'SOUVENIR', color:'var(--gold)',  icon:'🎁'},
+      {campo:'entrega',  tipo:'ENTREGA',  color:'var(--gold2)', icon:'🍽️'},
+      {campo:'fiesta',   tipo:'FIESTA',   color:'#60a5fa',      icon:'🎉'},
+      {campo:'aperitivo',tipo:'APERITIVO',color:'#ff6b6b',      icon:'🍢'},
+    ];
+    let latestOp=null;
     Object.entries(checkins).forEach(([qrid,ck])=>{
-      const row=allRows.find(r=>r[C.QR_ID]===qrid);
+      const row=allRows.find(r=>(r[C.QR_ID]||'').trim()===qrid);
       const nom=row?row[C.Nombre]:'Participante';
-      if(ck.ingreso){
-        // Parse time from ingreso string
-        const t=new Date().getTime(); // fallback
-        if(!latestOp||true){// just show last captured
-          if(ck.ingreso&&(!latestOp||ck.ingreso>latestOp.hora)){
-            latestOp={nombre:nom,tipo:'INGRESO',hora:ck.ingreso,color:'var(--mint)',icon:'🎫'};
+      EVENTOS.forEach(ev=>{
+        if(isCheckedIn(ck[ev.campo])){
+          const hora=String(ck[ev.campo]);
+          if(!latestOp||hora>latestOp.hora){
+            latestOp={nombre:nom,tipo:ev.tipo,hora,color:ev.color,icon:ev.icon};
           }
         }
-      }
-      if(ck.entrega){
-        if(!latestOp||ck.entrega>latestOp.hora){
-          latestOp={nombre:nom,tipo:'ENTREGA',hora:ck.entrega,color:'var(--gold)',icon:'🍽️'};
-        }
-      }
+      });
     });
 
-    // Usar lastOperation global si más reciente
-    const op=lastOperation||latestOp;
+    // Usar lastOperation global si más reciente (registro local en tiempo real)
+    const op=lastOperation&&(!latestOp||lastOperation.hora>latestOp.hora)?lastOperation:latestOp;
     lastOpHtml=`<div class="last-op-card">
       <div class="last-op-pulse"></div>
       <div class="last-op-info">
@@ -1823,12 +1831,15 @@ function renderDashboard(){
 
     // ── FLUJO DE ESTADOS ──────────────────────────────────────────
     const sinIngreso=total-countIngresos;
-    // Completos = ingresaron + entrega + souvenir + aperitivo (titulares); acompañantes solo necesitan ingreso+entrega
+    // Completo según tipo:
+    //   Titular/Padrino → Ingreso + Entrega + Souvenir + Aperitivo + Fiesta (5 eventos)
+    //   Acompañante     → Ingreso + Entrega + Fiesta (3 eventos)
     const completados=allRows.filter(r=>{
-      const q=r[C.QR_ID];const ck=checkins[q]||{};
-      const esTitular=(r[C.TipoPersona]||'')!=='Acompañante';
-      if(!ck.ingreso||!ck.entrega) return false;
-      if(esTitular&&(!ck.souvenir||!ck.aperitivo)) return false;
+      const q=(r[C.QR_ID]||'').trim();
+      const ck=checkins[q]||{};
+      const esAcomp=esAcompananteRow(r);
+      if(!isCheckedIn(ck.ingreso)||!isCheckedIn(ck.entrega)||!isCheckedIn(ck.fiesta)) return false;
+      if(!esAcomp&&(!isCheckedIn(ck.souvenir)||!isCheckedIn(ck.aperitivo))) return false;
       return true;
     }).length;
     const enProceso=countIngresos-completados;
@@ -2104,12 +2115,13 @@ function renderDepsDashboard(){
       <div class="stat m"><div class="stat-lbl">Entregas</div><div class="stat-val">${totalEnt}</div><div class="stat-icon">🍽️</div></div>
       <div class="stat c"><div class="stat-lbl">Souvenir</div><div class="stat-val">${totalSou}<span style="font-size:11px;color:var(--muted)">/${grandTotSou}</span></div><div class="stat-icon">🎁</div></div>
       <div class="stat" style="background:rgba(255,70,85,.10);border-color:rgba(255,70,85,.22)"><div class="stat-lbl">Aperitivo</div><div class="stat-val">${totalApr}<span style="font-size:11px;color:var(--muted)">/${grandTotApr}</span></div><div class="stat-icon">🥂</div></div>
+      <div class="stat l"><div class="stat-lbl">Fiesta</div><div class="stat-val">${totalFie}</div><div class="stat-icon">🎉</div></div>
     </div>
     <div class="deps-card">
       <div class="tbl-wrap">
         <table style="min-width:760px">
           <thead><tr>
-            <th>Dependencia</th><th style="text-align:center">Total</th><th style="text-align:center">Pendientes</th><th style="min-width:180px">Avance (Ingreso · Entrega · Souvenir · Aperitivo)</th><th>Proporción</th><th>Comidas</th>
+            <th>Dependencia</th><th style="text-align:center">Total</th><th style="text-align:center">Pendientes</th><th style="min-width:180px">Avance (Ingreso · Entrega · Souvenir · Aperitivo · Fiesta)</th><th>Proporción</th><th>Comidas</th>
           </tr></thead>
           <tbody>${rows||'<tr><td colspan="6"><div class="empty">Sin datos</div></td></tr>'}</tbody>
         </table>
@@ -2275,9 +2287,9 @@ function renderParticipants(s,f){
     frag.appendChild(tr);
   } else {
     rows.forEach(r=>{
-      const qid=r[C.QR_ID]||'',hasI=checkins[qid]&&checkins[qid].ingreso,hasE=checkins[qid]&&checkins[qid].entrega;
-      const hasS=checkins[qid]&&checkins[qid].souvenir,hasA=checkins[qid]&&checkins[qid].aperitivo;
-      const hasF=checkins[qid]&&checkins[qid].fiesta;
+      const qid=r[C.QR_ID]||'',hasI=checkins[qid]&&isCheckedIn(checkins[qid].ingreso),hasE=checkins[qid]&&isCheckedIn(checkins[qid].entrega);
+      const hasS=checkins[qid]&&isCheckedIn(checkins[qid].souvenir),hasA=checkins[qid]&&isCheckedIn(checkins[qid].aperitivo);
+      const hasF=checkins[qid]&&isCheckedIn(checkins[qid].fiesta);
       const padrino=r[C.Padrino]||'';
       const isPadrino=esPadrinoRow(r);
       const tipoInfo=getTipoDisplay(r);
@@ -2288,12 +2300,15 @@ function renderParticipants(s,f){
       const contactado=contactados[qid]||'PENDIENTE';
       const cColor=contactado==='SI'?'var(--mint)':contactado==='NO'?'var(--err)':'var(--warn)';
       const sel=_seleccionados.has(qid);
-      // Solo titulares (no acompañantes) reciben souvenir y aperitivo
-      const isAcompTipo=esAcompananteRow(r);
       const tr=document.createElement('tr');
       tr.setAttribute('data-qrid',qid);
-      if(hasI&&hasE) tr.className='attended';
       if(sel) tr.style.background='rgba(255,215,0,.07)';
+      // "Completo" visual: Titular/Padrino → 5 eventos; Acompañante → 3 (ingreso+entrega+fiesta)
+      const isAcompTipo=esAcompananteRow(r);
+      const esCompleto=isAcompTipo
+        ?(hasI&&hasE&&hasF)
+        :(hasI&&hasE&&hasF&&hasS&&hasA);
+      if(esCompleto) tr.className='attended';
       tr.innerHTML=`
         ${canMultiSelect?`<!-- FIX 2: Checkbox de selección por fila -->
         <td style="text-align:center;padding:6px 8px">
@@ -3803,6 +3818,7 @@ function renderUsersRows(users){
 //  MENSAJERÍA
 // ══════════════════════════════════════════════════════════════
 const PLANTILLAS_MSG={
+  pedido_wa:{label:'📦 Pedido (WhatsApp)',tpl:'__PEDIDO_WA__'},
   bienvenida:{label:'🎉 Bienvenida con QR',
     tpl:`Hola {{primer_nombre}} 😊\nMi nombre es {{edecan}}, edecán de la dependencia {{dependencia}}, y estaré acompañándote durante el evento.\n\nTe comparto el detalle de tu registro para el evento del 28.06.2026:\n\n👤 Participante titular: {{nombreCompleto}}\n📍 Plato elegido: {{comida}}\n 🥤Bebida elegida: {{bebida}}\n{{lista_acompanantes}}\nPor favor, conserva {{plural_qr}} ya que {{plural_necesario}} para tu ingreso y recepción de almuerzo.\n\nSi tienes alguna consulta, cambio o necesitas apoyo con algún detalle, puedes escribirme. 🙌`},
   confirmacion:{label:'✅ Confirmación de asistencia',
@@ -4715,7 +4731,7 @@ function renderMensajeria(){
   // ── Construir HTML del panel de mensajería ────────────────────
   // Seleccionar "libre" por defecto para que el textarea quede disponible de inmediato
   const plantOpts = Object.entries(PLANTILLAS_MSG).map(([k,v]) =>
-    `<option value="${k}"${k==='libre'?' selected':''}>${v.label}</option>`
+    `<option value="${k}"${k==='pedido_wa'?' selected':''}>${v.label}</option>`
   ).join('');
 
   document.getElementById('mensajeria-inner').innerHTML = `
@@ -5143,8 +5159,48 @@ function aplicarPlantilla(){
   const ta = document.getElementById('msg-texto');
   if(!ta) return;
 
-  const tipo = document.getElementById('msg-tipo')?.value || 'libre';
+  const tipo = document.getElementById('msg-tipo')?.value || 'pedido_wa';
   const pl = PLANTILLAS_MSG[tipo];
+
+  // ── Plantilla especial: Pedido WhatsApp ──────────────────────
+  if(tipo === 'pedido_wa'){
+    if(!msgQrid){
+      ta.value = '';
+      ta.placeholder = 'Selecciona un titular para generar el mensaje de pedido...';
+      return;
+    }
+    const r = allRows.find(x => x[C.QR_ID] === msgQrid);
+    if(!r){ ta.value = ''; return; }
+
+    const nombreCompleto = (r[C.Nombre]||'').trim();
+    const primerNom = _capitalizarPrimero(nombreCompleto.split(/\s+/)[0]||'');
+    const comida = (r[C.Comida]||'').trim();
+    const bebida = (r[C.Bebida]||'').trim();
+    const cel = r[C.Celular]||'';
+    const acomps = cel ? allRows.filter(x=>(x[C.Celular]||'')===cel&&esAcompananteRow(x)) : [];
+
+    // Construir sección pedido titular
+    const hayPedidoTitular = comida && comida!=='—' && bebida && bebida!=='—';
+    let seccionPedido = '';
+    if(hayPedidoTitular){
+      seccionPedido += `🍽️ ${nombreCompleto}: ${comida} · 🥤 ${bebida}`;
+      if(acomps.length > 0){
+        acomps.forEach((ac, i)=>{
+          const acNom = (ac[C.Nombre]||'—').trim();
+          const acCom = (ac[C.Comida]||'—').trim();
+          const acBeb = (ac[C.Bebida]||'—').trim();
+          seccionPedido += `\n🍽️ ${acNom}: ${acCom} · 🥤 ${acBeb}`;
+        });
+      }
+      seccionPedido = '\n\nPedido realizado:\n' + seccionPedido + '\n';
+    }
+
+    ta.value =
+`Hola, ${primerNom},
+¡Bienvenido al Campeonato Regional del SUR, te dejo el pedido realizado:${seccionPedido}
+¡Te esperamos!`;
+    return;
+  }
 
   // Sin titular seleccionado
   if(!msgQrid){
