@@ -1406,6 +1406,11 @@ html{scroll-behavior:smooth}
         <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🍢 Aperitivo</div>
         <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-aperitivo-val">—</div>
       </div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div style="flex:1;text-align:center;border-radius:4px;padding:8px 6px;" id="qr-status-fiesta">
+        <div style="font-family:var(--font-h);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">🎉 Fiesta</div>
+        <div style="font-family:var(--font-h);font-size:12px;font-weight:700" id="qr-status-fiesta-val">—</div>
+      </div>
     </div>
     <div style="padding:6px 20px 2px;text-align:center">
       <span style="font-family:var(--font-h);font-size:10px;color:var(--muted);letter-spacing:1px">♻️ QR REUTILIZABLE · válido para ingreso y comida</span>
@@ -1689,6 +1694,7 @@ function renderDashboard(){
   const countEntregas=Object.values(checkins).filter(c=>c.entrega).length;
   const countSouvenirs=Object.values(checkins).filter(c=>c.souvenir).length;
   const countAperitivos=Object.values(checkins).filter(c=>c.aperitivo).length;
+  const countFiestas=Object.values(checkins).filter(c=>c.fiesta).length;
   const total=allRows.length;
 
   // Disciplinas: split por coma para contar individualmente
@@ -1898,6 +1904,7 @@ function renderDashboard(){
       <div class="stat g"><div class="stat-lbl">Entregas</div><div class="stat-val">${countEntregas}</div><div class="stat-icon">🍽️</div></div>
       <div class="stat m"><div class="stat-lbl">Souvenirs</div><div class="stat-val">${countSouvenirs}</div><div class="stat-icon">🎁</div></div>
       <div class="stat c"><div class="stat-lbl">Aperitivos</div><div class="stat-val">${countAperitivos}</div><div class="stat-icon">🍢</div></div>
+      <div class="stat l"><div class="stat-lbl">Fiesta</div><div class="stat-val">${countFiestas}</div><div class="stat-icon">🎉</div></div>
     </div>
     <div class="charts">
       <div class="card"><div class="card-title">🍽️ Platos solicitados</div>${bars(comidas,'bf-gold',maxC)}</div>
@@ -1940,7 +1947,7 @@ function renderDepsDashboard(){
 
   // Compute per-dep: ingresos, entregas, souvenir, aperitivo, comidas, bebidas breakdown
   // souvenir y aperitivo solo aplican a Titular y Padrino (no Invitado/Acompañante)
-  const ingByDep={},entByDep={},souByDep={},aprByDep={};
+  const ingByDep={},entByDep={},souByDep={},aprByDep={},fieByDep={};
   const totalIngDep={},totalEntDep={},totalSouDep={},totalAprDep={};
   const comByDep={},bebByDepDash={};
   allRows.forEach(r=>{
@@ -1953,6 +1960,7 @@ function renderDepsDashboard(){
     if(!entByDep[dep]) entByDep[dep]=0;
     if(!souByDep[dep]) souByDep[dep]=0;
     if(!aprByDep[dep]) aprByDep[dep]=0;
+    if(!fieByDep[dep]) fieByDep[dep]=0;
     if(!totalIngDep[dep]) totalIngDep[dep]=0;
     if(!totalEntDep[dep]) totalEntDep[dep]=0;
     if(!totalSouDep[dep]) totalSouDep[dep]=0;
@@ -1976,6 +1984,7 @@ function renderDepsDashboard(){
       if(isCheckedIn(ck.souvenir)) souByDep[dep]++;
       if(isCheckedIn(ck.aperitivo)) aprByDep[dep]++;
     }
+    if(isCheckedIn(ck.fiesta)) fieByDep[dep]++;
     if(com&&com!=='—') comByDep[dep][com]=(comByDep[dep][com]||0)+1;
     if(beb&&beb!=='—') bebByDepDash[dep][beb]=(bebByDepDash[dep][beb]||0)+1;
   });
@@ -1987,6 +1996,7 @@ function renderDepsDashboard(){
     const ent=entByDep[dep]||0;
     const sou=souByDep[dep]||0;
     const apr=aprByDep[dep]||0;
+    const fie=fieByDep[dep]||0;
     const totIng=totalIngDep[dep]||cnt;
     const totEnt=totalEntDep[dep]||cnt;
     const totSou=totalSouDep[dep]||0;
@@ -2043,6 +2053,7 @@ function renderDepsDashboard(){
         ${miniBar(ent,totEnt,'bf-mint','Entrega comida')}
         ${souLabel}
         ${aprLabel}
+        ${miniBar(fie,cnt,'bf-lav','Fiesta')}
       </td>
       <td style="min-width:160px">
         <div class="bar-track" style="height:18px">
@@ -2057,6 +2068,7 @@ function renderDepsDashboard(){
   const totalEnt=Object.values(entByDep).reduce((a,b)=>a+b,0);
   const totalSou=Object.values(souByDep).reduce((a,b)=>a+b,0);
   const totalApr=Object.values(aprByDep).reduce((a,b)=>a+b,0);
+  const totalFie=Object.values(fieByDep).reduce((a,b)=>a+b,0);
   const grandTotSou=Object.values(totalSouDep).reduce((a,b)=>a+b,0);
   const grandTotApr=Object.values(totalAprDep).reduce((a,b)=>a+b,0);
 
@@ -2238,7 +2250,7 @@ function renderParticipants(s,f){
         <thead><tr>
           ${canMultiSelect?`<th style="width:34px;text-align:center"><input type="checkbox" id="chk-all-part" title="Seleccionar todos" onchange="toggleSeleccionTodos(this.checked)" style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer"></th>`:''}
           <th>Reg.</th><th>Nombre</th><th>Tipo</th><th>Dependencia</th><th>Disciplina</th><th>Comida</th><th>Bebida</th>
-          <th>Ingreso</th><th>Entrega</th><th>Souvenir</th><th>Aperitivo</th><th>Contactado</th><th>Acciones</th>
+          <th>Ingreso</th><th>Entrega</th><th>Souvenir</th><th>Aperitivo</th><th>Fiesta</th><th>Contactado</th><th>Acciones</th>
         </tr></thead>
         <tbody id="part-tbody"></tbody>
       </table>
@@ -2259,12 +2271,13 @@ function renderParticipants(s,f){
 
   if(!rows.length){
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td colspan="${canMultiSelect?14:13}"><div class="empty">Sin resultados</div></td>`;
+    tr.innerHTML=`<td colspan="${canMultiSelect?15:14}"><div class="empty">Sin resultados</div></td>`;
     frag.appendChild(tr);
   } else {
     rows.forEach(r=>{
       const qid=r[C.QR_ID]||'',hasI=checkins[qid]&&checkins[qid].ingreso,hasE=checkins[qid]&&checkins[qid].entrega;
       const hasS=checkins[qid]&&checkins[qid].souvenir,hasA=checkins[qid]&&checkins[qid].aperitivo;
+      const hasF=checkins[qid]&&checkins[qid].fiesta;
       const padrino=r[C.Padrino]||'';
       const isPadrino=esPadrinoRow(r);
       const tipoInfo=getTipoDisplay(r);
@@ -2299,6 +2312,7 @@ function renderParticipants(s,f){
         <td><span class="bdg ${hasE?'bdg-chk':'bdg-no'}">${hasE?'✓ '+formatHora(checkins[qid].entrega):'Pendiente'}</span></td>
         <td>${isAcompTipo?'<span style="color:var(--muted);font-size:11px">N/A</span>':`<span class="bdg ${hasS?'bdg-chk':'bdg-no'}">${hasS?'✓ '+formatHora(checkins[qid].souvenir):'Pendiente'}</span>`}</td>
         <td>${isAcompTipo?'<span style="color:var(--muted);font-size:11px">N/A</span>':`<span class="bdg ${hasA?'bdg-chk':'bdg-no'}">${hasA?'✓ '+formatHora(checkins[qid].aperitivo):'Pendiente'}</span>`}</td>
+        <td><span class="bdg ${hasF?'bdg-chk':'bdg-no'}">${hasF?'✓ '+formatHora(checkins[qid].fiesta):'Pendiente'}</span></td>
         <td>
           <!-- FIX 3: data-qrid para actualización sin re-render; onchange ahora llama a saveContactadoServer -->
           <select data-qrid="${e(qid)}"
@@ -2391,14 +2405,17 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
   const hasEntrega=!!(qrCheckins.entrega);
   const hasSouvenir=!!(qrCheckins.souvenir);
   const hasAperitivo=!!(qrCheckins.aperitivo);
+  const hasFiesta=!!(qrCheckins.fiesta);
   const ingresoEl=document.getElementById('qr-status-ingreso-val');
   const entregaEl=document.getElementById('qr-status-entrega-val');
   const souvenirEl=document.getElementById('qr-status-souvenir-val');
   const aperitivoEl=document.getElementById('qr-status-aperitivo-val');
+  const fiestaEl=document.getElementById('qr-status-fiesta-val');
   const ingresoBox=document.getElementById('qr-status-ingreso');
   const entregaBox=document.getElementById('qr-status-entrega');
   const souvenirBox=document.getElementById('qr-status-souvenir');
   const aperitivoBox=document.getElementById('qr-status-aperitivo');
+  const fiestaBox=document.getElementById('qr-status-fiesta');
   if(ingresoEl){
     ingresoEl.textContent=hasIngreso?('✓ '+formatHora(qrCheckins.ingreso)):'Pendiente';
     ingresoEl.style.color=hasIngreso?'var(--mint)':'var(--muted)';
@@ -2410,6 +2427,7 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
     if(entregaBox) entregaBox.style.background=hasEntrega?'rgba(0,230,118,.07)':'transparent';
   }
   // Souvenir y aperitivo solo aplican a Titulares (no Acompañantes)
+  // Fiesta aplica a titulares Y acompañantes (igual que ingreso)
   const esAcompQR = tipo === 'Acompañante';
   if(souvenirEl){
     souvenirEl.textContent=esAcompQR?'N/A':hasSouvenir?('✓ '+formatHora(qrCheckins.souvenir)):'Pendiente';
@@ -2420,6 +2438,11 @@ function showQR(qrid, nombre, comida, bebida, tipo, dependencia, padrino, disc){
     aperitivoEl.textContent=esAcompQR?'N/A':hasAperitivo?('✓ '+formatHora(qrCheckins.aperitivo)):'Pendiente';
     aperitivoEl.style.color=esAcompQR?'var(--muted)':hasAperitivo?'var(--mint)':'var(--muted)';
     if(aperitivoBox) aperitivoBox.style.background=hasAperitivo&&!esAcompQR?'rgba(0,230,118,.07)':'transparent';
+  }
+  if(fiestaEl){
+    fiestaEl.textContent=hasFiesta?('✓ '+formatHora(qrCheckins.fiesta)):'Pendiente';
+    fiestaEl.style.color=hasFiesta?'var(--mint)':'var(--muted)';
+    if(fiestaBox) fiestaBox.style.background=hasFiesta?'rgba(0,230,118,.07)':'transparent';
   }
 
   // FIX: Botón compartir eliminado — no se usa navigator.share en ningún punto
